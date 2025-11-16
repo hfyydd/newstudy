@@ -559,12 +559,37 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final response = await _agentService.runSimpleExplainer(term);
-      final suggestion = response.reply.trim();
+      final replyText = response.reply.trim();
+      
+      // 尝试解析JSON格式的返回结果
+      String explanationText = replyText;
+      try {
+        final jsonCandidate = _extractJsonBlock(replyText);
+        if (jsonCandidate != null) {
+          final decoded = jsonDecode(jsonCandidate);
+          if (decoded is Map<String, dynamic>) {
+            final explanations = decoded['explanations'];
+            if (explanations is List && explanations.isNotEmpty) {
+              final firstExplanation = explanations[0];
+              if (firstExplanation is Map<String, dynamic>) {
+                final simpleExplanation = firstExplanation['simple_explanation'];
+                if (simpleExplanation is String && simpleExplanation.isNotEmpty) {
+                  explanationText = simpleExplanation;
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // JSON解析失败，使用原始回复
+        debugPrint('[HomePage] Failed to parse explanation JSON: $e');
+      }
+      
       if (mounted) {
         setState(() {
           _inputMode = _InputMode.text;
         });
-        _textInputController.text = suggestion;
+        _textInputController.text = explanationText;
       }
     } catch (error) {
       if (mounted) {
