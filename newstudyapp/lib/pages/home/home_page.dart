@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/pages/home/home_state.dart';
-import 'package:newstudyapp/services/agent_service.dart';
 import 'package:newstudyapp/config/app_config.dart';
 import 'dart:math' as math;
 
@@ -12,19 +11,7 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 初始化或获取 Controller
-    final controller = Get.isRegistered<HomeController>(tag: 'home')
-        ? Get.find<HomeController>(tag: 'home')
-        : Get.put(
-            HomeController(),
-            tag: 'home',
-          );
-    
-    // 使用全局配置初始化 baseUrl
-    if (controller.backendBaseUrl.value.isEmpty) {
-      controller.backendBaseUrl.value = AppConfig.backendBaseUrl;
-      controller.agentService = AgentService(baseUrl: AppConfig.backendBaseUrl);
-      controller.loadTerms();
-    }
+    final controller = Get.put(HomeController(), tag: 'home');
 
     return Scaffold(
       appBar: AppBar(

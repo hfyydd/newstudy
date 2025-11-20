@@ -2,31 +2,22 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:newstudyapp/pages/home/home_state.dart';
-import 'package:newstudyapp/services/agent_service.dart';
+import 'package:newstudyapp/services/http_service.dart';
 
 class HomeController extends GetxController {
-  late final AgentService agentService;
+  // 使用 HttpService 单例
+  final httpService = HttpService();
   late final HomeState state;
-
-  final backendBaseUrl = ''.obs;
 
   @override
   void onInit() {
     super.onInit();
     state = HomeState();
-  }
-
-  void initializeWithBaseUrl(String baseUrl) {
-    if (baseUrl.isNotEmpty) {
-      backendBaseUrl.value = baseUrl;
-      agentService = AgentService(baseUrl: baseUrl);
-      loadTerms();
-    }
+    loadTerms();
   }
 
   @override
   void onClose() {
-    agentService.dispose();
     state.dispose();
     super.onClose();
   }
@@ -49,7 +40,7 @@ class HomeController extends GetxController {
     state.textInputController.clear();
 
     try {
-      final response = await agentService.fetchTerms(category: state.activeCategory.value);
+      final response = await httpService.fetchTerms(category: state.activeCategory.value);
       state.terms.value = List.of(response.terms);
       state.activeCategory.value = response.category;
       state.isLoading.value = false;
@@ -121,7 +112,7 @@ class HomeController extends GetxController {
     state.isExplaining.value = true;
 
     try {
-      final response = await agentService.runSimpleExplainer(term);
+      final response = await httpService.runSimpleExplainer(term);
       final replyText = response.reply.trim();
 
       String explanationText = replyText;
@@ -170,7 +161,7 @@ class HomeController extends GetxController {
 
     try {
       debugPrint('[HomeController] Submit text: "$trimmed"');
-      final response = await agentService.runCuriousStudent(trimmed);
+      final response = await httpService.runCuriousStudent(trimmed);
       debugPrint('[HomeController] Raw reply: ${response.reply}');
       final extraction = _extractTermsFromReply(
         reply: response.reply,
@@ -399,7 +390,7 @@ class HomeController extends GetxController {
     }
     state.isAppending.value = true;
     try {
-      final response = await agentService.fetchTerms(category: state.activeCategory.value);
+      final response = await httpService.fetchTerms(category: state.activeCategory.value);
       if (state.terms.value == null) {
         return;
       }
