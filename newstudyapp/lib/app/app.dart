@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:newstudyapp/config/api_config.dart';
-import 'package:newstudyapp/pages/home/home_page.dart';
+import 'package:get/get.dart';
+import 'package:newstudyapp/config/app_config.dart';
+import 'package:newstudyapp/routes/app_pages.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const title = '费曼学习法';
-    return MaterialApp(
-      title: title,
+    return GetMaterialApp(
+      title: AppConfig.appTitle,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.indigo,
@@ -18,10 +18,8 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      home: const HomePage(
-        title: title,
-        backendBaseUrl: apiBaseUrl,
-      ),
+      initialRoute: AppPages.INITIAL,
+      getPages: AppPages.routes,
     );
   }
 }

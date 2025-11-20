@@ -1,427 +1,371 @@
-import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:newstudyapp/pages/home/home_controller.dart';
+import 'package:newstudyapp/pages/home/home_state.dart';
+import 'package:newstudyapp/services/agent_service.dart';
+import 'package:newstudyapp/config/app_config.dart';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-import 'package:newstudyapp/services/agent_service.dart';
-
-class HomePage extends StatefulWidget {
-  const HomePage({
-    super.key,
-    required this.title,
-    required this.backendBaseUrl,
-  });
-
-  final String title;
-  final String backendBaseUrl;
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-enum _FloatingPhase { idle, flyingUp, flyingDown }
-
-enum _InputMode { voice, text }
-
-class _HomePageState extends State<HomePage> {
-  late final AgentService _agentService;
-
-  bool _isLoading = true;
-  List<String>? _terms;
-  String? _selectedTerm;
-  bool _isAppending = false;
-  String? _floatingTerm;
-  double? _floatingCardWidth;
-  double? _floatingCardHeight;
-  Alignment _floatingAlignment = Alignment.center;
-  double _floatingSizeFactor = 1.0;
-  bool _floatingAnimating = false;
-  _FloatingPhase _floatingPhase = _FloatingPhase.idle;
-  _InputMode _inputMode = _InputMode.voice;
-  bool _isExplaining = false;
-  bool _isSubmittingSuggestion = false;
-  final TextEditingController _textInputController = TextEditingController();
-  String _activeCategory = _defaultCategory;
-  String? _errorMessage;
-
-  static const String _defaultCategory = 'economics';
-  static const Alignment _floatingTargetAlignment = Alignment(-0.9, -0.9);
-  static const double _floatingTargetSizeFactor = 0.55;
-
-  @override
-  void initState() {
-    super.initState();
-    _agentService = AgentService(baseUrl: widget.backendBaseUrl);
-    _loadTerms();
-  }
-
-  @override
-  void dispose() {
-    _agentService.dispose();
-    _textInputController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadTerms() async {
-    setState(() {
-      _errorMessage = null;
-      _isLoading = true;
-      _terms = null;
-      _selectedTerm = null;
-      _isAppending = false;
-      _floatingTerm = null;
-      _floatingAnimating = false;
-      _floatingCardWidth = null;
-      _floatingCardHeight = null;
-      _floatingAlignment = Alignment.center;
-      _floatingSizeFactor = 1.0;
-      _floatingPhase = _FloatingPhase.idle;
-      _inputMode = _InputMode.voice;
-      _isSubmittingSuggestion = false;
-      _textInputController.clear();
-    });
-    try {
-      final response =
-          await _agentService.fetchTerms(category: _activeCategory);
-      setState(() {
-        _terms = List.of(response.terms);
-        _activeCategory = response.category;
-        _isLoading = false;
-      });
-    } catch (error) {
-      setState(() {
-        _errorMessage = '获取术语失败：$error';
-        _isLoading = false;
-      });
-    }
-  }
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // 初始化或获取 Controller
+    final controller = Get.isRegistered<HomeController>(tag: 'home')
+        ? Get.find<HomeController>(tag: 'home')
+        : Get.put(
+            HomeController(),
+            tag: 'home',
+          );
+    
+    // 使用全局配置初始化 baseUrl
+    if (controller.backendBaseUrl.value.isEmpty) {
+      controller.backendBaseUrl.value = AppConfig.backendBaseUrl;
+      controller.agentService = AgentService(baseUrl: AppConfig.backendBaseUrl);
+      controller.loadTerms();
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: const Text(AppConfig.appTitle),
         actions: [
-          IconButton(
-            onPressed: _isLoading ? null : _loadTerms,
+          Obx(() => IconButton(
+            onPressed: controller.state.isLoading.value ? null : controller.loadTerms,
             icon: const Icon(Icons.refresh),
             tooltip: '刷新',
-          ),
+          )),
         ],
       ),
-      body: _buildBody(theme),
+      body: _buildBody(context, controller),
     );
   }
 
-  Widget _buildConfirmedArea(ThemeData theme) {
-    final activeTerm = _floatingAnimating ? _floatingTerm : _selectedTerm;
-    final showSelection = activeTerm != null;
+  Widget _buildBody(BuildContext context, HomeController controller) {
+    return Obx(() {
+      final theme = Theme.of(context);
 
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-      child: showSelection
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      if (controller.state.isLoading.value) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (controller.state.errorMessage.value != null) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '已确认词汇',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    if (!_floatingAnimating && _selectedTerm != null)
-                      TextButton.icon(
-                        onPressed: _resumeSelection,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('重新选择'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 160,
-                  child: _floatingAnimating
-                      ? const SizedBox.shrink()
-                      : _SelectedTermCard(term: _selectedTerm!),
+                Icon(Icons.error_outline, color: theme.colorScheme.error),
+                const SizedBox(height: 12),
+                Text(
+                  controller.state.errorMessage.value!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(color: theme.colorScheme.error),
                 ),
                 const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: controller.loadTerms,
+                  child: const Text('重试'),
+                ),
               ],
-            )
-          : const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildInputArea(ThemeData theme) {
-    if (_selectedTerm == null) {
-      return const SizedBox.shrink();
-    }
-
-    final isVoice = _inputMode == _InputMode.voice;
-    final surfaceColor = theme.colorScheme.surfaceVariant;
-    final textPlaceholder =
-        _textInputController.text.isEmpty ? '输入新的词汇或备注' : 'AI 的解释（可继续编辑）';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '输入方式',
-          style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            ChoiceChip(
-              label: const Text('语音'),
-              avatar: const Icon(Icons.mic, size: 18),
-              selected: isVoice,
-              onSelected: (selected) {
-                if (selected && _inputMode != _InputMode.voice) {
-                  setState(() {
-                    _inputMode = _InputMode.voice;
-                    _textInputController.clear();
-                  });
-                }
-              },
             ),
-            ChoiceChip(
-              label: const Text('文本'),
-              avatar: const Icon(Icons.keyboard_alt_rounded, size: 18),
-              selected: !isVoice,
-              onSelected: (selected) {
-                if (selected && _inputMode != _InputMode.text) {
-                  setState(() {
-                    _inputMode = _InputMode.text;
-                  });
-                }
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 240),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: isVoice
-                ? _VoiceInputPanel(
-                    key: const ValueKey('voice-mode'),
-                    theme: theme,
-                    surfaceColor: surfaceColor,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('语音输入功能开发中'),
-                          duration: Duration(milliseconds: 1500),
-                        ),
-                      );
-                    },
-                  )
-                : _TextInputPanel(
-                    key: const ValueKey('text-mode'),
-                    theme: theme,
-                    surfaceColor: surfaceColor,
-                    controller: _textInputController,
-                    onSubmit: _handleTextSubmit,
-                    isSubmitting: _isSubmittingSuggestion,
-                    placeholder: textPlaceholder,
-                  ),
           ),
-        ),
-      ],
-    );
-  }
+        );
+      }
 
-  Widget _buildFloatingCard(ThemeData theme) {
-    final term = _floatingTerm;
-    if (term == null) {
-      return const SizedBox.shrink();
-    }
-
-    final baseWidth = _floatingCardWidth ?? 300;
-    final baseHeight = _floatingCardHeight ?? baseWidth * 1.45;
-
-    return AnimatedAlign(
-      alignment: _floatingAlignment,
-      duration: const Duration(milliseconds: 380),
-      curve: Curves.easeInOutCubic,
-      onEnd: _handleFloatingAnimationEnd,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeInOutCubic,
-        width: baseWidth * _floatingSizeFactor,
-        height: baseHeight * _floatingSizeFactor,
-        child: _TermCard(
-          term: term,
-          width: baseWidth * _floatingSizeFactor,
-          height: baseHeight * _floatingSizeFactor,
-          showHint: false,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody(ThemeData theme) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
+      Widget mainContent;
+      if (controller.state.terms.value == null || controller.state.terms.value!.isEmpty) {
+        mainContent = Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.error_outline, color: theme.colorScheme.error),
-              const SizedBox(height: 12),
+              _buildConfirmedArea(theme, controller),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        controller.state.selectedTerm.value != null ? '已确认当前词汇' : '暂无词汇',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      if (controller.state.selectedTerm.value == null)
+                        FilledButton.icon(
+                          onPressed: controller.loadTerms,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('重新获取词汇'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildInputArea(theme, controller),
+            ],
+          ),
+        );
+      } else {
+        final media = MediaQuery.of(context);
+        final cardWidth =
+            math.max(math.min(media.size.width * 0.85, 360.0), 260.0);
+        final cardHeight = cardWidth * 1.45;
+
+        mainContent = Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildConfirmedArea(theme, controller),
               Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge
-                    ?.copyWith(color: theme.colorScheme.error),
+                '类别：${controller.getCategoryDisplayName()}',
+                style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _loadTerms,
-                child: const Text('重试'),
+              Expanded(
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: (!controller.state.floatingAnimating.value && controller.state.selectedTerm.value == null)
+                        ? SizedBox(
+                            key: const ValueKey('card-stack'),
+                            width: cardWidth,
+                            height: cardHeight,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: _buildCardStack(
+                                theme,
+                                cardWidth,
+                                cardHeight,
+                                controller,
+                              ),
+                            ),
+                          )
+                        : (controller.state.selectedTerm.value != null
+                            ? _SelectionPlaceholder(theme: theme)
+                            : const SizedBox.shrink()),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildInputArea(theme, controller),
+            ],
+          ),
+        );
+      }
+
+      return Stack(
+        children: [
+          Positioned.fill(child: mainContent),
+          if (controller.state.floatingAnimating.value && controller.state.floatingTerm.value != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _buildFloatingCard(theme, controller),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildConfirmedArea(ThemeData theme, HomeController controller) {
+    return Obx(() {
+      final activeTerm = controller.state.floatingAnimating.value
+          ? controller.state.floatingTerm.value
+          : controller.state.selectedTerm.value;
+      final showSelection = activeTerm != null;
+
+      return AnimatedSize(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        child: showSelection
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '已确认词汇',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      if (!controller.state.floatingAnimating.value && controller.state.selectedTerm.value != null)
+                        TextButton.icon(
+                          onPressed: controller.resumeSelection,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('重新选择'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 160,
+                    child: controller.state.floatingAnimating.value
+                        ? const SizedBox.shrink()
+                        : _SelectedTermCard(term: controller.state.selectedTerm.value!),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              )
+            : const SizedBox.shrink(),
+      );
+    });
+  }
+
+  Widget _buildInputArea(ThemeData theme, HomeController controller) {
+    return Obx(() {
+      if (controller.state.selectedTerm.value == null) {
+        return const SizedBox.shrink();
+      }
+
+      final isVoice = controller.state.inputMode.value == InputMode.voice;
+      final surfaceColor = theme.colorScheme.surfaceVariant;
+      final textPlaceholder = controller.state.textInputController.text.isEmpty
+          ? '输入新的词汇或备注'
+          : 'AI 的解释（可继续编辑）';
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '输入方式',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('语音'),
+                avatar: const Icon(Icons.mic, size: 18),
+                selected: isVoice,
+                onSelected: (selected) {
+                  if (selected && controller.state.inputMode.value != InputMode.voice) {
+                    controller.state.inputMode.value = InputMode.voice;
+                    controller.state.textInputController.clear();
+                  }
+                },
+              ),
+              ChoiceChip(
+                label: const Text('文本'),
+                avatar: const Icon(Icons.keyboard_alt_rounded, size: 18),
+                selected: !isVoice,
+                onSelected: (selected) {
+                  if (selected && controller.state.inputMode.value != InputMode.text) {
+                    controller.state.inputMode.value = InputMode.text;
+                  }
+                },
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    Widget mainContent;
-    if (_terms == null || _terms!.isEmpty) {
-      mainContent = Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildConfirmedArea(theme),
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _selectedTerm != null ? '已确认当前词汇' : '暂无词汇',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
+          const SizedBox(height: 16),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 240),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: isVoice
+                  ? _VoiceInputPanel(
+                      key: const ValueKey('voice-mode'),
+                      theme: theme,
+                      surfaceColor: surfaceColor,
+                      onTap: () {
+                        Get.snackbar(
+                          '提示',
+                          '语音输入功能开发中',
+                          snackPosition: SnackPosition.BOTTOM,
+                          duration: const Duration(milliseconds: 1500),
+                        );
+                      },
+                    )
+                  : _TextInputPanel(
+                      key: const ValueKey('text-mode'),
+                      theme: theme,
+                      surfaceColor: surfaceColor,
+                      controller: controller.state.textInputController,
+                      onSubmit: controller.handleTextSubmit,
+                      isSubmitting: controller.state.isSubmittingSuggestion.value,
+                      placeholder: textPlaceholder,
                     ),
-                    const SizedBox(height: 16),
-                    if (_selectedTerm == null)
-                      FilledButton.icon(
-                        onPressed: _loadTerms,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('重新获取词汇'),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildInputArea(theme),
-          ],
-        ),
-      );
-    } else {
-      final media = MediaQuery.of(context);
-      final cardWidth =
-          math.max(math.min(media.size.width * 0.85, 360.0), 260.0);
-      final cardHeight = cardWidth * 1.45;
-
-      mainContent = Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildConfirmedArea(theme),
-            Text(
-              '类别：${_categoryDisplayName()}',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: (!_floatingAnimating && _selectedTerm == null)
-                      ? SizedBox(
-                          key: const ValueKey('card-stack'),
-                          width: cardWidth,
-                          height: cardHeight,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: _buildCardStack(
-                              theme,
-                              cardWidth,
-                              cardHeight,
-                            ),
-                          ),
-                        )
-                      : (_selectedTerm != null
-                          ? _SelectionPlaceholder(theme: theme)
-                          : const SizedBox.shrink()),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildInputArea(theme),
-          ],
-        ),
-      );
-    }
-
-    return Stack(
-      children: [
-        Positioned.fill(child: mainContent),
-        if (_floatingAnimating && _floatingTerm != null)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: _buildFloatingCard(theme),
             ),
           ),
-      ],
-    );
+        ],
+      );
+    });
+  }
+
+  Widget _buildFloatingCard(ThemeData theme, HomeController controller) {
+    return Obx(() {
+      final term = controller.state.floatingTerm.value;
+      if (term == null) {
+        return const SizedBox.shrink();
+      }
+
+      final baseWidth = controller.state.floatingCardWidth.value ?? 300;
+      final baseHeight = controller.state.floatingCardHeight.value ?? baseWidth * 1.45;
+
+      return AnimatedAlign(
+        alignment: controller.state.floatingAlignment.value,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeInOutCubic,
+        onEnd: controller.handleFloatingAnimationEnd,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeInOutCubic,
+          width: baseWidth * controller.state.floatingSizeFactor.value,
+          height: baseHeight * controller.state.floatingSizeFactor.value,
+          child: _TermCard(
+            term: term,
+            width: baseWidth * controller.state.floatingSizeFactor.value,
+            height: baseHeight * controller.state.floatingSizeFactor.value,
+            showHint: false,
+          ),
+        ),
+      );
+    });
   }
 
   List<Widget> _buildCardStack(
     ThemeData theme,
     double cardWidth,
     double cardHeight,
+    HomeController controller,
   ) {
     final widgets = <Widget>[];
-    final terms = _terms!;
+    final terms = controller.state.terms.value ?? [];
     final visibleCount = math.min(terms.length, 3);
     const animationDuration = Duration(milliseconds: 260);
     const animationCurve = Curves.easeOutCubic;
 
+    // 倒序遍历：从后往前，先添加底层卡片，再添加顶层卡片
+    // 这样Stack中最后添加的terms[0]就会显示在最上面
     for (var index = visibleCount - 1; index >= 0; index--) {
       final term = terms[index];
+      // index越小，layer值越小，verticalOffset越小（越靠上）
       final layer = index;
       final verticalOffset = layer * 20.0;
       final scale = 1.0 - layer * 0.05;
+      // terms[0]是最顶层卡片，可交互
+      final isTop = index == 0;
 
       final cardSurface = _buildCardSurface(
         term,
         theme,
         cardWidth: cardWidth,
         cardHeight: cardHeight,
-        isTop: index == 0,
+        isTop: isTop,
+        controller: controller,
       );
 
       widgets.add(
@@ -452,6 +396,7 @@ class _HomePageState extends State<HomePage> {
     required double cardWidth,
     required double cardHeight,
     required bool isTop,
+    required HomeController controller,
   }) {
     final cardContent = _TermCard(
       term: term,
@@ -474,446 +419,12 @@ class _HomePageState extends State<HomePage> {
       term: term,
       width: cardWidth,
       height: cardHeight,
-      onExplain: _handleCardExplain,
-      isExplainInProgress: _isExplaining,
+      onExplain: controller.handleCardExplain,
+      isExplainInProgress: controller.state.isExplaining.value,
       onDismissed: (isConfirm) =>
-          _handleCardDismiss(term, isConfirm, cardWidth, cardHeight),
+          controller.handleCardDismiss(term, isConfirm, cardWidth, cardHeight),
       child: cardContent,
     );
-  }
-
-  void _handleCardDismiss(
-    String term,
-    bool isConfirm,
-    double cardWidth,
-    double cardHeight,
-  ) {
-    if (isConfirm) {
-      setState(() {
-        _terms!.remove(term);
-        _floatingTerm = term;
-        _floatingCardWidth = cardWidth;
-        _floatingCardHeight = cardHeight;
-        _floatingAlignment = Alignment.center;
-        _floatingSizeFactor = 1.0;
-        _floatingAnimating = true;
-        _floatingPhase = _FloatingPhase.flyingUp;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_floatingAnimating) {
-          return;
-        }
-        setState(() {
-          _floatingAlignment = _floatingTargetAlignment;
-          _floatingSizeFactor = _floatingTargetSizeFactor;
-        });
-      });
-    } else {
-      setState(() {
-        _terms!.remove(term);
-      });
-      _maybeReplenishDeck();
-    }
-  }
-
-  void _resumeSelection() {
-    final term = _selectedTerm;
-    if (term == null || _floatingAnimating) {
-      return;
-    }
-    final media = MediaQuery.of(context);
-    final cardWidth = math.max(math.min(media.size.width * 0.85, 360.0), 260.0);
-    final cardHeight = cardWidth * 1.45;
-
-    setState(() {
-      _floatingTerm = term;
-      _floatingCardWidth = cardWidth;
-      _floatingCardHeight = cardHeight;
-      _floatingAnimating = true;
-      _floatingPhase = _FloatingPhase.flyingDown;
-      _floatingAlignment = _floatingTargetAlignment;
-      _floatingSizeFactor = _floatingTargetSizeFactor;
-      _inputMode = _InputMode.voice;
-      _textInputController.clear();
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _floatingPhase != _FloatingPhase.flyingDown) {
-        return;
-      }
-      setState(() {
-        _floatingAlignment = Alignment.center;
-        _floatingSizeFactor = 1.0;
-      });
-    });
-  }
-
-  Future<void> _handleCardExplain(String term) async {
-    if (_isExplaining) {
-      return;
-    }
-    setState(() {
-      _isExplaining = true;
-    });
-
-    try {
-      final response = await _agentService.runSimpleExplainer(term);
-      final replyText = response.reply.trim();
-      
-      // 尝试解析JSON格式的返回结果
-      String explanationText = replyText;
-      try {
-        final jsonCandidate = _extractJsonBlock(replyText);
-        if (jsonCandidate != null) {
-          final decoded = jsonDecode(jsonCandidate);
-          if (decoded is Map<String, dynamic>) {
-            final explanations = decoded['explanations'];
-            if (explanations is List && explanations.isNotEmpty) {
-              final firstExplanation = explanations[0];
-              if (firstExplanation is Map<String, dynamic>) {
-                final simpleExplanation = firstExplanation['simple_explanation'];
-                if (simpleExplanation is String && simpleExplanation.isNotEmpty) {
-                  explanationText = simpleExplanation;
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        // JSON解析失败，使用原始回复
-        debugPrint('[HomePage] Failed to parse explanation JSON: $e');
-      }
-      
-      if (mounted) {
-        setState(() {
-          _inputMode = _InputMode.text;
-        });
-        _textInputController.text = explanationText;
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('获取解释失败：$error'),
-            duration: const Duration(milliseconds: 1800),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isExplaining = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _handleTextSubmit(String text) async {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty || _isSubmittingSuggestion) {
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-
-    setState(() {
-      _isSubmittingSuggestion = true;
-    });
-
-    try {
-      debugPrint('[HomePage] Submit text: "$trimmed"');
-      final response = await _agentService.runCuriousStudent(trimmed);
-      debugPrint('[HomePage] Raw reply: ${response.reply}');
-      final extraction = _extractTermsFromReply(
-        reply: response.reply,
-        originalText: trimmed,
-      );
-      final extracted = extraction.terms;
-      debugPrint('[HomePage] Extracted terms: $extracted');
-
-      if (extracted.isEmpty) {
-        if (extraction.isClear) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('解释已清楚，无需新增词汇'),
-                duration: Duration(milliseconds: 1500),
-              ),
-            );
-            setState(() {
-              _selectedTerm = null;
-              _floatingTerm = null;
-              _floatingAnimating = false;
-              _floatingCardWidth = null;
-              _floatingCardHeight = null;
-              _floatingAlignment = Alignment.center;
-              _floatingSizeFactor = 1.0;
-              _floatingPhase = _FloatingPhase.idle;
-              _inputMode = _InputMode.voice;
-            });
-            _textInputController.clear();
-          }
-          _maybeReplenishDeck();
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('未从响应中解析到词汇，请重试'),
-                duration: Duration(milliseconds: 1500),
-              ),
-            );
-          }
-        }
-        return;
-      }
-
-      if (mounted) {
-        setState(() {
-          _terms = List.of(extracted);
-          _selectedTerm = null;
-          _floatingTerm = null;
-          _floatingAnimating = false;
-          _floatingCardWidth = null;
-          _floatingCardHeight = null;
-          _floatingAlignment = Alignment.center;
-          _floatingSizeFactor = 1.0;
-          _floatingPhase = _FloatingPhase.idle;
-          _inputMode = _InputMode.voice;
-        });
-        _textInputController.clear();
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('获取词汇失败：$error'),
-            duration: const Duration(milliseconds: 1800),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmittingSuggestion = false;
-        });
-      }
-    }
-  }
-
-  void _handleFloatingAnimationEnd() {
-    if (!_floatingAnimating) {
-      return;
-    }
-
-    final term = _floatingTerm ?? _selectedTerm;
-    if (term == null) {
-      setState(() {
-        _floatingAnimating = false;
-        _floatingPhase = _FloatingPhase.idle;
-        _floatingAlignment = Alignment.center;
-        _floatingSizeFactor = 1.0;
-      });
-      return;
-    }
-
-    if (_floatingPhase == _FloatingPhase.flyingUp &&
-        _floatingAlignment == _floatingTargetAlignment) {
-      setState(() {
-        _selectedTerm = term;
-        _floatingTerm = null;
-        _floatingAnimating = false;
-        _floatingSizeFactor = 1.0;
-        _floatingPhase = _FloatingPhase.idle;
-        _floatingAlignment = Alignment.center;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已确认：$term'),
-          duration: const Duration(milliseconds: 1200),
-        ),
-      );
-
-      _maybeReplenishDeck();
-    } else if (_floatingPhase == _FloatingPhase.flyingDown &&
-        _floatingAlignment == Alignment.center) {
-      setState(() {
-        _terms ??= <String>[];
-        if (!_terms!.contains(term)) {
-          _terms!.insert(0, term);
-        }
-        _selectedTerm = null;
-        _floatingTerm = null;
-        _floatingAnimating = false;
-        _floatingCardWidth = null;
-        _floatingCardHeight = null;
-        _floatingAlignment = Alignment.center;
-        _floatingSizeFactor = 1.0;
-        _floatingPhase = _FloatingPhase.idle;
-      });
-
-      _maybeReplenishDeck();
-    }
-  }
-
-  _ExtractionResult _extractTermsFromReply({
-    required String reply,
-    required String originalText,
-  }) {
-    final trimmed = reply.trim();
-    if (trimmed.isEmpty) {
-      return _ExtractionResult.empty();
-    }
-
-    final jsonCandidate = _extractJsonBlock(trimmed);
-    if (jsonCandidate != null) {
-      debugPrint('[HomePage] JSON candidate: $jsonCandidate');
-      try {
-        final decoded = jsonDecode(jsonCandidate);
-        if (decoded is Map<String, dynamic>) {
-          final status = decoded['status'];
-          final wordsRaw = decoded['words'];
-          if (status == 'confused' && wordsRaw is List) {
-            final terms = wordsRaw
-                .whereType<String>()
-                .map((word) => word.replaceAll(RegExp(r'^<|>$'), '').trim())
-                .where((word) => word.isNotEmpty)
-                .take(10)
-                .toList(growable: false);
-            if (terms.isNotEmpty) {
-              return _ExtractionResult(terms: terms, isClear: false);
-            }
-          }
-          if (status == 'clear') {
-            return const _ExtractionResult(terms: <String>[], isClear: true);
-          }
-        }
-      } catch (error, stackTrace) {
-        debugPrint('[HomePage] JSON parse error: $error');
-        debugPrint('[HomePage] Stack trace: $stackTrace');
-        // fall through to fallback parsing
-      }
-    }
-
-    final parts = trimmed
-        .split(RegExp(r'[\s,，；;。.!?\n\r]+'))
-        .map((segment) => segment.trim())
-        .where((segment) => segment.isNotEmpty)
-        .toList(growable: false);
-
-    if (parts.isEmpty) {
-      debugPrint('[HomePage] Fallback split produced 0 parts');
-      return _ExtractionResult.empty();
-    }
-
-    final unique = <String>[];
-    for (final part in parts) {
-      final normalized = part.replaceAll(RegExp(r'^<|>$'), '');
-      if (normalized.isEmpty) {
-        continue;
-      }
-      if (!unique.contains(normalized)) {
-        unique.add(normalized);
-      }
-      if (unique.length >= 10) {
-        break;
-      }
-    }
-    debugPrint('[HomePage] Fallback terms: $unique');
-    return _ExtractionResult(terms: unique, isClear: false);
-  }
-
-  String? _extractJsonBlock(String text) {
-    if (text.startsWith('```')) {
-      debugPrint('[HomePage] Detected code block response');
-      final startBrace = text.indexOf('{');
-      final endBrace = text.lastIndexOf('}');
-      if (startBrace != -1 && endBrace > startBrace) {
-        return text.substring(startBrace, endBrace + 1);
-      }
-    }
-
-    if (text.startsWith('{') && text.endsWith('}')) {
-      debugPrint('[HomePage] Reply appears to be pure JSON');
-      return text;
-    }
-
-    final start = text.indexOf('{');
-    final end = text.lastIndexOf('}');
-    if (start != -1 && end > start) {
-      debugPrint('[HomePage] Found JSON within text block');
-      return text.substring(start, end + 1);
-    }
-
-    debugPrint('[HomePage] No JSON block detected');
-
-    return null;
-  }
-
-  String _categoryDisplayName() {
-    switch (_activeCategory) {
-      case 'economics':
-        return '经济学';
-      default:
-        return _activeCategory;
-    }
-  }
-
-  void _maybeReplenishDeck() {
-    if (_terms == null ||
-        _terms!.length > 1 ||
-        _isAppending ||
-        _floatingAnimating) {
-      return;
-    }
-    _fetchAdditionalTerms();
-  }
-
-  Future<void> _fetchAdditionalTerms() async {
-    if (_isAppending) {
-      return;
-    }
-    _isAppending = true;
-    try {
-      final response =
-          await _agentService.fetchTerms(category: _activeCategory);
-      if (!mounted || _terms == null) {
-        return;
-      }
-      final existing = <String>{..._terms!};
-      if (_selectedTerm != null) {
-        existing.add(_selectedTerm!);
-      }
-      if (_floatingTerm != null) {
-        existing.add(_floatingTerm!);
-      }
-      final newTerms = response.terms.where((term) => !existing.contains(term));
-      if (newTerms.isNotEmpty) {
-        setState(() {
-          _terms!.addAll(newTerms);
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('暂无更多新的词汇可补充'),
-            duration: Duration(milliseconds: 1600),
-          ),
-        );
-      }
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('补充词汇失败：$error'),
-          duration: const Duration(milliseconds: 1800),
-        ),
-      );
-    } finally {
-      _isAppending = false;
-    }
   }
 }
 
@@ -945,7 +456,7 @@ class _SelectionPlaceholder extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '如需重新挑选，请点击上方“重新选择”。',
+            '如需重新挑选，请点击上方"重新选择"。',
             style: theme.textTheme.bodyMedium
                 ?.copyWith(color: theme.colorScheme.outline),
             textAlign: TextAlign.center,
@@ -954,16 +465,6 @@ class _SelectionPlaceholder extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ExtractionResult {
-  const _ExtractionResult({required this.terms, required this.isClear});
-
-  final List<String> terms;
-  final bool isClear;
-
-  static _ExtractionResult empty() =>
-      const _ExtractionResult(terms: <String>[], isClear: false);
 }
 
 class _VoiceInputPanel extends StatelessWidget {
@@ -1219,7 +720,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 600),  // 增加到600ms，让回弹更柔和
     )
       ..addListener(_handleAnimationTick)
       ..addStatusListener(_handleAnimationStatus);
@@ -1345,9 +846,10 @@ class _SwipeableCardState extends State<_SwipeableCard>
     _pendingConfirm = null;
     _isAnimating = true;
 
+    // 使用弹性曲线，带有更明显的回弹效果
     final curve = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic,
+      curve: Curves.elasticOut,  // 使用elasticOut曲线，带有弹性回弹效果
     );
 
     _offsetAnimation =
@@ -1420,26 +922,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Opacity(
-              opacity: confirmOpacity,
-              child: _CardActionOverlay(
-                alignment: Alignment.centerLeft,
-                icon: Icons.check_circle,
-                color: theme.colorScheme.primaryContainer,
-                textColor: theme.colorScheme.onPrimaryContainer,
-                label: '确认',
-              ),
-            ),
-            Opacity(
-              opacity: skipOpacity,
-              child: _CardActionOverlay(
-                alignment: Alignment.centerRight,
-                icon: Icons.skip_next,
-                color: theme.colorScheme.secondaryContainer,
-                textColor: theme.colorScheme.onSecondaryContainer,
-                label: '跳过',
-              ),
-            ),
+            // 移除滑动提示层，保留纯净的卡片滚动效果
             Transform.translate(
               offset: _offset,
               child: Transform.rotate(

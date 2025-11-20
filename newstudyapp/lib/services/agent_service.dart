@@ -1,5 +1,6 @@
 import 'package:newstudyapp/models/agent_models.dart';
 import 'package:newstudyapp/services/api_client.dart';
+import 'package:newstudyapp/config/api_config.dart';
 
 class AgentService {
   AgentService({
@@ -12,19 +13,19 @@ class AgentService {
   final ApiClient _apiClient;
 
   Future<AgentResponse> runCuriousStudent(String text) async {
-    final uri = Uri.parse('$_baseUrl/agents/curious-student');
+    final uri = Uri.parse('$_baseUrl${ApiConfig.curiousStudent}');
     final json = await _apiClient.postJson(uri, body: {'text': text});
     return AgentResponse.fromJson(json);
   }
 
   Future<AgentResponse> runSimpleExplainer(String text) async {
-    final uri = Uri.parse('$_baseUrl/agents/simple-explainer');
+    final uri = Uri.parse('$_baseUrl${ApiConfig.simpleExplainer}');
     final json = await _apiClient.postJson(uri, body: {'text': text});
     return AgentResponse.fromJson(json);
   }
 
   Future<TermsResponse> fetchTerms({String category = 'economics'}) async {
-    final uri = Uri.parse('$_baseUrl/topics/terms').replace(queryParameters: {'category': category});
+    final uri = Uri.parse('$_baseUrl${ApiConfig.fetchTerms}').replace(queryParameters: {'category': category});
     final json = await _apiClient.getJson(uri);
     return TermsResponse.fromJson(json);
   }
