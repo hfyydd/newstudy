@@ -18,6 +18,9 @@ class HomeState {
   final terms = Rxn<List<String>>();
   final selectedTerm = Rxn<String>();
   final activeCategory = 'economics'.obs;
+  
+  // 卡片浏览状态
+  final currentCardIndex = 0.obs;
 
   // 浮动卡片动画状态
   final floatingTerm = Rxn<String>();

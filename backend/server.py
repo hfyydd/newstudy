@@ -79,3 +79,7 @@ def list_terms(category: str = Query("economics", min_length=1)) -> TermsRespons
     return TermsResponse(category=key, terms=terms)
 
 
+if __name__ == "__main__":
+    import uvicorn
+    
+    uvicorn.run(app, host="0.0.0.0", port=8000)

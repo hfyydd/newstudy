@@ -1,689 +1,461 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
-import 'package:newstudyapp/pages/home/home_state.dart';
-import 'package:newstudyapp/config/app_config.dart';
-import 'dart:math' as math;
+import 'package:newstudyapp/pages/feynman_card/feynman_card_state.dart';
+import 'package:newstudyapp/routes/app_routes.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // 初始化或获取 Controller
     final controller = Get.put(HomeController(), tag: 'home');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppConfig.appTitle),
-        actions: [
-          Obx(() => IconButton(
-            onPressed: controller.state.isLoading.value ? null : controller.loadTerms,
-            icon: const Icon(Icons.refresh),
-            tooltip: '刷新',
-          )),
-        ],
-      ),
-      body: _buildBody(context, controller),
-    );
-  }
-
-  Widget _buildBody(BuildContext context, HomeController controller) {
-    return Obx(() {
-      final theme = Theme.of(context);
-
-      if (controller.state.isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
-
-      if (controller.state.errorMessage.value != null) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.error_outline, color: theme.colorScheme.error),
-                const SizedBox(height: 12),
-                Text(
-                  controller.state.errorMessage.value!,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge
-                      ?.copyWith(color: theme.colorScheme.error),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: controller.loadTerms,
-                  child: const Text('重试'),
-                ),
-              ],
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F172B), // Dark purple
+              Color(0xFF59168B), // Purple
+              Color(0xFF0F172B), // Dark purple
+            ],
+            stops: [0.0, 0.5, 1.0],
           ),
-        );
-      }
+        ),
+        child: SafeArea(
+          child: Obx(() {
+            if (controller.state.isLoading.value) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                ),
+              );
+            }
 
-      Widget mainContent;
-      if (controller.state.terms.value == null || controller.state.terms.value!.isEmpty) {
-        mainContent = Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildConfirmedArea(theme, controller),
-              Expanded(
-                child: Center(
+            if (controller.state.errorMessage.value != null) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        controller.state.selectedTerm.value != null ? '已确认当前词汇' : '暂无词汇',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.white,
+                        size: 48,
                       ),
                       const SizedBox(height: 16),
-                      if (controller.state.selectedTerm.value == null)
-                        FilledButton.icon(
-                          onPressed: controller.loadTerms,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('重新获取词汇'),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildInputArea(theme, controller),
-            ],
-          ),
-        );
-      } else {
-        final media = MediaQuery.of(context);
-        final cardWidth =
-            math.max(math.min(media.size.width * 0.85, 360.0), 260.0);
-        final cardHeight = cardWidth * 1.45;
-
-        mainContent = Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildConfirmedArea(theme, controller),
-              Text(
-                '类别：${controller.getCategoryDisplayName()}',
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: Center(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    child: (!controller.state.floatingAnimating.value && controller.state.selectedTerm.value == null)
-                        ? SizedBox(
-                            key: const ValueKey('card-stack'),
-                            width: cardWidth,
-                            height: cardHeight,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: _buildCardStack(
-                                theme,
-                                cardWidth,
-                                cardHeight,
-                                controller,
-                              ),
-                            ),
-                          )
-                        : (controller.state.selectedTerm.value != null
-                            ? _SelectionPlaceholder(theme: theme)
-                            : const SizedBox.shrink()),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildInputArea(theme, controller),
-            ],
-          ),
-        );
-      }
-
-      return Stack(
-        children: [
-          Positioned.fill(child: mainContent),
-          if (controller.state.floatingAnimating.value && controller.state.floatingTerm.value != null)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: _buildFloatingCard(theme, controller),
-              ),
-            ),
-        ],
-      );
-    });
-  }
-
-  Widget _buildConfirmedArea(ThemeData theme, HomeController controller) {
-    return Obx(() {
-      final activeTerm = controller.state.floatingAnimating.value
-          ? controller.state.floatingTerm.value
-          : controller.state.selectedTerm.value;
-      final showSelection = activeTerm != null;
-
-      return AnimatedSize(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        child: showSelection
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
                       Text(
-                        '已确认词汇',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      if (!controller.state.floatingAnimating.value && controller.state.selectedTerm.value != null)
-                        TextButton.icon(
-                          onPressed: controller.resumeSelection,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('重新选择'),
+                        controller.state.errorMessage.value!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
                         ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: controller.loadTerms,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF59168B),
+                        ),
+                        child: const Text('重试'),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 160,
-                    child: controller.state.floatingAnimating.value
-                        ? const SizedBox.shrink()
-                        : _SelectedTermCard(term: controller.state.selectedTerm.value!),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              )
-            : const SizedBox.shrink(),
-      );
-    });
-  }
-
-  Widget _buildInputArea(ThemeData theme, HomeController controller) {
-    return Obx(() {
-      if (controller.state.selectedTerm.value == null) {
-        return const SizedBox.shrink();
-      }
-
-      final isVoice = controller.state.inputMode.value == InputMode.voice;
-      final surfaceColor = theme.colorScheme.surfaceVariant;
-      final textPlaceholder = controller.state.textInputController.text.isEmpty
-          ? '输入新的词汇或备注'
-          : 'AI 的解释（可继续编辑）';
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '输入方式',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              ChoiceChip(
-                label: const Text('语音'),
-                avatar: const Icon(Icons.mic, size: 18),
-                selected: isVoice,
-                onSelected: (selected) {
-                  if (selected && controller.state.inputMode.value != InputMode.voice) {
-                    controller.state.inputMode.value = InputMode.voice;
-                    controller.state.textInputController.clear();
-                  }
-                },
-              ),
-              ChoiceChip(
-                label: const Text('文本'),
-                avatar: const Icon(Icons.keyboard_alt_rounded, size: 18),
-                selected: !isVoice,
-                onSelected: (selected) {
-                  if (selected && controller.state.inputMode.value != InputMode.text) {
-                    controller.state.inputMode.value = InputMode.text;
-                  }
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 240),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: isVoice
-                  ? _VoiceInputPanel(
-                      key: const ValueKey('voice-mode'),
-                      theme: theme,
-                      surfaceColor: surfaceColor,
-                      onTap: () {
-                        Get.snackbar(
-                          '提示',
-                          '语音输入功能开发中',
-                          snackPosition: SnackPosition.BOTTOM,
-                          duration: const Duration(milliseconds: 1500),
-                        );
-                      },
-                    )
-                  : _TextInputPanel(
-                      key: const ValueKey('text-mode'),
-                      theme: theme,
-                      surfaceColor: surfaceColor,
-                      controller: controller.state.textInputController,
-                      onSubmit: controller.handleTextSubmit,
-                      isSubmitting: controller.state.isSubmittingSuggestion.value,
-                      placeholder: textPlaceholder,
-                    ),
-            ),
-          ),
-        ],
-      );
-    });
-  }
-
-  Widget _buildFloatingCard(ThemeData theme, HomeController controller) {
-    return Obx(() {
-      final term = controller.state.floatingTerm.value;
-      if (term == null) {
-        return const SizedBox.shrink();
-      }
-
-      final baseWidth = controller.state.floatingCardWidth.value ?? 300;
-      final baseHeight = controller.state.floatingCardHeight.value ?? baseWidth * 1.45;
-
-      return AnimatedAlign(
-        alignment: controller.state.floatingAlignment.value,
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeInOutCubic,
-        onEnd: controller.handleFloatingAnimationEnd,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 380),
-          curve: Curves.easeInOutCubic,
-          width: baseWidth * controller.state.floatingSizeFactor.value,
-          height: baseHeight * controller.state.floatingSizeFactor.value,
-          child: _TermCard(
-            term: term,
-            width: baseWidth * controller.state.floatingSizeFactor.value,
-            height: baseHeight * controller.state.floatingSizeFactor.value,
-            showHint: false,
-          ),
-        ),
-      );
-    });
-  }
-
-  List<Widget> _buildCardStack(
-    ThemeData theme,
-    double cardWidth,
-    double cardHeight,
-    HomeController controller,
-  ) {
-    final widgets = <Widget>[];
-    final terms = controller.state.terms.value ?? [];
-    final visibleCount = math.min(terms.length, 3);
-    const animationDuration = Duration(milliseconds: 260);
-    const animationCurve = Curves.easeOutCubic;
-
-    // 倒序遍历：从后往前，先添加底层卡片，再添加顶层卡片
-    // 这样Stack中最后添加的terms[0]就会显示在最上面
-    for (var index = visibleCount - 1; index >= 0; index--) {
-      final term = terms[index];
-      // index越小，layer值越小，verticalOffset越小（越靠上）
-      final layer = index;
-      final verticalOffset = layer * 20.0;
-      final scale = 1.0 - layer * 0.05;
-      // terms[0]是最顶层卡片，可交互
-      final isTop = index == 0;
-
-      final cardSurface = _buildCardSurface(
-        term,
-        theme,
-        cardWidth: cardWidth,
-        cardHeight: cardHeight,
-        isTop: isTop,
-        controller: controller,
-      );
-
-      widgets.add(
-        AnimatedPositioned(
-          key: ValueKey('card-position-$term'),
-          duration: animationDuration,
-          curve: animationCurve,
-          left: 0,
-          right: 0,
-          top: verticalOffset,
-          child: AnimatedScale(
-            scale: scale,
-            duration: animationDuration,
-            curve: animationCurve,
-            alignment: Alignment.center,
-            child: cardSurface,
-          ),
-        ),
-      );
-    }
-
-    return widgets;
-  }
-
-  Widget _buildCardSurface(
-    String term,
-    ThemeData theme, {
-    required double cardWidth,
-    required double cardHeight,
-    required bool isTop,
-    required HomeController controller,
-  }) {
-    final cardContent = _TermCard(
-      term: term,
-      width: cardWidth,
-      height: cardHeight,
-      showHint: isTop,
-    );
-
-    if (!isTop) {
-      return IgnorePointer(
-        child: Opacity(
-          opacity: 0.85,
-          child: cardContent,
-        ),
-      );
-    }
-
-    return _SwipeableCard(
-      key: ValueKey(term),
-      term: term,
-      width: cardWidth,
-      height: cardHeight,
-      onExplain: controller.handleCardExplain,
-      isExplainInProgress: controller.state.isExplaining.value,
-      onDismissed: (isConfirm) =>
-          controller.handleCardDismiss(term, isConfirm, cardWidth, cardHeight),
-      child: cardContent,
-    );
-  }
-}
-
-class _SelectionPlaceholder extends StatelessWidget {
-  const _SelectionPlaceholder({required this.theme});
-
-  final ThemeData theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const ValueKey('selection-placeholder'),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.style_outlined,
-              size: 40, color: theme.colorScheme.primary),
-          const SizedBox(height: 12),
-          Text(
-            '已确认当前词汇',
-            style: theme.textTheme.titleMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '如需重新挑选，请点击上方"重新选择"。',
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.outline),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VoiceInputPanel extends StatelessWidget {
-  const _VoiceInputPanel({
-    super.key,
-    required this.theme,
-    required this.surfaceColor,
-    required this.onTap,
-  });
-
-  final ThemeData theme;
-  final Color surfaceColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              shape: const CircleBorder(),
-              padding: const EdgeInsets.all(26),
-              backgroundColor: theme.colorScheme.primary,
-            ),
-            onPressed: onTap,
-            child: Icon(
-              Icons.mic,
-              size: 36,
-              color: theme.colorScheme.onPrimary,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            '按住开始说话，松开发送语音内容',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TextInputPanel extends StatelessWidget {
-  const _TextInputPanel({
-    super.key,
-    required this.theme,
-    required this.surfaceColor,
-    required this.controller,
-    required this.onSubmit,
-    required this.isSubmitting,
-    required this.placeholder,
-  });
-
-  final ThemeData theme;
-  final Color surfaceColor;
-  final TextEditingController controller;
-  final Future<void> Function(String text) onSubmit;
-  final bool isSubmitting;
-  final String placeholder;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: controller,
-            maxLines: 4,
-            minLines: 3,
-            decoration: InputDecoration(
-              labelText: placeholder,
-              border: const OutlineInputBorder(),
-              alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, _) {
-              final trimmed = value.text.trim();
-              final canSend = trimmed.isNotEmpty;
-              final submitting = isSubmitting;
-
-              return Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed:
-                      (!canSend || submitting) ? null : () => onSubmit(trimmed),
-                  icon: submitting
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              theme.colorScheme.onPrimary,
-                            ),
-                          ),
-                        )
-                      : const Icon(Icons.send),
-                  label: Text(submitting ? '提交中...' : '提交'),
                 ),
               );
-            },
+            }
+
+            final terms = controller.state.terms.value;
+            if (terms == null || terms.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '暂无卡片',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: controller.loadTerms,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF59168B),
+                      ),
+                      child: const Text('刷新'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                // Header section
+                _buildHeader(controller),
+                const SizedBox(height: 24),
+                // Card section
+                Expanded(
+                  child: Center(
+                    child: _buildCardSection(context, controller),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Pagination section
+                _buildPagination(controller),
+                const SizedBox(height: 32),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  /// 构建头部
+  Widget _buildHeader(HomeController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          // Title row with icons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(
+                Icons.auto_awesome,
+                size: 24,
+                color: Colors.white,
+              ),
+              SizedBox(width: 8),
+              Text(
+                '费曼学习法',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.white,
+                  letterSpacing: 0.07,
+                ),
+              ),
+              SizedBox(width: 8),
+              Icon(
+                Icons.auto_awesome,
+                size: 24,
+                color: Colors.white,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Subtitle
+          const Text(
+            '左右滑动切换卡片',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFFE9D4FF),
+              letterSpacing: -0.15,
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _TermCard extends StatelessWidget {
-  const _TermCard({
-    required this.term,
-    required this.width,
-    required this.height,
-    required this.showHint,
-  });
+  /// 构建卡片区域
+  Widget _buildCardSection(BuildContext context, HomeController controller) {
+    return Obx(() {
+      final terms = controller.state.terms.value!;
+      final currentIndex = controller.state.currentCardIndex.value;
+      
+      if (currentIndex >= terms.length) {
+        return const SizedBox.shrink();
+      }
+      
+      final term = terms[currentIndex];
+      final category = controller.getCategoryDisplayName();
+      
+      // 固定卡片尺寸，与设计稿保持一致
+      const cardWidth = 345.0;
+      const cardHeight = 500.0;
 
-  final String term;
-  final double width;
-  final double height;
-  final bool showHint;
+      return SizedBox(
+        width: cardWidth,
+        height: cardHeight,
+        child: _SwipeableCard(
+          key: ValueKey(currentIndex),
+          cardWidth: cardWidth,
+          cardHeight: cardHeight,
+          onSwipeLeft: controller.previousCard,
+          onSwipeRight: controller.nextCard,
+          child: _buildCardContent(term, category, cardWidth, cardHeight),
+        ),
+      );
+    });
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SizedBox(
-      width: width,
-      height: height,
-      child: Card(
-        elevation: 12,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.class_, size: 56, color: theme.colorScheme.primary),
-              const SizedBox(height: 28),
-              Text(
-                term,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+  /// 构建卡片内容
+  Widget _buildCardContent(
+    String term,
+    String category,
+    double cardWidth,
+    double cardHeight,
+  ) {
+    return Stack(
+      children: [
+        // Blur shadow container
+        Positioned(
+          left: 8,
+          top: 28,
+          right: 8,
+          bottom: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 50,
+                  offset: const Offset(0, 25),
                 ),
+              ],
+            ),
+          ),
+        ),
+        // Main card
+        SizedBox(
+          width: cardWidth,
+          height: cardHeight,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF10B981), // Green
+                  Color(0xFF059669), // Darker green
+                ],
               ),
-              if (showHint) ...[
-                const SizedBox(height: 24),
-                Text(
-                  '向左滑动查看下一个词，向右滑动表示确认',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.hintColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 50,
+                  offset: const Offset(0, 25),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Decorative circles
+                Positioned(
+                  right: -40,
+                  top: -80,
+                  child: Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.1),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: -64,
+                  bottom: -64,
+                  child: Container(
+                    width: 128,
+                    height: 128,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.1),
+                    ),
+                  ),
+                ),
+                // Card content
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Category badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          category,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            letterSpacing: -0.15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Title
+                      Text(
+                        term,
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.normal,
+                          color: Colors.white,
+                          letterSpacing: 0.37,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Description placeholder
+                      Text(
+                        '点击下方按钮了解更多关于"$term"的内容',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.white.withOpacity(0.9),
+                          letterSpacing: -0.44,
+                          height: 1.5,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Bottom button
+                      GestureDetector(
+                        onTap: () {
+                          // 创建临时 FeynmanCard 对象用于详情页
+                          final card = FeynmanCard(
+                            category: category,
+                            title: term,
+                            description: '点击下方按钮了解更多关于"$term"的内容',
+                          );
+                          Get.toNamed(
+                            AppRoutes.FEYNMAN_CARD_DETAIL,
+                            arguments: card,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.menu_book,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  '点击查看学习步骤',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    letterSpacing: -0.31,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
-}
 
-class _SelectedTermCard extends StatelessWidget {
-  const _SelectedTermCard({required this.term});
-
-  final String term;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 10,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle,
-                size: 48, color: theme.colorScheme.primary),
-            const SizedBox(height: 20),
-            Text(
-              term,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
+  /// 构建分页指示器
+  Widget _buildPagination(HomeController controller) {
+    return Obx(() {
+      final terms = controller.state.terms.value;
+      if (terms == null || terms.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      
+      final currentIndex = controller.state.currentCardIndex.value;
+      final totalCards = terms.length;
+      
+      return Column(
+        children: [
+          // Dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              totalCards,
+              (index) {
+                final isActive = index == currentIndex;
+                return GestureDetector(
+                  onTap: () => controller.goToCard(index),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: isActive ? 32 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+          const SizedBox(height: 12),
+          // Page number
+          Text(
+            '${currentIndex + 1} / $totalCards',
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFFE9D4FF),
+              letterSpacing: -0.15,
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 
+/// 可滑动的卡片组件
 class _SwipeableCard extends StatefulWidget {
   const _SwipeableCard({
     super.key,
-    required this.term,
-    required this.width,
-    required this.height,
+    required this.cardWidth,
+    required this.cardHeight,
+    required this.onSwipeLeft,
+    required this.onSwipeRight,
     required this.child,
-    required this.onExplain,
-    required this.isExplainInProgress,
-    required this.onDismissed,
   });
 
-  final String term;
-  final double width;
-  final double height;
+  final double cardWidth;
+  final double cardHeight;
+  final VoidCallback onSwipeLeft;
+  final VoidCallback onSwipeRight;
   final Widget child;
-  final Future<void> Function(String term) onExplain;
-  final bool isExplainInProgress;
-  final ValueChanged<bool> onDismissed;
 
   @override
   State<_SwipeableCard> createState() => _SwipeableCardState();
@@ -691,278 +463,184 @@ class _SwipeableCard extends StatefulWidget {
 
 class _SwipeableCardState extends State<_SwipeableCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  Animation<Offset>? _offsetAnimation;
-  Animation<double>? _rotationAnimation;
-  Animation<double>? _scaleAnimation;
-
-  Offset _offset = Offset.zero;
-  double _rotation = 0;
-  double _scale = 1;
-  bool _isAnimating = false;
-  bool? _pendingConfirm;
+  late AnimationController _controller;
+  Offset _dragOffset = Offset.zero;
+  double _rotation = 0.0;
+  double _scale = 1.0;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),  // 增加到600ms，让回弹更柔和
-    )
-      ..addListener(_handleAnimationTick)
-      ..addStatusListener(_handleAnimationStatus);
-  }
-
-  @override
-  void didUpdateWidget(covariant _SwipeableCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.term != widget.term) {
-      _controller.stop();
-      _offset = Offset.zero;
-      _rotation = 0;
-      _scale = 1;
-      _pendingConfirm = null;
-      _isAnimating = false;
-      _offsetAnimation = null;
-      _rotationAnimation = null;
-      _scaleAnimation = null;
-    }
+      duration: const Duration(milliseconds: 400),
+    );
   }
 
   @override
   void dispose() {
-    _controller
-      ..removeListener(_handleAnimationTick)
-      ..removeStatusListener(_handleAnimationStatus)
-      ..dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _handleAnimationTick() {
-    if (!mounted) {
-      return;
-    }
+  void _handlePanStart(DragStartDetails details) {
+    // Start dragging
+  }
+
+  void _handlePanUpdate(DragUpdateDetails details) {
     setState(() {
-      if (_offsetAnimation != null) {
-        _offset = _offsetAnimation!.value;
-      }
-      if (_rotationAnimation != null) {
-        _rotation = _rotationAnimation!.value;
-      }
-      if (_scaleAnimation != null) {
-        _scale = _scaleAnimation!.value;
-      }
+      _dragOffset += details.delta;
+      // 计算旋转角度（左滑为负，右滑为正）
+      _rotation = (_dragOffset.dx / widget.cardWidth) * 0.3;
+      // 计算缩放（稍微缩小以增强效果）
+      _scale = 1.0 - (_dragOffset.dx.abs() / widget.cardWidth) * 0.1;
+      _scale = _scale.clamp(0.9, 1.0);
     });
   }
 
-  void _handleAnimationStatus(AnimationStatus status) {
-    if (status != AnimationStatus.completed) {
-      return;
-    }
+  void _handlePanEnd(DragEndDetails details) {
+    final velocity = details.velocity.pixelsPerSecond.dx;
+    final threshold = widget.cardWidth * 0.3;
 
-    if (_pendingConfirm != null) {
-      final confirm = _pendingConfirm!;
-      _pendingConfirm = null;
-      _offsetAnimation = null;
-      _rotationAnimation = null;
-      _scaleAnimation = null;
-      _isAnimating = false;
-      widget.onDismissed(confirm);
-      return;
-    }
-
-    _resetToCenter();
-  }
-
-  void _resetToCenter() {
-    _offset = Offset.zero;
-    _rotation = 0;
-    _scale = 1;
-    _isAnimating = false;
-    _pendingConfirm = null;
-    _offsetAnimation = null;
-    _rotationAnimation = null;
-    _scaleAnimation = null;
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _animateDismiss(bool isConfirm) {
-    _controller.stop();
-    _pendingConfirm = isConfirm;
-    _isAnimating = true;
-    final curve = CurvedAnimation(
-      parent: _controller,
-      curve: isConfirm ? Curves.easeInOutCubic : Curves.easeIn,
-    );
-
-    if (isConfirm) {
-      _offsetAnimation = Tween<Offset>(
-        begin: _offset,
-        end: Offset(0, -widget.height * 1.2),
-      ).animate(curve);
-      _rotationAnimation = Tween<double>(
-        begin: _rotation,
-        end: 0,
-      ).animate(curve);
-      _scaleAnimation = Tween<double>(
-        begin: _scale,
-        end: 0.55,
-      ).animate(curve);
+    // 判断是否触发滑动
+    if (_dragOffset.dx.abs() > threshold || velocity.abs() > 800) {
+      if (_dragOffset.dx < 0) {
+        // 左滑
+        _animateSwipe(true);
+      } else {
+        // 右滑
+        _animateSwipe(false);
+      }
     } else {
-      _offsetAnimation = Tween<Offset>(
-        begin: _offset,
-        end: Offset(-widget.width * 1.3, widget.height * 0.1),
-      ).animate(curve);
-      _rotationAnimation = Tween<double>(
-        begin: _rotation,
-        end: -0.45,
-      ).animate(curve);
-      _scaleAnimation = Tween<double>(
-        begin: _scale,
-        end: 1,
-      ).animate(curve);
-    }
-
-    _controller.forward(from: 0);
-  }
-
-  void _animateReset() {
-    _controller.stop();
-    _pendingConfirm = null;
-    _isAnimating = true;
-
-    // 使用弹性曲线，带有更明显的回弹效果
-    final curve = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,  // 使用elasticOut曲线，带有弹性回弹效果
-    );
-
-    _offsetAnimation =
-        Tween<Offset>(begin: _offset, end: Offset.zero).animate(curve);
-    _rotationAnimation = Tween<double>(begin: _rotation, end: 0).animate(curve);
-    _scaleAnimation = Tween<double>(begin: _scale, end: 1).animate(curve);
-
-    _controller.forward(from: 0);
-  }
-
-  void _onPanStart(DragStartDetails details) {
-    if (_isAnimating) {
-      return;
-    }
-    _controller.stop();
-    _offsetAnimation = null;
-    _rotationAnimation = null;
-    _scaleAnimation = null;
-  }
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (_isAnimating) {
-      return;
-    }
-    setState(() {
-      final newDx = _offset.dx + details.delta.dx;
-      _offset = Offset(newDx, 0);
-      final normalized = (_offset.dx / widget.width).clamp(-1.0, 1.0);
-      _rotation = normalized * 0.4;
-      _scale = 1;
-    });
-  }
-
-  void _onPanEnd(DragEndDetails details) {
-    if (_isAnimating) {
-      return;
-    }
-    final velocityX = details.velocity.pixelsPerSecond.dx;
-    final threshold = widget.width * 0.32;
-    final hasVelocity = velocityX.abs() > 650;
-    final shouldDismiss = _offset.dx.abs() > threshold || hasVelocity;
-
-    if (shouldDismiss) {
-      final isConfirm = (_offset.dx + velocityX * 0.1) > 0;
-      _animateDismiss(isConfirm);
-    } else {
+      // 回弹
       _animateReset();
     }
   }
 
+  void _animateSwipe(bool isLeft) {
+    final targetX = isLeft ? -widget.cardWidth * 1.5 : widget.cardWidth * 1.5;
+    final targetRotation = isLeft ? -0.5 : 0.5;
+
+    _controller.reset();
+    final animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    animation.addListener(() {
+      setState(() {
+        _dragOffset = Offset(
+          _dragOffset.dx + (targetX - _dragOffset.dx) * animation.value * 0.1,
+          _dragOffset.dy,
+        );
+        _rotation = _rotation + (targetRotation - _rotation) * animation.value * 0.1;
+        _scale = 1.0 - animation.value * 0.2;
+      });
+    });
+
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        // 执行回调并重置
+        if (isLeft) {
+          widget.onSwipeLeft();
+        } else {
+          widget.onSwipeRight();
+        }
+        setState(() {
+          _dragOffset = Offset.zero;
+          _rotation = 0.0;
+          _scale = 1.0;
+        });
+      }
+    });
+
+    _controller.forward();
+  }
+
+  void _animateReset() {
+    _controller.reset();
+    final animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    );
+
+    final startOffset = _dragOffset;
+    final startRotation = _rotation;
+    final startScale = _scale;
+
+    animation.addListener(() {
+      setState(() {
+        _dragOffset = Offset.lerp(startOffset, Offset.zero, animation.value)!;
+        _rotation = startRotation * (1 - animation.value);
+        _scale = startScale + (1.0 - startScale) * animation.value;
+      });
+    });
+
+    _controller.forward();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final progress = (_offset.dx / widget.width).clamp(-1.0, 1.0);
-    final confirmOpacity =
-        progress > 0 ? progress.abs().clamp(0.0, 1.0).toDouble() : 0.0;
-    final skipOpacity =
-        progress < 0 ? progress.abs().clamp(0.0, 1.0).toDouble() : 0.0;
+    // 计算透明度提示
+    final swipeProgress = (_dragOffset.dx.abs() / widget.cardWidth).clamp(0.0, 1.0);
+    final leftHintOpacity = _dragOffset.dx < 0 ? swipeProgress : 0.0;
+    final rightHintOpacity = _dragOffset.dx > 0 ? swipeProgress : 0.0;
 
-    return SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: GestureDetector(
-        onLongPress: widget.isExplainInProgress
-            ? null
-            : () => widget.onExplain(widget.term),
-        onPanStart: _onPanStart,
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: _onPanEnd,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 移除滑动提示层，保留纯净的卡片滚动效果
-            Transform.translate(
-              offset: _offset,
-              child: Transform.rotate(
-                angle: _rotation,
-                child: Transform.scale(
-                  scale: _scale,
-                  alignment: Alignment.topCenter,
-                  child: widget.child,
+    return GestureDetector(
+      onPanStart: _handlePanStart,
+      onPanUpdate: _handlePanUpdate,
+      onPanEnd: _handlePanEnd,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Left hint (上一张)
+          if (leftHintOpacity > 0)
+            Positioned.fill(
+              child: Opacity(
+                opacity: leftHintOpacity,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    color: Colors.blue.withOpacity(0.3),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.arrow_back,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CardActionOverlay extends StatelessWidget {
-  const _CardActionOverlay({
-    required this.alignment,
-    required this.icon,
-    required this.color,
-    required this.textColor,
-    required this.label,
-  });
-
-  final Alignment alignment;
-  final IconData icon;
-  final Color color;
-  final Color textColor;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      alignment: alignment,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: textColor),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: textColor),
+          // Right hint (下一张)
+          if (rightHintOpacity > 0)
+            Positioned.fill(
+              child: Opacity(
+                opacity: rightHintOpacity,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    color: Colors.green.withOpacity(0.3),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.arrow_forward,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Card with transform
+          Transform.translate(
+            offset: _dragOffset,
+            child: Transform.rotate(
+              angle: _rotation,
+              child: Transform.scale(
+                scale: _scale,
+                child: widget.child,
+              ),
+            ),
           ),
         ],
       ),

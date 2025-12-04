@@ -38,6 +38,7 @@ class HomeController extends GetxController {
     state.inputMode.value = InputMode.voice;
     state.isSubmittingSuggestion.value = false;
     state.textInputController.clear();
+    state.currentCardIndex.value = 0;
 
     try {
       final response = await httpService.fetchTerms(category: state.activeCategory.value);
@@ -47,6 +48,29 @@ class HomeController extends GetxController {
     } catch (error) {
       state.errorMessage.value = '获取术语失败：$error';
       state.isLoading.value = false;
+    }
+  }
+
+  /// 切换到上一张卡片
+  void previousCard() {
+    if (state.currentCardIndex.value > 0) {
+      state.currentCardIndex.value--;
+    }
+  }
+
+  /// 切换到下一张卡片
+  void nextCard() {
+    final totalCards = state.terms.value?.length ?? 0;
+    if (state.currentCardIndex.value < totalCards - 1) {
+      state.currentCardIndex.value++;
+    }
+  }
+
+  /// 跳转到指定卡片
+  void goToCard(int index) {
+    final totalCards = state.terms.value?.length ?? 0;
+    if (index >= 0 && index < totalCards) {
+      state.currentCardIndex.value = index;
     }
   }
 

@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:newstudyapp/pages/home/home_page.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
+import 'package:newstudyapp/pages/feynman_card/feynman_card_detail_page.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 
 /// GetX 页面路由配置
@@ -18,6 +19,10 @@ class AppPages {
       binding: BindingsBuilder(() {
         Get.lazyPut<HomeController>(() => HomeController());
       }),
+    ),
+    GetPage(
+      name: AppRoutes.FEYNMAN_CARD_DETAIL,
+      page: () => const FeynmanCardDetailPage(),
     ),
   ];
 }
