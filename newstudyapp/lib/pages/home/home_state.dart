@@ -4,6 +4,33 @@ import 'package:get/get.dart';
 enum FloatingPhase { idle, flyingUp, flyingDown }
 enum InputMode { voice, text }
 
+/// 学习阶段枚举
+enum LearningPhase {
+  /// 选择卡片阶段
+  selecting,
+  /// 解释中（输入解释）
+  explaining,
+  /// 查看不清楚的词汇列表
+  reviewing,
+  /// 学习成功
+  success,
+}
+
+/// 词汇解释结果
+class WordExplanation {
+  final String word;
+  final String simpleExplanation;
+  final String analogy;
+  final String keyPoint;
+
+  const WordExplanation({
+    required this.word,
+    required this.simpleExplanation,
+    required this.analogy,
+    required this.keyPoint,
+  });
+}
+
 class HomeState {
   // 服务相关
   static const String defaultCategory = 'economics';
@@ -32,13 +59,55 @@ class HomeState {
   final floatingPhase = FloatingPhase.idle.obs;
 
   // 输入相关状态
+  final isExplanationViewVisible = false.obs;
   final inputMode = InputMode.voice.obs;
   final isExplaining = false.obs;
   final isSubmittingSuggestion = false.obs;
   final textInputController = TextEditingController();
   final isAppending = false.obs;
 
+  // ========== 学习流程状态 ==========
+  /// 当前学习阶段
+  final learningPhase = LearningPhase.selecting.obs;
+  
+  /// 当前正在解释的词汇（根词汇或衍生词汇）
+  final currentExplainingTerm = Rxn<String>();
+  
+  /// Agent 返回的不清楚词汇列表
+  final confusedWords = <String>[].obs;
+  
+  /// 当前显示的不清楚词汇索引
+  final currentConfusedIndex = 0.obs;
+  
+  /// 解释历史：记录用户解释过的词汇链
+  final explanationHistory = <String>[].obs;
+  
+  /// 解释内容记录：词汇 -> 用户的解释内容
+  final explanationContents = <String, String>{}.obs;
+  
+  /// 词汇解释缓存（辅助解释功能）
+  final wordExplanations = <String, WordExplanation>{}.obs;
+  
+  /// 是否正在加载辅助解释
+  final isLoadingExplanation = false.obs;
+  
+  /// 用户当前输入的解释内容
+  final userExplanation = Rxn<String>();
+
   void dispose() {
     textInputController.dispose();
+  }
+  
+  /// 重置学习状态
+  void resetLearningState() {
+    learningPhase.value = LearningPhase.selecting;
+    currentExplainingTerm.value = null;
+    confusedWords.clear();
+    currentConfusedIndex.value = 0;
+    explanationHistory.clear();
+    explanationContents.clear();
+    wordExplanations.clear();
+    isLoadingExplanation.value = false;
+    userExplanation.value = null;
   }
 }

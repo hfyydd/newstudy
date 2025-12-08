@@ -130,48 +130,37 @@ class HomeController extends GetxController {
   }
 
   Future<void> handleCardExplain(String term) async {
-    if (state.isExplaining.value) {
-      return;
-    }
-    state.isExplaining.value = true;
+    // 设置当前解释的词汇
+    state.currentExplainingTerm.value = term;
+    state.learningPhase.value = LearningPhase.explaining;
+    state.explanationHistory.add(term);
+    
+    // 切换到解释视图状态
+    state.isExplanationViewVisible.value = true;
+    state.inputMode.value = InputMode.voice;
+    state.textInputController.clear();
+  }
+
+  void restoreCardView() {
+    // 重置学习状态
+    state.learningPhase.value = LearningPhase.selecting;
+    state.currentExplainingTerm.value = null;
+    state.confusedWords.clear();
+    state.explanationHistory.clear();
+    
+    // 先更新状态
+    state.isExplanationViewVisible.value = false;
+    state.isExplanationViewVisible.refresh(); // 强制刷新
+    
+    // 调试：显示提示
+    // Get.snackbar('Debug', 'Restoring view...', duration: const Duration(milliseconds: 500));
 
     try {
-      final response = await httpService.runSimpleExplainer(term);
-      final replyText = response.reply.trim();
-
-      String explanationText = replyText;
-      try {
-        final jsonCandidate = _extractJsonBlock(replyText);
-        if (jsonCandidate != null) {
-          final decoded = jsonDecode(jsonCandidate);
-          if (decoded is Map<String, dynamic>) {
-            final explanations = decoded['explanations'];
-            if (explanations is List && explanations.isNotEmpty) {
-              final firstExplanation = explanations[0];
-              if (firstExplanation is Map<String, dynamic>) {
-                final simpleExplanation = firstExplanation['simple_explanation'];
-                if (simpleExplanation is String && simpleExplanation.isNotEmpty) {
-                  explanationText = simpleExplanation;
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('[HomeController] Failed to parse explanation JSON: $e');
-      }
-
-      state.inputMode.value = InputMode.text;
-      state.textInputController.text = explanationText;
-    } catch (error) {
-      Get.snackbar(
-        '错误',
-        '获取解释失败：$error',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(milliseconds: 1800),
-      );
-    } finally {
-      state.isExplaining.value = false;
+      state.inputMode.value = InputMode.voice;
+      state.textInputController.clear();
+      FocusManager.instance.primaryFocus?.unfocus();
+    } catch (e) {
+      debugPrint('Error checking/restoring view: $e');
     }
   }
 
@@ -182,6 +171,15 @@ class HomeController extends GetxController {
     }
 
     state.isSubmittingSuggestion.value = true;
+    
+    // 保存用户输入的解释内容，用于页面显示
+    state.userExplanation.value = trimmed;
+    
+    // 保存到解释历史记录中（词汇 -> 解释内容）
+    final currentTerm = state.currentExplainingTerm.value;
+    if (currentTerm != null) {
+      state.explanationContents[currentTerm] = trimmed;
+    }
 
     try {
       debugPrint('[HomeController] Submit text: "$trimmed"');
@@ -196,23 +194,10 @@ class HomeController extends GetxController {
 
       if (extracted.isEmpty) {
         if (extraction.isClear) {
-          Get.snackbar(
-            '提示',
-            '解释已清楚，无需新增词汇',
-            snackPosition: SnackPosition.BOTTOM,
-            duration: const Duration(milliseconds: 1500),
-          );
-          state.selectedTerm.value = null;
-          state.floatingTerm.value = null;
-          state.floatingAnimating.value = false;
-          state.floatingCardWidth.value = null;
-          state.floatingCardHeight.value = null;
-          state.floatingAlignment.value = Alignment.center;
-          state.floatingSizeFactor.value = 1.0;
-          state.floatingPhase.value = FloatingPhase.idle;
-          state.inputMode.value = InputMode.voice;
+          // 🎉 学习成功！显示成功界面
+          state.learningPhase.value = LearningPhase.success;
+          state.confusedWords.clear();
           state.textInputController.clear();
-          maybeReplenishDeck();
         } else {
           Get.snackbar(
             '提示',
@@ -224,17 +209,11 @@ class HomeController extends GetxController {
         return;
       }
 
-      state.terms.value = List.of(extracted);
-      state.selectedTerm.value = null;
-      state.floatingTerm.value = null;
-      state.floatingAnimating.value = false;
-      state.floatingCardWidth.value = null;
-      state.floatingCardHeight.value = null;
-      state.floatingAlignment.value = Alignment.center;
-      state.floatingSizeFactor.value = 1.0;
-      state.floatingPhase.value = FloatingPhase.idle;
-      state.inputMode.value = InputMode.voice;
+      // 有不清楚的词汇，进入 reviewing 阶段
+      state.confusedWords.value = List.of(extracted);
+      state.learningPhase.value = LearningPhase.reviewing;
       state.textInputController.clear();
+      
     } catch (error) {
       Get.snackbar(
         '错误',
@@ -447,6 +426,111 @@ class HomeController extends GetxController {
     } finally {
       state.isAppending.value = false;
     }
+  }
+  
+  // ========== 学习流程方法 ==========
+  
+  /// 选择一个不清楚的词汇继续解释
+  void selectConfusedWord(String word) {
+    // 清除上一轮的解释内容
+    state.userExplanation.value = null;
+    state.confusedWords.clear();
+    
+    // 设置新的解释词汇
+    state.currentExplainingTerm.value = word;
+    state.explanationHistory.add(word);
+    state.learningPhase.value = LearningPhase.explaining;
+    state.inputMode.value = InputMode.voice;
+    state.textInputController.clear();
+  }
+  
+  /// 获取词汇的辅助解释（可选功能）
+  Future<void> getWordExplanation(String word) async {
+    // 如果已经缓存了，直接返回
+    if (state.wordExplanations.containsKey(word)) {
+      return;
+    }
+    
+    state.isLoadingExplanation.value = true;
+    
+    try {
+      // 构造请求：包含词汇和上下文
+      final requestText = '{"words": ["<$word>"], "original_context": "${state.currentExplainingTerm.value ?? word}"}';
+      final response = await httpService.runSimpleExplainer(requestText);
+      
+      debugPrint('[HomeController] Explanation reply: ${response.reply}');
+      
+      // 解析响应
+      final explanation = _parseExplanation(response.reply, word);
+      if (explanation != null) {
+        state.wordExplanations[word] = explanation;
+      }
+    } catch (error) {
+      Get.snackbar(
+        '提示',
+        '获取解释失败：$error',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(milliseconds: 1500),
+      );
+    } finally {
+      state.isLoadingExplanation.value = false;
+    }
+  }
+  
+  /// 解析辅助解释响应
+  WordExplanation? _parseExplanation(String reply, String word) {
+    try {
+      final jsonBlock = _extractJsonBlock(reply);
+      if (jsonBlock == null) return null;
+      
+      final decoded = jsonDecode(jsonBlock);
+      if (decoded is Map<String, dynamic>) {
+        final explanations = decoded['explanations'];
+        if (explanations is List && explanations.isNotEmpty) {
+          final first = explanations.first as Map<String, dynamic>;
+          return WordExplanation(
+            word: first['word']?.toString() ?? word,
+            simpleExplanation: first['simple_explanation']?.toString() ?? '',
+            analogy: first['analogy']?.toString() ?? '',
+            keyPoint: first['key_point']?.toString() ?? '',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[HomeController] Parse explanation error: $e');
+    }
+    return null;
+  }
+  
+  /// 完成学习，返回卡片选择界面
+  void finishLearning() {
+    // 先保存要移除的词汇（在重置状态之前）
+    final originalTerm = state.explanationHistory.isNotEmpty 
+        ? state.explanationHistory.first 
+        : null;
+    
+    // 从术语列表中移除已成功学习的词汇
+    if (originalTerm != null && state.terms.value != null) {
+      state.terms.value!.remove(originalTerm);
+      state.terms.refresh();
+    }
+    
+    // 重置学习状态
+    state.resetLearningState();
+    state.isExplanationViewVisible.value = false;
+    state.inputMode.value = InputMode.voice;
+    state.textInputController.clear();
+    
+    // 如果列表为空，补充新词汇
+    maybeReplenishDeck();
+  }
+  
+  /// 中途退出学习
+  void cancelLearning() {
+    state.resetLearningState();
+    state.isExplanationViewVisible.value = false;
+    state.inputMode.value = InputMode.voice;
+    state.textInputController.clear();
   }
 }
 

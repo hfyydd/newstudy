@@ -5,7 +5,7 @@ class ApiConfig {
   /// 后端服务基础地址
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.95.144:8000',
+    defaultValue: 'http://127.0.0.1:8000',
   );
 
   // ==================== Agent 相关接口 ====================
