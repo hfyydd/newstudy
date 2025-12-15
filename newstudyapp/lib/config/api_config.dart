@@ -21,6 +21,14 @@ class ApiConfig {
   /// 获取术语列表
   static const String fetchTerms = '/topics/terms';
 
+  // ==================== Notes 相关接口 ====================
+
+  /// 从笔记文本中抽取待学习词语
+  static const String extractNoteTerms = '/notes/extract-terms';
+
+  /// 从笔记文件中抽取待学习词语（multipart/form-data）
+  static const String extractNoteTermsFile = '/notes/extract-terms/file';
+
   // ==================== 辅助方法 ====================
 
   /// 构建完整的 API URL

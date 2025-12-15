@@ -11,7 +11,6 @@ base_url = os.getenv("BASE_URL", "https://api.moonshot.cn/v1")
 api_key = os.getenv("API_KEY", "")
 model = os.getenv("MODEL", "kimi-k2-turbo-preview")
 
-if not api_key:
-    raise ValueError(
-        "API_KEY 未设置。请在 .env 文件中配置 API_KEY，或参考 .env.example"
-    )
+# 注意：
+# 这里不要在 import 阶段直接抛错，否则服务无法启动（即使只想用不依赖 LLM 的功能）。
+# 需要调用 LLM 的地方应在运行时自行校验 api_key 是否为空。

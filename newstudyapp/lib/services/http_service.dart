@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/models/agent_models.dart';
+import 'package:newstudyapp/models/note_models.dart';
 
 /// HTTP 网络请求服务（单例模式）
 /// 
@@ -99,6 +100,56 @@ class HttpService {
         queryParameters: {'category': category},
       );
       return TermsResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== Notes 相关接口 ====================
+
+  /// 从笔记文本中抽取待学习词语
+  Future<NoteExtractResponse> extractTermsFromNote({
+    required String text,
+    String? title,
+    int maxTerms = 30,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.extractNoteTerms,
+        data: {
+          'title': title,
+          'text': text,
+          'max_terms': maxTerms,
+        },
+      );
+      return NoteExtractResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 从笔记文件中抽取待学习词语（PDF/DOCX/TXT）
+  Future<NoteExtractResponse> extractTermsFromNoteFile({
+    required String filePath,
+    required String filename,
+    int maxTerms = 30,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'max_terms': maxTerms,
+        'file': await MultipartFile.fromFile(
+          filePath,
+          filename: filename,
+        ),
+      });
+      final response = await _dio.post(
+        ApiConfig.extractNoteTermsFile,
+        data: formData,
+        options: Options(
+          headers: {'Content-Type': 'multipart/form-data'},
+        ),
+      );
+      return NoteExtractResponse.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }

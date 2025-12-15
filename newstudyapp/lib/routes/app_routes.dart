@@ -3,8 +3,17 @@ class AppRoutes {
   AppRoutes._();
 
   /// 首页
-  static const HOME = '/home';
+  static const home = '/home';
 
   /// 费曼卡片详情页
-  static const FEYNMAN_CARD_DETAIL = '/feynman-card-detail';
+  static const feynmanCardDetail = '/feynman-card-detail';
+
+  /// 主题选择页
+  static const topicSelection = '/topic-selection';
+
+  /// 费曼学习页面
+  static const feynmanLearning = '/feynman-learning';
+
+  /// 创建笔记（笔记抽词）
+  static const noteCreation = '/note-creation';
 }
