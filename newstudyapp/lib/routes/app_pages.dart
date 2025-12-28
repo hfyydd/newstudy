@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:newstudyapp/pages/home/home_page.dart';
-import 'package:newstudyapp/pages/home/home_controller.dart';
+import 'package:newstudyapp/pages/main/main_page.dart';
+import 'package:newstudyapp/pages/main/main_controller.dart';
 import 'package:newstudyapp/pages/feynman_card/feynman_card_detail_page.dart';
 import 'package:newstudyapp/pages/topic_selection/topic_selection_page.dart';
 import 'package:newstudyapp/pages/topic_selection/topic_selection_controller.dart';
@@ -15,15 +15,15 @@ class AppPages {
   AppPages._();
 
   /// 初始路由
-  static const initial = AppRoutes.home;
+  static const initial = AppRoutes.main;
 
   /// 所有路由页面配置
   static final routes = [
     GetPage(
-      name: AppRoutes.home,
-      page: () => const HomePage(),
+      name: AppRoutes.main,
+      page: () => const MainPage(),
       binding: BindingsBuilder(() {
-        Get.lazyPut<HomeController>(() => HomeController());
+        Get.lazyPut<MainController>(() => MainController());
       }),
     ),
     GetPage(

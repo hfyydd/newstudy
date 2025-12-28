@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/config/app_config.dart';
+import 'package:newstudyapp/config/app_theme.dart';
+import 'package:newstudyapp/config/theme_controller.dart';
 import 'package:newstudyapp/routes/app_pages.dart';
 
 class MyApp extends StatelessWidget {
@@ -8,18 +10,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
+    // 初始化主题控制器
+    final themeController = Get.put(ThemeController());
+    
+    return Obx(() => GetMaterialApp(
       title: AppConfig.appTitle,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.indigo,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeController.themeMode,
       debugShowCheckedModeBanner: false,
       initialRoute: AppPages.initial,
       getPages: AppPages.routes,
-    );
+    ));
   }
 }

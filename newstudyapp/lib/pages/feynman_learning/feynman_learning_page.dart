@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.dart';
+import 'package:newstudyapp/config/app_theme.dart';
 
 class FeynmanLearningPage extends StatelessWidget {
   const FeynmanLearningPage({super.key});
@@ -8,41 +9,44 @@ class FeynmanLearningPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(FeynmanLearningController());
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: _buildAppBar(controller),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: _buildAppBar(controller, isDark),
       body: Obx(() {
         if (controller.state.isLoading.value) {
-          return const Center(
-            child: CircularProgressIndicator(),
+          return Center(
+            child: CircularProgressIndicator(
+              color: AppTheme.darkPrimary,
+            ),
           );
         }
 
         if (controller.state.errorMessage.value != null) {
-          return _buildErrorView(controller);
+          return _buildErrorView(controller, isDark);
         }
 
         final terms = controller.state.terms.value;
         if (terms == null || terms.isEmpty) {
-          return _buildEmptyView(controller);
+          return _buildEmptyView(controller, isDark);
         }
 
         return Column(
           children: [
             // 进度显示
-            _buildProgressBar(controller, terms.length),
+            _buildProgressBar(controller, terms.length, isDark),
             const SizedBox(height: 16),
 
             // 卡片区域
             Expanded(
-              child: _buildCardSection(controller, terms),
+              child: _buildCardSection(controller, terms, isDark),
             ),
 
             const SizedBox(height: 24),
 
             // 分页指示器
-            _buildPageIndicator(controller, terms.length),
+            _buildPageIndicator(controller, terms.length, isDark),
             const SizedBox(height: 32),
           ],
         );
@@ -51,18 +55,22 @@ class FeynmanLearningPage extends StatelessWidget {
   }
 
   /// 构建AppBar
-  PreferredSizeWidget _buildAppBar(FeynmanLearningController controller) {
+  PreferredSizeWidget _buildAppBar(
+      FeynmanLearningController controller, bool isDark) {
+    final iconColor = isDark ? Colors.white : Colors.black87;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(Get.context!).scaffoldBackgroundColor,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        icon: Icon(Icons.arrow_back, color: iconColor),
         onPressed: () => Get.back(),
       ),
       title: Obx(() => Text(
             controller.getCategoryDisplayName(),
-            style: const TextStyle(
-              color: Colors.black87,
+            style: TextStyle(
+              color: textColor,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -72,10 +80,13 @@ class FeynmanLearningPage extends StatelessWidget {
   }
 
   /// 构建进度条
-  Widget _buildProgressBar(FeynmanLearningController controller, int total) {
+  Widget _buildProgressBar(
+      FeynmanLearningController controller, int total, bool isDark) {
     return Obx(() {
       final current = controller.state.currentCardIndex.value + 1;
       final progress = current / total;
+      final textColor = isDark ? Colors.grey[400] : Colors.black54;
+      final bgColor = isDark ? Colors.grey[800] : Colors.grey[200];
 
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -86,17 +97,17 @@ class FeynmanLearningPage extends StatelessWidget {
               children: [
                 Text(
                   '进度：$current/$total',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.black54,
+                    color: textColor,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   '${(progress * 100).toInt()}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.black54,
+                    color: textColor,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -108,9 +119,9 @@ class FeynmanLearningPage extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 8,
-                backgroundColor: Colors.grey[200],
+                backgroundColor: bgColor,
                 valueColor: const AlwaysStoppedAnimation<Color>(
-                  Color(0xFF6366F1),
+                  AppTheme.darkPrimary,
                 ),
               ),
             ),
@@ -122,7 +133,7 @@ class FeynmanLearningPage extends StatelessWidget {
 
   /// 构建卡片区域（支持滑动）
   Widget _buildCardSection(
-      FeynmanLearningController controller, List<String> terms) {
+      FeynmanLearningController controller, List<String> terms, bool isDark) {
     return PageView.builder(
       controller: PageController(
         initialPage: controller.state.currentCardIndex.value,
@@ -149,6 +160,7 @@ class FeynmanLearningPage extends StatelessWidget {
                 terms[index],
                 index,
                 isCurrentCard,
+                isDark,
               ),
             ),
           );
@@ -164,12 +176,12 @@ class FeynmanLearningPage extends StatelessWidget {
     String term,
     int index,
     bool isCurrentCard,
+    bool isDark,
   ) {
     return GestureDetector(
       onTap: isCurrentCard
           ? () {
-              // 点击当前卡片，显示学习选项
-              _showLearningOptions(context, controller, term);
+              _showLearningOptions(context, controller, term, isDark);
             }
           : null,
       child: Container(
@@ -299,146 +311,186 @@ class FeynmanLearningPage extends StatelessWidget {
   /// 根据索引返回卡片颜色
   Color _getCardColor(int index) {
     final colors = [
-      const Color(0xFF6366F1), // Indigo
-      const Color(0xFF8B5CF6), // Purple
-      const Color(0xFF10B981), // Green
-      const Color(0xFF3B82F6), // Blue
-      const Color(0xFFF59E0B), // Amber
+      const Color(0xFF6366F1), // 紫色
+      const Color(0xFFEC4899), // 粉色
+      const Color(0xFF10B981), // 绿色
+      const Color(0xFFF59E0B), // 橙色
+      const Color(0xFF3B82F6), // 蓝色
+      const Color(0xFF8B5CF6), // 深紫色
     ];
     return colors[index % colors.length];
   }
 
   /// 构建分页指示器
-  Widget _buildPageIndicator(FeynmanLearningController controller, int total) {
+  Widget _buildPageIndicator(
+      FeynmanLearningController controller, int total, bool isDark) {
     return Obx(() {
-      final currentIndex = controller.state.currentCardIndex.value;
+      final current = controller.state.currentCardIndex.value;
+      final dotColor = isDark ? Colors.grey[700] : Colors.grey[300];
+      final activeDotColor = AppTheme.darkPrimary;
 
-      return Column(
-        children: [
-          // 圆点指示器
-          SizedBox(
-            height: 8,
-            child: ListView.builder(
-              shrinkWrap: true,
-              scrollDirection: Axis.horizontal,
-              itemCount: total.clamp(0, 10), // 最多显示10个点
-              itemBuilder: (context, index) {
-                final isActive = index == currentIndex;
-                return GestureDetector(
-                  onTap: () => controller.goToCard(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: isActive ? 32 : 8,
-                    height: 8,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color:
-                          isActive ? const Color(0xFF6366F1) : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          // 数字显示
-          Text(
-            '${currentIndex + 1} / $total',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(total > 8 ? 8 : total, (index) {
+          if (total > 8) {
+            // 显示前3个、当前、后3个和省略号
+            if (index < 3) {
+              return _buildDot(index == current, dotColor, activeDotColor);
+            } else if (index == 3) {
+              if (current > 3 && current < total - 4) {
+                return _buildDot(true, dotColor, activeDotColor);
+              } else if (current <= 3) {
+                return _buildDot(index == current, dotColor, activeDotColor);
+              } else {
+                return _buildEllipsis(dotColor);
+              }
+            } else if (index >= 4 && index < 7) {
+              final actualIndex = total - (8 - index);
+              return _buildDot(
+                  actualIndex == current, dotColor, activeDotColor);
+            } else {
+              return _buildDot(
+                  (total - 1) == current, dotColor, activeDotColor);
+            }
+          } else {
+            return _buildDot(index == current, dotColor, activeDotColor);
+          }
+        }),
       );
     });
   }
 
-  /// 显示学习选项弹窗
+  Widget _buildDot(bool isActive, Color? inactiveColor, Color activeColor) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: isActive ? 24 : 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: isActive ? activeColor : inactiveColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+
+  Widget _buildEllipsis(Color? color) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        '...',
+        style: TextStyle(
+          color: color,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  /// 显示学习选项
   void _showLearningOptions(
     BuildContext context,
     FeynmanLearningController controller,
     String term,
+    bool isDark,
   ) {
+    final bgColor = isDark ? Colors.grey[900] : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
+    final dividerColor = isDark ? Colors.grey[800] : Colors.grey[200];
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      isScrollControlled: true,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 标题
+            // 拖动指示器
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: dividerColor,
                 borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Text(
-              '学习：$term',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
               ),
             ),
             const SizedBox(height: 24),
 
-            // 开始学习
+            // 词条名称
+            Text(
+              term,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '选择学习方式',
+              style: TextStyle(
+                fontSize: 14,
+                color: secondaryColor,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // 学习选项按钮
             _LearningOptionButton(
-              icon: Icons.school,
-              title: '开始学习',
-              subtitle: '用费曼学习法解释这个词条',
+              icon: Icons.record_voice_over,
+              title: '开始解释',
+              subtitle: '用自己的话解释这个词条',
               color: const Color(0xFF6366F1),
-              onPressed: () {
+              onTap: () {
                 Get.back();
                 controller.handleCardExplain(term);
               },
+              isDark: isDark,
             ),
             const SizedBox(height: 12),
-
-            // 查看提示
             _LearningOptionButton(
               icon: Icons.lightbulb_outline,
               title: '查看提示',
-              subtitle: '获取词条的简单解释',
-              color: const Color(0xFF10B981),
-              onPressed: () {
+              subtitle: '获取学习提示和引导',
+              color: const Color(0xFFF59E0B),
+              onTap: () {
                 Get.back();
-                _showHintDialog(context, controller, term);
+                // TODO: 实现查看提示功能
+                Get.snackbar(
+                  '提示',
+                  '功能开发中...',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: bgColor,
+                  colorText: textColor,
+                );
               },
+              isDark: isDark,
             ),
             const SizedBox(height: 12),
-
-            // 标记已掌握
             _LearningOptionButton(
               icon: Icons.check_circle_outline,
               title: '标记已掌握',
               subtitle: '跳过这个词条',
-              color: const Color(0xFF8B5CF6),
-              onPressed: () {
+              color: const Color(0xFF10B981),
+              onTap: () {
                 Get.back();
+                // TODO: 实现标记已掌握功能
                 Get.snackbar(
-                  '已标记',
-                  '词条「$term」已标记为已掌握',
+                  '成功',
+                  '已标记为掌握',
                   snackPosition: SnackPosition.BOTTOM,
-                  duration: const Duration(seconds: 2),
-                  backgroundColor: const Color(0xFF10B981),
-                  colorText: Colors.white,
+                  backgroundColor: bgColor,
+                  colorText: textColor,
                 );
                 controller.nextCard();
               },
+              isDark: isDark,
             ),
             const SizedBox(height: 16),
           ],
@@ -447,123 +499,52 @@ class FeynmanLearningPage extends StatelessWidget {
     );
   }
 
-  /// 显示提示对话框
-  void _showHintDialog(
-    BuildContext context,
-    FeynmanLearningController controller,
-    String term,
-  ) {
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.lightbulb,
-                    color: Color(0xFFFBBF24),
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      term,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  '提示功能开发中...\n请尝试用自己的话解释这个词条',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black54,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Get.back(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    '我知道了',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  /// 构建错误视图
+  Widget _buildErrorView(FeynmanLearningController controller, bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
 
-  /// 错误视图
-  Widget _buildErrorView(FeynmanLearningController controller) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.error_outline,
               size: 64,
-              color: Colors.red,
+              color: secondaryColor,
             ),
             const SizedBox(height: 16),
             Text(
-              controller.state.errorMessage.value ?? '发生错误',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
+              '加载失败',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
             ),
+            const SizedBox(height: 8),
+            Obx(() => Text(
+                  controller.state.errorMessage.value ?? '未知错误',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: secondaryColor,
+                  ),
+                  textAlign: TextAlign.center,
+                )),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => controller.loadTerms(),
+              onPressed: () => Get.back(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                backgroundColor: AppTheme.darkPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
                 ),
               ),
-              child: const Text(
-                '重试',
-                style: TextStyle(color: Colors.white),
-              ),
+              child: const Text('返回'),
             ),
           ],
         ),
@@ -571,110 +552,143 @@ class FeynmanLearningPage extends StatelessWidget {
     );
   }
 
-  /// 空视图
-  Widget _buildEmptyView(FeynmanLearningController controller) {
+  /// 构建空视图
+  Widget _buildEmptyView(FeynmanLearningController controller, bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
+
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: Colors.grey,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '暂无卡片',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => controller.loadTerms(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 64,
+              color: secondaryColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '暂无词条',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: textColor,
               ),
             ),
-            child: const Text(
-              '刷新',
-              style: TextStyle(color: Colors.white),
+            const SizedBox(height: 8),
+            Text(
+              '请先选择学习主题',
+              style: TextStyle(
+                fontSize: 14,
+                color: secondaryColor,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => Get.back(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.darkPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+              ),
+              child: const Text('返回'),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// 学习选项按钮
+/// 学习选项按钮组件
 class _LearningOptionButton extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+  final bool isDark;
+
   const _LearningOptionButton({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.color,
-    required this.onPressed,
+    required this.onTap,
+    required this.isDark,
   });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 1,
+    final cardColor = isDark ? Colors.grey[850] : Colors.grey[50];
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+              width: 1,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 24,
+                ),
               ),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: color,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black54,
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: secondaryColor,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right, color: color),
-          ],
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: secondaryColor,
+              ),
+            ],
+          ),
         ),
       ),
     );

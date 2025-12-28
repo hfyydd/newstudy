@@ -1,619 +1,593 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
+import 'package:newstudyapp/config/app_theme.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.put(HomeController(), tag: 'home');
+  State<HomePage> createState() => _HomePageState();
+}
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // 顶部用户信息区域
-            _buildHeader(controller),
-            
-            // 主要内容区域（可滚动）
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                child: Column(
-                  children: [
-                    // 开学季卡片
-                    _buildBackToSchoolCard(),
-                    const SizedBox(height: 16),
-                    
-                    // Feynman AI 卡片
-                    _buildFeynmanAICard(controller),
-                    const SizedBox(height: 16),
-                    
-                    // 创建笔记卡片
-                    _buildCreateNotesCard(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
-            
-            // 底部导航栏
-            _buildBottomNavigationBar(controller),
-          ],
-        ),
-      ),
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+  late AnimationController _fabAnimationController;
+  late Animation<double> _fabScaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fabAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _fabScaleAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _fabAnimationController, curve: Curves.easeInOut),
     );
   }
 
-  /// 构建顶部用户信息区域
-  Widget _buildHeader(HomeController controller) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          // 用户头像
-          Container(
-            width: 48,
-            height: 48,
+  @override
+  void dispose() {
+    _fabAnimationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                
+                // 大标题
+                _buildHeader(isDark),
+                const SizedBox(height: 40),
+                
+                // 今日复习卡片
+                _buildTodayReviewCard(isDark),
+                const SizedBox(height: 24),
+                
+                // 我的笔记区域
+                _buildNotesSection(isDark),
+                const SizedBox(height: 24),
+                
+                // 学习统计
+                _buildStatsSection(isDark),
+                const SizedBox(height: 24),
+                
+                // 测试按钮
+                _buildTestButton(isDark),
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: _buildAnimatedFAB(isDark),
+    );
+  }
+
+  Widget _buildAnimatedFAB(bool isDark) {
+    return AnimatedBuilder(
+      animation: _fabAnimationController,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _fabScaleAnimation.value,
+          child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.grey[300],
-              border: Border.all(color: Colors.grey[400]!, width: 1),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF667EEA),
+                  Color(0xFF764BA2),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF667EEA).withOpacity(0.5),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                  spreadRadius: 2,
+                ),
+              ],
             ),
-            child: const Icon(Icons.person, color: Colors.grey, size: 28),
+            child: FloatingActionButton(
+              onPressed: () {
+                // TODO: 跳转到创建笔记页面
+                Get.snackbar(
+                  '提示',
+                  '创建笔记功能即将推出',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: const Color(0xFF667EEA),
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 2),
+                  margin: const EdgeInsets.all(16),
+                  borderRadius: 12,
+                );
+              },
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: const Icon(
+                Icons.add,
+                size: 32,
+                color: Colors.white,
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
-          
-          // 问候语
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _getGreeting(),
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? Colors.grey[500] : Colors.grey[600],
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '准备好学习了吗？',
+          style: TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black,
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return '早上好';
+    } else if (hour < 18) {
+      return '下午好';
+    } else {
+      return '晚上好';
+    }
+  }
+
+  Widget _buildTodayReviewCard(bool isDark) {
+    return GestureDetector(
+      onTap: () {},
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF667EEA),
+              Color(0xFF764BA2),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF667EEA).withOpacity(0.4),
+              blurRadius: 30,
+              offset: const Offset(0, 15),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.local_fire_department, color: Colors.white, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        '今日复习',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const Row(
               children: [
                 Text(
-                  '你好, thyself Know!',
+                  '8',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[800],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // 语言选择
-          Row(
-            children: [
-              _buildLanguageFlag('🇨🇳'),
-              const SizedBox(width: 4),
-              _buildLanguageFlag('🇹🇼'),
-              const SizedBox(width: 4),
-              _buildLanguageFlag('🇭🇰'),
-              const SizedBox(width: 8),
-              Text(
-                'zh',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建语言国旗图标
-  Widget _buildLanguageFlag(String emoji) {
-    return GestureDetector(
-      onTap: () {
-        // 处理语言切换
-      },
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        child: Text(
-          emoji,
-          style: const TextStyle(fontSize: 16),
-        ),
-      ),
-    );
-  }
-
-  /// 构建开学季卡片
-  Widget _buildBackToSchoolCard() {
-    return Container(
-      height: 180,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFF6B6B), // 红色
-            Color(0xFFFF8E53), // 橙色
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // 左侧文字内容
-          Positioned(
-            left: 20,
-            top: 0,
-            bottom: 0,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  '开学季',
-                  style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 56,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    letterSpacing: 1,
+                    height: 1,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  '5折优惠',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                // 底部按钮
-                Container(
-                  margin: const EdgeInsets.only(bottom: 20),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // 处理获取优惠
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFFFF6B6B),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '个词条',
+                        style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w400),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
+                      Text(
+                        '等待复习',
+                        style: TextStyle(fontSize: 14, color: Colors.white70),
                       ),
-                      elevation: 0,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.card_giftcard, size: 18),
-                        SizedBox(width: 6),
-                        Text(
-                          '立即获取5折',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-          
-          // 右侧书包图标（使用 emoji 或图标）
-          Positioned(
-            right: 20,
-            top: 20,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text(
-                  '🎒',
-                  style: TextStyle(fontSize: 60),
-                ),
-              ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                _buildQuickStat('困难', '3', Colors.orange),
+                const SizedBox(width: 12),
+                _buildQuickStat('需改进', '5', Colors.yellow),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建 Feynman AI 卡片
-  Widget _buildFeynmanAICard(HomeController controller) {
-    return Container(
-      height: 180,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF4A90E2), // 蓝色
-            Color(0xFF9B59B6), // 紫色
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // 左侧文字内容
-          Positioned(
-            left: 20,
-            top: 0,
-            bottom: 0,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Feynman ',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'AI',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '使用费曼技巧',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '学习和记忆任何东西。',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
-                  ),
-                ),
-                const Spacer(),
-                // 底部按钮
-                Container(
-                  margin: const EdgeInsets.only(bottom: 20),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // 导航到主题选择页面
-                      Get.toNamed(AppRoutes.topicSelection);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF9B59B6),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star, size: 18, color: Color(0xFF9B59B6)),
-                        SizedBox(width: 6),
-                        Text(
-                          '开始学习',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // 右侧浣熊图标
-          Positioned(
-            right: 20,
-            top: 20,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text(
-                  '🦝',
-                  style: TextStyle(fontSize: 60),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  /// 构建创建笔记卡片
-  Widget _buildCreateNotesCard() {
+  Widget _buildQuickStat(String label, String value, Color color) {
     return Container(
-      height: 180,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF52C9A2), // 浅绿色
-            Color(0xFF2ECC71), // 深绿色
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: Colors.black.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Stack(
-        children: [
-          // 左侧文字内容
-          Positioned(
-            left: 20,
-            top: 0,
-            bottom: 0,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  '创建笔记',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '创建笔记、测验、记忆卡等,',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Text(
-                  '帮助您更快地学习。',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                // 底部按钮
-                Container(
-                  margin: const EdgeInsets.only(bottom: 20),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Get.toNamed(AppRoutes.noteCreation);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF2ECC71),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.note_add, size: 18),
-                        SizedBox(width: 6),
-                        Text(
-                          '创建笔记',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // 右侧笔记本图标
-          Positioned(
-            right: 20,
-            top: 20,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text(
-                  '📔',
-                  style: TextStyle(fontSize: 60),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建底部导航栏
-  Widget _buildBottomNavigationBar(HomeController controller) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // Home 按钮
-              _buildNavItem(
-                icon: Icons.home,
-                label: 'Home',
-                isActive: true,
-                onTap: () {},
-              ),
-              
-              // Library 按钮
-              _buildNavItem(
-                icon: Icons.library_books,
-                label: 'Library',
-                isActive: false,
-                onTap: () {},
-              ),
-              
-              // 中间的加号按钮（大号）
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      // 处理添加操作
-                    },
-                    borderRadius: BorderRadius.circular(28),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                ),
-              ),
-              
-              // Profile 按钮
-              _buildNavItem(
-                icon: Icons.person,
-                label: 'Profile',
-                isActive: false,
-                onTap: () {},
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 构建导航项
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: isActive ? Colors.black : Colors.grey[400],
-            size: 24,
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$value $label',
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotesSection(bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '我的笔记',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+            ),
+            TextButton(
+              onPressed: () {},
+              child: Text('查看全部', style: TextStyle(color: secondaryColor, fontSize: 14)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildNoteCard(
+          isDark: isDark,
+          title: '经济学基础',
+          progress: 12,
+          total: 30,
+          reviewCount: 5,
+          color: const Color(0xFF4ECDC4),
+        ),
+        const SizedBox(height: 12),
+        _buildNoteCard(
+          isDark: isDark,
+          title: '机器学习笔记',
+          progress: 5,
+          total: 15,
+          reviewCount: 3,
+          color: const Color(0xFFFF6B6B),
+        ),
+        const SizedBox(height: 12),
+        _buildAddNoteButton(isDark),
+      ],
+    );
+  }
+
+  Widget _buildNoteCard({
+    required bool isDark,
+    required String title,
+    required int progress,
+    required int total,
+    required int reviewCount,
+    required Color color,
+  }) {
+    final percentage = (progress / total * 100).toInt();
+    final cardColor = isDark ? Colors.grey[900] : Colors.white;
+    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[600] : Colors.grey[600];
+    
+    return GestureDetector(
+      onTap: () {},
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor!, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor),
+                  ),
+                ),
+                if (reviewCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$reviewCount 待复习',
+                      style: const TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '$progress',
+                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color),
+                          ),
+                          Text(
+                            '/$total',
+                            style: TextStyle(fontSize: 16, color: secondaryColor),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text('已掌握', style: TextStyle(fontSize: 12, color: secondaryColor)),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: SizedBox(
+                          width: 60,
+                          height: 60,
+                          child: CircularProgressIndicator(
+                            value: progress / total,
+                            strokeWidth: 5,
+                            backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
+                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Text(
+                          '$percentage%',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddNoteButton(bool isDark) {
+    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+    final iconColor = isDark ? Colors.grey[600] : Colors.grey[500];
+    
+    return GestureDetector(
+      onTap: () {},
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor!, width: 1, style: BorderStyle.solid),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_circle_outline, color: iconColor, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              '创建新笔记',
+              style: TextStyle(color: iconColor, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsSection(bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '学习统计',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildStatCard(isDark, Icons.local_fire_department_rounded, '7', '连续天数', const Color(0xFFFF6B6B))),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStatCard(isDark, Icons.psychology_rounded, '25', '已掌握', const Color(0xFF4ECDC4))),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildStatCard(isDark, Icons.timer_outlined, '2.5h', '累计时长', const Color(0xFFFFD93D))),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStatCard(isDark, Icons.library_books_outlined, '50', '累计学习', const Color(0xFF95E1D3))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(bool isDark, IconData icon, String value, String label, Color color) {
+    final cardColor = isDark ? Colors.grey[900] : Colors.white;
+    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor, height: 1),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isActive ? Colors.black : Colors.grey[400],
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+          Text(label, style: TextStyle(fontSize: 12, color: secondaryColor)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTestButton(bool isDark) {
+    final cardColor = isDark ? Colors.grey[900] : Colors.white;
+    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+    final iconColor = isDark ? Colors.grey[500] : Colors.grey[600];
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor!, width: 1),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.science_outlined, color: iconColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                '测试功能',
+                style: TextStyle(fontSize: 14, color: iconColor, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Get.toNamed(AppRoutes.feynmanLearning);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.darkPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              child: const Text(
+                '跳转到闪词学习页面',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ],
