@@ -19,4 +19,10 @@ class AppRoutes {
 
   /// 创建笔记（笔记抽词）
   static const noteCreation = '/note-creation';
+
+  /// 自定义文本创建笔记
+  static const createNote = '/create-note';
+
+  /// 笔记详情页
+  static const noteDetail = '/note-detail';
 }

@@ -8,6 +8,10 @@ import 'package:newstudyapp/pages/feynman_learning/feynman_learning_page.dart';
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.dart';
 import 'package:newstudyapp/pages/note_creation/note_creation_page.dart';
 import 'package:newstudyapp/pages/note_creation/note_creation_controller.dart';
+import 'package:newstudyapp/pages/create_note/create_note_page.dart';
+import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
+import 'package:newstudyapp/pages/note_detail/note_detail_page.dart';
+import 'package:newstudyapp/pages/note_detail/note_detail_controller.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 
 /// GetX 页面路由配置
@@ -49,6 +53,20 @@ class AppPages {
       page: () => const NoteCreationPage(),
       binding: BindingsBuilder(() {
         Get.lazyPut<NoteCreationController>(() => NoteCreationController());
+      }),
+    ),
+    GetPage(
+      name: AppRoutes.createNote,
+      page: () => const CreateNotePage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<CreateNoteController>(() => CreateNoteController());
+      }),
+    ),
+    GetPage(
+      name: AppRoutes.noteDetail,
+      page: () => const NoteDetailPage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<NoteDetailController>(() => NoteDetailController());
       }),
     ),
   ];
