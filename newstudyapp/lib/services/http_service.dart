@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/models/agent_models.dart';
 import 'package:newstudyapp/models/note_models.dart';
+import 'package:newstudyapp/pages/note_detail/note_detail_state.dart';
 
 /// HTTP 网络请求服务（单例模式）
 /// 
@@ -150,6 +151,94 @@ class HttpService {
         ),
       );
       return NoteExtractResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== 笔记管理接口 ====================
+
+  /// 获取笔记列表
+  Future<NotesListResponse> listNotes() async {
+    try {
+      final url = '${ApiConfig.baseUrl}${ApiConfig.listNotes}';
+      print('[HttpService] 请求笔记列表: $url');
+      final response = await _dio.get(
+        ApiConfig.listNotes,
+      );
+      print('[HttpService] 响应状态码: ${response.statusCode}');
+      print('[HttpService] 响应数据: ${response.data}');
+      return NotesListResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      print('[HttpService] 请求失败: ${e.message}');
+      print('[HttpService] 错误类型: ${e.type}');
+      if (e.response != null) {
+        print('[HttpService] 响应状态码: ${e.response?.statusCode}');
+        print('[HttpService] 响应数据: ${e.response?.data}');
+      }
+      throw _handleError(e);
+    } catch (e) {
+      print('[HttpService] 未知错误: $e');
+      rethrow;
+    }
+  }
+
+  /// 创建笔记
+  Future<NoteResponse> createNote({
+    String? title,
+    required String content,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.createNote,
+        data: {
+          'title': title,
+          'content': content,
+        },
+      );
+      return NoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取笔记详情
+  Future<NoteResponse> getNote(String noteId) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.getNote(noteId),
+      );
+      return NoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 生成闪词卡片
+  Future<FlashCardGenerateResponse> generateFlashCards({
+    required String noteId,
+    int maxTerms = 30,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.generateFlashCards(noteId),
+        data: {
+          'max_terms': maxTerms,
+        },
+      );
+      return FlashCardGenerateResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取闪词学习进度
+  Future<FlashCardProgress> getFlashCardProgress(String noteId) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.getFlashCardProgress(noteId),
+      );
+      return flashCardProgressFromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }

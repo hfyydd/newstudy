@@ -4,37 +4,10 @@ import 'package:newstudyapp/routes/app_routes.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
+import 'package:newstudyapp/pages/home/home_controller.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _fabAnimationController;
-  late Animation<double> _fabScaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _fabAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _fabScaleAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _fabAnimationController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _fabAnimationController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,61 +48,20 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       ),
-      floatingActionButton: _buildAnimatedFAB(isDark),
+      floatingActionButton: _buildAnimatedFAB(isDark, context),
     );
   }
 
-  Widget _buildAnimatedFAB(bool isDark) {
-    return AnimatedBuilder(
-      animation: _fabAnimationController,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _fabScaleAnimation.value,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF667EEA),
-                  Color(0xFF764BA2),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF667EEA).withOpacity(0.5),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: FloatingActionButton(
-              onPressed: () {
-                _showCreateNoteSheet(context, isDark);
-              },
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              child: const Icon(
-                Icons.add,
-                size: 32,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showCreateNoteSheet(BuildContext context, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _CreateNoteBottomSheet(isDark: isDark),
-    );
+  // 将所有原来的方法改为实例方法
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return '早上好';
+    } else if (hour < 18) {
+      return '下午好';
+    } else {
+      return '晚上好';
+    }
   }
 
   Widget _buildHeader(bool isDark) {
@@ -158,18 +90,273 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) {
-      return '早上好';
-    } else if (hour < 18) {
-      return '下午好';
-    } else {
-      return '晚上好';
-    }
+  Widget _buildTodayReviewCard(bool isDark) {
+    return _HomePageHelper.buildTodayReviewCard(isDark);
   }
 
-  Widget _buildTodayReviewCard(bool isDark) {
+  Widget _buildNotesSection(bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '我的笔记',
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+            ),
+            TextButton(
+              onPressed: () {},
+              child: Text('查看全部',
+                  style: TextStyle(color: secondaryColor, fontSize: 14)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Obx(() {
+          // 显示错误信息
+          if (controller.state.errorMessage.value != null) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          controller.state.errorMessage.value ?? '未知错误',
+                          style: const TextStyle(color: Colors.red, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () => controller.loadNotes(),
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (controller.state.isLoading.value) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          if (controller.state.notes.isEmpty) {
+            return _HomePageHelper.buildAddNoteButton(isDark);
+          }
+
+          // 显示笔记列表（最多显示前3个）
+          final displayNotes = controller.state.notes.take(3).toList();
+          final colors = [
+            const Color(0xFF4ECDC4),
+            const Color(0xFFFF6B6B),
+            const Color(0xFFFFD93D),
+          ];
+
+          return Column(
+            children: [
+              ...displayNotes.asMap().entries.map((entry) {
+                final index = entry.key;
+                final note = entry.value;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: index < displayNotes.length - 1 ? 12 : 12),
+                  child: _buildNoteCard(
+                    isDark: isDark,
+                    noteId: note.id,
+                    title: note.title ?? '无标题',
+                    progress: note.masteredCount,
+                    total: note.termCount,
+                    reviewCount: note.reviewCount,
+                    color: colors[index % colors.length],
+                  ),
+                );
+              }),
+              _HomePageHelper.buildAddNoteButton(isDark),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildNoteCard({
+    required bool isDark,
+    required String noteId,
+    required String title,
+    required int progress,
+    required int total,
+    required int reviewCount,
+    required Color color,
+  }) {
+    final percentage = total > 0 ? (progress / total * 100).toInt() : 0;
+    final cardColor = isDark ? Colors.grey[900] : Colors.white;
+    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[600] : Colors.grey[600];
+
+    return GestureDetector(
+      onTap: () {
+        controller.navigateToNoteDetail(noteId);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor!, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(
+                      color: color, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: textColor),
+                  ),
+                ),
+                if (reviewCount > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$reviewCount 待复习',
+                      style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '$progress',
+                            style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: color),
+                          ),
+                          Text(
+                            '/$total',
+                            style:
+                                TextStyle(fontSize: 16, color: secondaryColor),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text('已掌握',
+                          style:
+                              TextStyle(fontSize: 12, color: secondaryColor)),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: SizedBox(
+                          width: 60,
+                          height: 60,
+                          child: CircularProgressIndicator(
+                            value: total > 0 ? progress / total : 0,
+                            strokeWidth: 5,
+                            backgroundColor:
+                                isDark ? Colors.grey[800] : Colors.grey[300],
+                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Text(
+                          '$percentage%',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: textColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsSection(bool isDark) {
+    return _HomePageHelper.buildStatsSection(isDark);
+  }
+
+  Widget _buildTestButton(bool isDark) {
+    return _HomePageHelper.buildTestButton(isDark);
+  }
+
+  Widget _buildAnimatedFAB(bool isDark, BuildContext context) {
+    return _HomePageHelper.buildAnimatedFAB(context, isDark, _showCreateNoteSheet);
+  }
+
+  void _showCreateNoteSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CreateNoteBottomSheet(isDark: isDark),
+    );
+  }
+}
+
+// 辅助类，包含所有原来的方法实现（静态方法）
+class _HomePageHelper {
+  static Widget buildTodayReviewCard(bool isDark) {
     return GestureDetector(
       onTap: () {},
       child: Container(
@@ -279,7 +466,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildQuickStat(String label, String value, Color color) {
+  static Widget _buildQuickStat(String label, String value, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -305,183 +492,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildNotesSection(bool isDark) {
-    final textColor = isDark ? Colors.white : Colors.black;
-    final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '我的笔记',
-              style: TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
-            ),
-            TextButton(
-              onPressed: () {},
-              child: Text('查看全部',
-                  style: TextStyle(color: secondaryColor, fontSize: 14)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _buildNoteCard(
-          isDark: isDark,
-          title: '经济学基础',
-          progress: 12,
-          total: 30,
-          reviewCount: 5,
-          color: const Color(0xFF4ECDC4),
-        ),
-        const SizedBox(height: 12),
-        _buildNoteCard(
-          isDark: isDark,
-          title: '机器学习笔记',
-          progress: 5,
-          total: 15,
-          reviewCount: 3,
-          color: const Color(0xFFFF6B6B),
-        ),
-        const SizedBox(height: 12),
-        _buildAddNoteButton(isDark),
-      ],
-    );
-  }
-
-  Widget _buildNoteCard({
-    required bool isDark,
-    required String title,
-    required int progress,
-    required int total,
-    required int reviewCount,
-    required Color color,
-  }) {
-    final percentage = (progress / total * 100).toInt();
-    final cardColor = isDark ? Colors.grey[900] : Colors.white;
-    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
-    final textColor = isDark ? Colors.white : Colors.black;
-    final secondaryColor = isDark ? Colors.grey[600] : Colors.grey[600];
-
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: borderColor!, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                      color: color, borderRadius: BorderRadius.circular(2)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: textColor),
-                  ),
-                ),
-                if (reviewCount > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$reviewCount 待复习',
-                      style: const TextStyle(
-                          color: Colors.orange,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            '$progress',
-                            style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: color),
-                          ),
-                          Text(
-                            '/$total',
-                            style:
-                                TextStyle(fontSize: 16, color: secondaryColor),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text('已掌握',
-                          style:
-                              TextStyle(fontSize: 12, color: secondaryColor)),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: SizedBox(
-                          width: 60,
-                          height: 60,
-                          child: CircularProgressIndicator(
-                            value: progress / total,
-                            strokeWidth: 5,
-                            backgroundColor:
-                                isDark ? Colors.grey[800] : Colors.grey[300],
-                            valueColor: AlwaysStoppedAnimation<Color>(color),
-                          ),
-                        ),
-                      ),
-                      Center(
-                        child: Text(
-                          '$percentage%',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: textColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddNoteButton(bool isDark) {
+  static Widget buildAddNoteButton(bool isDark) {
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final iconColor = isDark ? Colors.grey[600] : Colors.grey[500];
 
@@ -511,7 +522,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildStatsSection(bool isDark) {
+  static Widget buildStatsSection(bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black;
 
     return Column(
@@ -554,7 +565,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildStatCard(
+  static Widget _buildStatCard(
       bool isDark, IconData icon, String value, String label, Color color) {
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
@@ -595,7 +606,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildTestButton(bool isDark) {
+  static Widget buildTestButton(bool isDark) {
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final iconColor = isDark ? Colors.grey[500] : Colors.grey[600];
@@ -644,6 +655,42 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  static Widget buildAnimatedFAB(BuildContext context, bool isDark, Function(BuildContext, bool) showCreateNoteSheet) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withOpacity(0.5),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: FloatingActionButton(
+        onPressed: () {
+          showCreateNoteSheet(context, isDark);
+        },
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: const Icon(
+          Icons.add,
+          size: 32,
+          color: Colors.white,
+        ),
       ),
     );
   }
@@ -886,7 +933,18 @@ class _CreateNoteBottomSheet extends StatelessWidget {
           if (result != null) {
             Get.back();
           }
-        } else {
+        } 
+        // PDF文档、Word文档、其他文档 - 跳转到文件上传页面
+        else if (item.label == 'PDF文档' || 
+                 item.label == 'Word文档' || 
+                 item.label == '其他文档') {
+          // 关闭创建源选择弹窗
+          Get.back();
+          // 跳转到文件上传页面
+          Get.toNamed(AppRoutes.noteCreation);
+        } 
+        // 其他功能（音频、图片、视频）暂未实现
+        else {
           // 其他功能先关闭弹窗，再显示提示
           Get.back();
           Get.snackbar(

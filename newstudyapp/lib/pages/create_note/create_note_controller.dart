@@ -6,11 +6,13 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
+import 'package:newstudyapp/services/http_service.dart';
 import 'create_note_state.dart';
 
 /// 创建笔记控制器
 class CreateNoteController extends GetxController {
   final CreateNoteState state = CreateNoteState();
+  final HttpService httpService = HttpService();
 
   /// 内容输入控制器
   final TextEditingController contentController = TextEditingController();
@@ -196,16 +198,24 @@ class CreateNoteController extends GetxController {
     state.isSaving.value = true;
 
     try {
-      // TODO: 调用后端API保存笔记
-      await Future.delayed(const Duration(seconds: 1)); // 模拟网络请求
+      // 调用后端API保存笔记
+      final noteResponse = await httpService.createNote(
+        title: state.noteContent.value.trim().isEmpty
+            ? null
+            : state.noteContent.value.trim().split('\n').first,
+        content: state.noteContent.value.trim(),
+      );
 
       // 关闭创建笔记弹窗
       Get.back();
       // 再关闭创建来源选择弹窗
       Get.back();
 
-      // 跳转到笔记详情页
-      Get.toNamed(AppRoutes.noteDetail);
+      // 跳转到笔记详情页，传递笔记ID
+      Get.toNamed(
+        AppRoutes.noteDetail,
+        arguments: {'noteId': noteResponse.id},
+      );
 
       Get.snackbar(
         '成功',

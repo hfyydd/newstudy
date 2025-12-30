@@ -3,9 +3,16 @@ class ApiConfig {
   ApiConfig._();
 
   /// 后端服务基础地址
+  ///
+  /// 注意：在 HarmonyOS 设备上，需要使用本机的局域网 IP 地址而不是 127.0.0.1
+  /// 如果 IP 地址发生变化，可以通过 --dart-define=API_BASE_URL=http://192.168.x.x:8000 来设置
+  ///
+  /// 获取本机 IP 地址的命令：
+  /// macOS/Linux: ifconfig | grep "inet " | grep -v 127.0.0.1
+  /// Windows: ipconfig
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000',
+    defaultValue: 'http://192.168.101.25:8000',
   );
 
   // ==================== Agent 相关接口 ====================
@@ -28,6 +35,23 @@ class ApiConfig {
 
   /// 从笔记文件中抽取待学习词语（multipart/form-data）
   static const String extractNoteTermsFile = '/notes/extract-terms/file';
+
+  /// 获取笔记列表
+  static const String listNotes = '/notes';
+
+  /// 创建笔记
+  static const String createNote = '/notes';
+
+  /// 获取笔记详情
+  static String getNote(String noteId) => '/notes/$noteId';
+
+  /// 生成闪词卡片
+  static String generateFlashCards(String noteId) =>
+      '/notes/$noteId/flash-cards/generate';
+
+  /// 获取闪词学习进度
+  static String getFlashCardProgress(String noteId) =>
+      '/notes/$noteId/flash-cards/progress';
 
   // ==================== 辅助方法 ====================
 
