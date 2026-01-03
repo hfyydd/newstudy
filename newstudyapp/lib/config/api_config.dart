@@ -12,7 +12,7 @@ class ApiConfig {
   /// Windows: ipconfig
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.101.25:8000',
+    defaultValue: 'http://192.168.1.105:8000',
   );
 
   // ==================== Agent 相关接口 ====================
@@ -45,13 +45,35 @@ class ApiConfig {
   /// 获取笔记详情
   static String getNote(String noteId) => '/notes/$noteId';
 
+  /// 更新笔记
+  static String updateNote(String noteId) => '/notes/$noteId';
+
+  /// 删除笔记
+  static String deleteNote(String noteId) => '/notes/$noteId';
+
   /// 生成闪词卡片
   static String generateFlashCards(String noteId) =>
       '/notes/$noteId/flash-cards/generate';
 
+  /// 获取闪词卡片列表
+  static String getFlashCards(String noteId) => '/notes/$noteId/flash-cards';
+
   /// 获取闪词学习进度
   static String getFlashCardProgress(String noteId) =>
       '/notes/$noteId/flash-cards/progress';
+
+  /// 更新闪词卡片状态
+  static String updateFlashCardStatus(String noteId) =>
+      '/notes/$noteId/flash-cards/status';
+
+  /// 获取学习统计
+  static const String getStatistics = '/statistics';
+
+  /// 获取今日复习统计
+  static const String getTodayReviewStatistics = '/review/today';
+
+  /// 获取需要复习的闪词卡片列表
+  static const String getReviewFlashCards = '/review/cards';
 
   // ==================== 辅助方法 ====================
 

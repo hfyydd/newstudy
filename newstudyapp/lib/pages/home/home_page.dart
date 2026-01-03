@@ -5,6 +5,9 @@ import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
+import 'package:newstudyapp/pages/note_creation/note_creation_controller.dart';
+import 'package:newstudyapp/models/note_models.dart';
+import 'package:image_picker/image_picker.dart';
 
 class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
@@ -38,17 +41,12 @@ class HomePage extends GetView<HomeController> {
 
                 // 学习统计
                 _buildStatsSection(isDark),
-                const SizedBox(height: 24),
-
-                // 测试按钮
-                _buildTestButton(isDark),
                 const SizedBox(height: 100),
               ],
             ),
           ),
         ),
       ),
-      floatingActionButton: _buildAnimatedFAB(isDark, context),
     );
   }
 
@@ -91,7 +89,11 @@ class HomePage extends GetView<HomeController> {
   }
 
   Widget _buildTodayReviewCard(bool isDark) {
-    return _HomePageHelper.buildTodayReviewCard(isDark);
+    return Obx(() => _HomePageHelper.buildTodayReviewCard(
+      isDark,
+      statistics: controller.state.todayReviewStatistics.value,
+      onTap: controller.navigateToReview,
+    ));
   }
 
   Widget _buildNotesSection(bool isDark) {
@@ -110,7 +112,22 @@ class HomePage extends GetView<HomeController> {
                   fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                print('[HomePage] 点击查看全部按钮');
+                try {
+                  print('[HomePage] 准备跳转到: ${AppRoutes.notes}');
+                  Get.toNamed(AppRoutes.notes);
+                  print('[HomePage] 跳转完成');
+                } catch (e, stackTrace) {
+                  print('[HomePage] 跳转失败: $e');
+                  print('[HomePage] 堆栈: $stackTrace');
+                  Get.snackbar(
+                    '错误',
+                    '无法打开笔记列表：$e',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
+              },
               child: Text('查看全部',
                   style: TextStyle(color: secondaryColor, fontSize: 14)),
             ),
@@ -162,7 +179,7 @@ class HomePage extends GetView<HomeController> {
           }
 
           if (controller.state.notes.isEmpty) {
-            return _HomePageHelper.buildAddNoteButton(isDark);
+            return _HomePageHelper.buildAddNoteButton(isDark, _showCreateNoteSheet);
           }
 
           // 显示笔记列表（最多显示前3个）
@@ -191,7 +208,7 @@ class HomePage extends GetView<HomeController> {
                   ),
                 );
               }),
-              _HomePageHelper.buildAddNoteButton(isDark),
+              _HomePageHelper.buildAddNoteButton(isDark, _showCreateNoteSheet),
             ],
           );
         }),
@@ -333,15 +350,10 @@ class HomePage extends GetView<HomeController> {
   }
 
   Widget _buildStatsSection(bool isDark) {
-    return _HomePageHelper.buildStatsSection(isDark);
-  }
-
-  Widget _buildTestButton(bool isDark) {
-    return _HomePageHelper.buildTestButton(isDark);
-  }
-
-  Widget _buildAnimatedFAB(bool isDark, BuildContext context) {
-    return _HomePageHelper.buildAnimatedFAB(context, isDark, _showCreateNoteSheet);
+    return Obx(() => _HomePageHelper.buildStatsSection(
+      isDark,
+      statistics: controller.state.statistics.value,
+    ));
   }
 
   void _showCreateNoteSheet(BuildContext context, bool isDark) {
@@ -356,9 +368,18 @@ class HomePage extends GetView<HomeController> {
 
 // 辅助类，包含所有原来的方法实现（静态方法）
 class _HomePageHelper {
-  static Widget buildTodayReviewCard(bool isDark) {
+  static Widget buildTodayReviewCard(
+    bool isDark, {
+    TodayReviewStatisticsResponse? statistics,
+    VoidCallback? onTap,
+  }) {
+    // 使用统计数据，如果没有则显示默认值
+    final total = statistics?.total ?? 0;
+    final needsReview = statistics?.needsReview ?? 0;
+    final needsImprove = statistics?.needsImprove ?? 0;
+
     return GestureDetector(
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
@@ -420,19 +441,19 @@ class _HomePageHelper {
               ],
             ),
             const SizedBox(height: 24),
-            const Row(
+            Row(
               children: [
                 Text(
-                  '8',
-                  style: TextStyle(
+                  '$total',
+                  style: const TextStyle(
                     fontSize: 56,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     height: 1,
                   ),
                 ),
-                SizedBox(width: 12),
-                Expanded(
+                const SizedBox(width: 12),
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -455,9 +476,9 @@ class _HomePageHelper {
             const SizedBox(height: 20),
             Row(
               children: [
-                _buildQuickStat('困难', '3', Colors.orange),
+                _buildQuickStat('困难', '$needsReview', Colors.orange),
                 const SizedBox(width: 12),
-                _buildQuickStat('需改进', '5', Colors.yellow),
+                _buildQuickStat('需改进', '$needsImprove', Colors.yellow),
               ],
             ),
           ],
@@ -492,12 +513,17 @@ class _HomePageHelper {
     );
   }
 
-  static Widget buildAddNoteButton(bool isDark) {
+  static Widget buildAddNoteButton(bool isDark, Function(BuildContext, bool) showCreateNoteSheet) {
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final iconColor = isDark ? Colors.grey[600] : Colors.grey[500];
 
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        final context = Get.context;
+        if (context != null) {
+          showCreateNoteSheet(context, isDark);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -522,8 +548,30 @@ class _HomePageHelper {
     );
   }
 
-  static Widget buildStatsSection(bool isDark) {
+  static Widget buildStatsSection(
+    bool isDark, {
+    LearningStatisticsResponse? statistics,
+  }) {
     final textColor = isDark ? Colors.white : Colors.black;
+
+    // 使用统计数据，如果没有则显示默认值
+    final consecutiveDays = statistics?.consecutiveDays ?? 0;
+    final mastered = statistics?.mastered ?? 0;
+    final totalMinutes = statistics?.totalMinutes ?? 0;
+    final totalTerms = statistics?.totalTerms ?? 0;
+
+    // 格式化累计时长：分钟转换为小时
+    String formatDuration(int minutes) {
+      if (minutes < 60) {
+        return '${minutes}分钟';
+      }
+      final hours = minutes ~/ 60;
+      final mins = minutes % 60;
+      if (mins == 0) {
+        return '${hours}h';
+      }
+      return '${hours}.${(mins / 60 * 10).toInt()}h';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,12 +588,12 @@ class _HomePageHelper {
                 child: _buildStatCard(
                     isDark,
                     Icons.local_fire_department_rounded,
-                    '7',
+                    '$consecutiveDays',
                     '连续天数',
                     const Color(0xFFFF6B6B))),
             const SizedBox(width: 12),
             Expanded(
-                child: _buildStatCard(isDark, Icons.psychology_rounded, '25',
+                child: _buildStatCard(isDark, Icons.psychology_rounded, '$mastered',
                     '已掌握', const Color(0xFF4ECDC4))),
           ],
         ),
@@ -553,12 +601,16 @@ class _HomePageHelper {
         Row(
           children: [
             Expanded(
-                child: _buildStatCard(isDark, Icons.timer_outlined, '2.5h',
-                    '累计时长', const Color(0xFFFFD93D))),
+                child: _buildStatCard(
+                    isDark,
+                    Icons.timer_outlined,
+                    formatDuration(totalMinutes),
+                    '累计时长',
+                    const Color(0xFFFFD93D))),
             const SizedBox(width: 12),
             Expanded(
                 child: _buildStatCard(isDark, Icons.library_books_outlined,
-                    '50', '累计学习', const Color(0xFF95E1D3))),
+                    '$totalTerms', '累计学习', const Color(0xFF95E1D3))),
           ],
         ),
       ],
@@ -606,94 +658,6 @@ class _HomePageHelper {
     );
   }
 
-  static Widget buildTestButton(bool isDark) {
-    final cardColor = isDark ? Colors.grey[900] : Colors.white;
-    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
-    final iconColor = isDark ? Colors.grey[500] : Colors.grey[600];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor!, width: 1),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(Icons.science_outlined, color: iconColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                '测试功能',
-                style: TextStyle(
-                    fontSize: 14,
-                    color: iconColor,
-                    fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Get.toNamed(AppRoutes.feynmanLearning);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.darkPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
-              ),
-              child: const Text(
-                '跳转到闪词学习页面',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static Widget buildAnimatedFAB(BuildContext context, bool isDark, Function(BuildContext, bool) showCreateNoteSheet) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667EEA).withOpacity(0.5),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: FloatingActionButton(
-        onPressed: () {
-          showCreateNoteSheet(context, isDark);
-        },
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: const Icon(
-          Icons.add,
-          size: 32,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
 }
 
 // 创建笔记底部选择器
@@ -792,26 +756,6 @@ class _CreateNoteBottomSheet extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 音频类
-              _buildCategorySection(
-                isDark: isDark,
-                textColor: textColor,
-                title: '音频',
-                icon: Icons.mic_outlined,
-                iconColor: const Color(0xFFFF6B6B),
-                items: [
-                  _SourceItem(
-                      icon: Icons.fiber_manual_record,
-                      label: '录制音频',
-                      color: const Color(0xFFE74C3C)),
-                  _SourceItem(
-                      icon: Icons.audiotrack,
-                      label: '上传音频',
-                      color: const Color(0xFFF39C12)),
-                ],
-              ),
-              const SizedBox(height: 20),
-
               // 图片类
               _buildCategorySection(
                 isDark: isDark,
@@ -828,22 +772,6 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                       icon: Icons.photo_library_outlined,
                       label: '上传图片',
                       color: const Color(0xFF9B59B6)),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // 视频类
-              _buildCategorySection(
-                isDark: isDark,
-                textColor: textColor,
-                title: '视频',
-                icon: Icons.video_library_outlined,
-                iconColor: const Color(0xFFE67E22),
-                items: [
-                  _SourceItem(
-                      icon: Icons.link,
-                      label: 'YouTube链接',
-                      color: const Color(0xFFFF0000)),
                 ],
               ),
               const SizedBox(height: 20),
@@ -914,50 +842,47 @@ class _CreateNoteBottomSheet extends StatelessWidget {
 
     return GestureDetector(
       onTap: () async {
-        // 如果是自定义文本，从底部弹出创建笔记页面
-        if (item.label == '自定义文本') {
-          // 在打开 BottomSheet 前注入控制器
+        final label = item.label;
+        
+        // 1. 自定义文本 (BottomSheet)
+        if (label == '自定义文本') {
           Get.put(CreateNoteController());
-
           final result = await Get.bottomSheet(
             const CreateNotePage(),
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             enableDrag: true,
           );
-
-          // 结束后可以根据需要移除控制器（如果不需要保持状态）
-          // Get.delete<CreateNoteController>();
-
-          // 如果创建成功，关闭创建源选择弹窗
-          if (result != null) {
-            Get.back();
-          }
-        } 
-        // PDF文档、Word文档、其他文档 - 跳转到文件上传页面
-        else if (item.label == 'PDF文档' || 
-                 item.label == 'Word文档' || 
-                 item.label == '其他文档') {
-          // 关闭创建源选择弹窗
-          Get.back();
-          // 跳转到文件上传页面
-          Get.toNamed(AppRoutes.noteCreation);
-        } 
-        // 其他功能（音频、图片、视频）暂未实现
-        else {
-          // 其他功能先关闭弹窗，再显示提示
-          Get.back();
-          Get.snackbar(
-            '提示',
-            '${item.label}功能开发中',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: item.color,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 2),
-            margin: const EdgeInsets.all(16),
-            borderRadius: 12,
-          );
+          if (result != null) Get.back();
+          return;
         }
+
+        // 2. 文档、图片 (进入 NoteCreationPage 解析流程)
+        if (['PDF文档', 'Word文档', '其他文档', '上传图片', '拍照'].contains(label)) {
+          final creationController = Get.put(NoteCreationController());
+          Get.back(); // 关闭当前源选择弹窗
+          
+          if (label == '上传图片') {
+            creationController.pickImage(ImageSource.gallery);
+          } else if (label == '拍照') {
+            creationController.pickImage(ImageSource.camera);
+          } else {
+            // 文档类直接跳转，由用户在页面内点击选择
+            Get.toNamed(AppRoutes.noteCreation);
+          }
+          return;
+        }
+
+        // 4. 其他未实现功能
+        Get.back();
+        Get.snackbar(
+          '提示',
+          '${item.label}功能正在开发中',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: item.color,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

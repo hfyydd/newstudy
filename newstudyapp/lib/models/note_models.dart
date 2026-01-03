@@ -143,6 +143,47 @@ class FlashCardGenerateResponse {
   final int total;
 }
 
+/// 闪词卡片列表响应模型
+class FlashCardListResponse {
+  const FlashCardListResponse({
+    required this.noteId,
+    required this.terms,
+    required this.total,
+  });
+
+  factory FlashCardListResponse.fromJson(Map<String, dynamic> json) {
+    final noteIdRaw = json['note_id'];
+    final termsRaw = json['terms'];
+    final totalRaw = json['total'];
+
+    if (noteIdRaw is! String || noteIdRaw.isEmpty) {
+      throw const FormatException('缺少 note_id 字段');
+    }
+    if (termsRaw is! List) {
+      throw const FormatException('缺少 terms 字段');
+    }
+    if (totalRaw is! int) {
+      throw const FormatException('缺少 total 字段');
+    }
+
+    final terms = termsRaw
+        .whereType<String>()
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+
+    return FlashCardListResponse(
+      noteId: noteIdRaw,
+      terms: terms,
+      total: totalRaw,
+    );
+  }
+
+  final String noteId;
+  final List<String> terms;
+  final int total;
+}
+
 /// 笔记列表项响应模型
 class NoteListItemResponse {
   const NoteListItemResponse({
@@ -249,4 +290,171 @@ FlashCardProgress flashCardProgressFromJson(Map<String, dynamic> json) {
     needsImprove: needsImproveRaw is int ? needsImproveRaw : 0,
     notStarted: notStartedRaw is int ? notStartedRaw : 0,
   );
+}
+
+/// 学习统计响应模型
+class LearningStatisticsResponse {
+  const LearningStatisticsResponse({
+    required this.mastered,
+    required this.totalTerms,
+    required this.consecutiveDays,
+    required this.totalMinutes,
+  });
+
+  factory LearningStatisticsResponse.fromJson(Map<String, dynamic> json) {
+    final masteredRaw = json['mastered'];
+    final totalTermsRaw = json['totalTerms'];
+    final consecutiveDaysRaw = json['consecutiveDays'];
+    final totalMinutesRaw = json['totalMinutes'];
+
+    if (masteredRaw is! int) {
+      throw const FormatException('缺少 mastered 字段');
+    }
+    if (totalTermsRaw is! int) {
+      throw const FormatException('缺少 totalTerms 字段');
+    }
+    if (consecutiveDaysRaw is! int) {
+      throw const FormatException('缺少 consecutiveDays 字段');
+    }
+    if (totalMinutesRaw is! int) {
+      throw const FormatException('缺少 totalMinutes 字段');
+    }
+
+    return LearningStatisticsResponse(
+      mastered: masteredRaw,
+      totalTerms: totalTermsRaw,
+      consecutiveDays: consecutiveDaysRaw,
+      totalMinutes: totalMinutesRaw,
+    );
+  }
+
+  final int mastered;
+  final int totalTerms;
+  final int consecutiveDays;
+  final int totalMinutes;
+}
+
+/// 今日复习统计响应模型
+class TodayReviewStatisticsResponse {
+  const TodayReviewStatisticsResponse({
+    required this.total,
+    required this.needsReview,
+    required this.needsImprove,
+  });
+
+  factory TodayReviewStatisticsResponse.fromJson(Map<String, dynamic> json) {
+    final totalRaw = json['total'];
+    final needsReviewRaw = json['needsReview'];
+    final needsImproveRaw = json['needsImprove'];
+
+    if (totalRaw is! int) {
+      throw const FormatException('缺少 total 字段');
+    }
+    if (needsReviewRaw is! int) {
+      throw const FormatException('缺少 needsReview 字段');
+    }
+    if (needsImproveRaw is! int) {
+      throw const FormatException('缺少 needsImprove 字段');
+    }
+
+    return TodayReviewStatisticsResponse(
+      total: totalRaw,
+      needsReview: needsReviewRaw,
+      needsImprove: needsImproveRaw,
+    );
+  }
+
+  final int total;
+  final int needsReview;
+  final int needsImprove;
+}
+
+/// 复习闪词卡片响应模型
+class ReviewFlashCardResponse {
+  const ReviewFlashCardResponse({
+    required this.id,
+    required this.noteId,
+    required this.noteTitle,
+    required this.term,
+    required this.status,
+    required this.createdAt,
+    required this.lastReviewedAt,
+  });
+
+  factory ReviewFlashCardResponse.fromJson(Map<String, dynamic> json) {
+    final idRaw = json['id'];
+    final noteIdRaw = json['noteId'];
+    final noteTitleRaw = json['noteTitle'];
+    final termRaw = json['term'];
+    final statusRaw = json['status'];
+    final createdAtRaw = json['createdAt'];
+    final lastReviewedAtRaw = json['lastReviewedAt'];
+
+    if (idRaw is! String || idRaw.isEmpty) {
+      throw const FormatException('缺少 id 字段');
+    }
+    if (noteIdRaw is! String || noteIdRaw.isEmpty) {
+      throw const FormatException('缺少 noteId 字段');
+    }
+    if (termRaw is! String || termRaw.isEmpty) {
+      throw const FormatException('缺少 term 字段');
+    }
+    if (statusRaw is! String) {
+      throw const FormatException('缺少 status 字段');
+    }
+    if (createdAtRaw is! String) {
+      throw const FormatException('缺少 createdAt 字段');
+    }
+
+    return ReviewFlashCardResponse(
+      id: idRaw,
+      noteId: noteIdRaw,
+      noteTitle: noteTitleRaw is String && noteTitleRaw.trim().isNotEmpty
+          ? noteTitleRaw
+          : null,
+      term: termRaw,
+      status: statusRaw,
+      createdAt: DateTime.parse(createdAtRaw),
+      lastReviewedAt: lastReviewedAtRaw != null && lastReviewedAtRaw is String
+          ? DateTime.parse(lastReviewedAtRaw)
+          : null,
+    );
+  }
+
+  final String id;
+  final String noteId;
+  final String? noteTitle;
+  final String term;
+  final String status; // needsReview, needsImprove
+  final DateTime createdAt;
+  final DateTime? lastReviewedAt;
+}
+
+/// 复习闪词卡片列表响应模型
+class ReviewFlashCardsResponse {
+  const ReviewFlashCardsResponse({
+    required this.cards,
+    required this.total,
+  });
+
+  factory ReviewFlashCardsResponse.fromJson(Map<String, dynamic> json) {
+    final cardsRaw = json['cards'];
+    final totalRaw = json['total'];
+
+    if (cardsRaw is! List) {
+      throw const FormatException('缺少 cards 字段');
+    }
+    if (totalRaw is! int) {
+      throw const FormatException('缺少 total 字段');
+    }
+
+    final cards = cardsRaw
+        .map((e) => ReviewFlashCardResponse.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+
+    return ReviewFlashCardsResponse(cards: cards, total: totalRaw);
+  }
+
+  final List<ReviewFlashCardResponse> cards;
+  final int total;
 }

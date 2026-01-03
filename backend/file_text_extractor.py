@@ -63,6 +63,26 @@ def extract_text_from_upload(filename: Optional[str], raw: bytes) -> str:
     if ext == "doc":
         raise ValueError("暂不支持 .doc（请另存为 .docx 后上传）")
 
+    if ext in {"jpg", "jpeg", "png", "bmp", "webp"}:
+        try:
+            import easyocr
+            import numpy as np
+            import cv2
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError("缺少 OCR 依赖 (easyocr/opencv/numpy)") from exc
+        
+        # 将 bytes 转为 numpy array 以供 cv2 使用
+        nparr = np.frombuffer(raw, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("无法解析图片文件")
+
+        # 初始化 easyocr (支持中英文)
+        # 注意：第一次运行会自动下载模型，可能较慢
+        reader = easyocr.Reader(['ch_sim', 'en'], gpu=False)
+        results = reader.readtext(img, detail=0)
+        return "\n".join(results).strip()
+
     raise ValueError(f"不支持的文件类型: .{ext}")
 
 

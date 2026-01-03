@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi import File, UploadFile
@@ -66,6 +66,12 @@ class NoteCreateRequest(BaseModel):
     content: str = Field(..., min_length=1, description="笔记内容（文本）")
 
 
+class NoteUpdateRequest(BaseModel):
+    """更新笔记请求模型"""
+    title: Optional[str] = Field(default=None, description="笔记标题（可选）")
+    content: Optional[str] = Field(default=None, min_length=1, description="笔记内容（可选）")
+
+
 class NoteResponse(BaseModel):
     id: str = Field(..., description="笔记ID")
     title: Optional[str] = Field(default=None, description="笔记标题")
@@ -91,6 +97,13 @@ class FlashCardProgressResponse(BaseModel):
     needsReview: int = Field(..., description="待复习数量")
     needsImprove: int = Field(..., description="需改进数量")
     notStarted: int = Field(..., description="未学习数量")
+
+
+class FlashCardListResponse(BaseModel):
+    """闪词卡片列表响应模型"""
+    note_id: str = Field(..., description="笔记ID")
+    terms: List[str] = Field(..., description="词条列表")
+    total: int = Field(..., description="总词条数")
 
 
 TERMS_LIBRARY = {
@@ -383,6 +396,84 @@ def get_note(note_id: str) -> NoteResponse:
     )
 
 
+@app.put("/notes/{note_id}", response_model=NoteResponse)
+def update_note(note_id: str, payload: NoteUpdateRequest) -> NoteResponse:
+    """
+    更新笔记
+    
+    更新笔记的标题和/或内容。如果只提供部分字段，只更新提供的字段。
+    """
+    # 检查笔记是否存在
+    existing_note = db.get_note(note_id)
+    if not existing_note:
+        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+    # 验证至少提供一个更新字段
+    if payload.title is None and payload.content is None:
+        raise HTTPException(
+            status_code=400,
+            detail="至少需要提供一个更新字段（title 或 content）"
+        )
+
+    try:
+        updated_note = db.update_note(
+            note_id=note_id,
+            title=payload.title,
+            content=payload.content,
+        )
+
+        if not updated_note:
+            raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+        # 获取该笔记的词条数量
+        cards = db.get_flash_cards(note_id)
+        term_count = len(cards)
+
+        return NoteResponse(
+            id=updated_note.id,
+            title=updated_note.title,
+            content=updated_note.content,
+            createdAt=updated_note.created_at,  # type: ignore
+            updatedAt=updated_note.updated_at,  # type: ignore
+            termCount=term_count,  # type: ignore
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.delete("/notes/{note_id}")
+def delete_note(note_id: str) -> Dict[str, str]:
+    """
+    删除笔记
+    
+    删除指定笔记及其关联的所有闪词卡片（级联删除）。
+    """
+    # 检查笔记是否存在
+    note = db.get_note(note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+    try:
+        print(f"[Server] 开始删除笔记: {note_id}, 标题: {note.title}")
+        success = db.delete_note(note_id)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+        # 验证删除是否成功
+        deleted_note = db.get_note(note_id)
+        if deleted_note is not None:
+            print(f"[Server] 警告：删除后笔记仍然存在: {note_id}")
+        else:
+            print(f"[Server] 笔记删除成功: {note_id}")
+
+        return {"message": f"笔记 {note_id} 已删除"}
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        print(f"[Server] 删除笔记异常: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @app.post("/notes/{note_id}/flash-cards/generate", response_model=FlashCardGenerateResponse)
 def generate_flash_cards(
     note_id: str,
@@ -429,6 +520,79 @@ def generate_flash_cards(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@app.get("/notes/{note_id}/flash-cards", response_model=FlashCardListResponse)
+def get_flash_cards(note_id: str) -> FlashCardListResponse:
+    """
+    获取笔记的闪词卡片列表
+    
+    返回笔记的所有闪词卡片词条列表。
+    """
+    # 检查笔记是否存在
+    note = db.get_note(note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+    try:
+        cards = db.get_flash_cards(note_id)
+        terms = [card.term for card in cards]
+        return FlashCardListResponse(
+            note_id=note_id,
+            terms=terms,
+            total=len(terms),
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class FlashCardStatusUpdateRequest(BaseModel):
+    """更新闪词卡片状态请求模型"""
+    term: str = Field(..., description="词条")
+    status: str = Field(..., description="学习状态：notStarted, needsReview, needsImprove, mastered")
+
+
+@app.put("/notes/{note_id}/flash-cards/status", response_model=dict)
+def update_flash_card_status(
+    note_id: str,
+    payload: FlashCardStatusUpdateRequest,
+) -> dict:
+    """
+    更新闪词卡片的学习状态
+    
+    用于标记卡片为已掌握、待复习等状态。
+    """
+    note = db.get_note(note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+    # 验证状态值
+    valid_statuses = ["notStarted", "needsReview", "needsImprove", "mastered"]
+    if payload.status not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效的状态值。允许的值: {', '.join(valid_statuses)}"
+        )
+
+    try:
+        success = db.update_flash_card_status(
+            note_id=note_id,
+            term=payload.term,
+            status=payload.status,
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到词条 '{payload.term}' 的闪词卡片"
+            )
+        
+        return {
+            "success": True,
+            "message": f"已更新词条 '{payload.term}' 的状态为 '{payload.status}'"
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @app.get("/notes/{note_id}/flash-cards/progress", response_model=FlashCardProgressResponse)
 def get_flash_card_progress(note_id: str) -> FlashCardProgressResponse:
     """
@@ -449,6 +613,109 @@ def get_flash_card_progress(note_id: str) -> FlashCardProgressResponse:
             needsReview=progress["needsReview"],
             needsImprove=progress["needsImprove"],
             notStarted=progress["notStarted"],
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class LearningStatisticsResponse(BaseModel):
+    """学习统计响应模型"""
+    mastered: int = Field(..., description="已掌握词条数")
+    totalTerms: int = Field(..., description="累计学习词条数")
+    consecutiveDays: int = Field(..., description="连续学习天数")
+    totalMinutes: int = Field(..., description="累计学习时长（分钟）")
+
+
+@app.get("/statistics", response_model=LearningStatisticsResponse)
+def get_learning_statistics() -> LearningStatisticsResponse:
+    """
+    获取学习统计信息
+    
+    返回全局学习统计数据，包括已掌握词条数、累计学习词条数、连续学习天数等。
+    """
+    try:
+        stats = db.get_learning_statistics()
+        return LearningStatisticsResponse(
+            mastered=stats["mastered"],
+            totalTerms=stats["totalTerms"],
+            consecutiveDays=stats["consecutiveDays"],
+            totalMinutes=stats["totalMinutes"],
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class TodayReviewStatisticsResponse(BaseModel):
+    """今日复习统计响应模型"""
+    total: int = Field(..., description="需要复习的词条总数")
+    needsReview: int = Field(..., description="困难词条数（需要复习）")
+    needsImprove: int = Field(..., description="需改进词条数")
+
+
+@app.get("/review/today", response_model=TodayReviewStatisticsResponse)
+def get_today_review_statistics() -> TodayReviewStatisticsResponse:
+    """
+    获取今日复习统计信息
+    
+    返回今日需要复习的词条统计，包括总数、困难词条数、需改进词条数。
+    """
+    try:
+        stats = db.get_today_review_statistics()
+        return TodayReviewStatisticsResponse(
+            total=stats["total"],
+            needsReview=stats["needsReview"],
+            needsImprove=stats["needsImprove"],
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class ReviewFlashCardResponse(BaseModel):
+    """复习闪词卡片响应模型"""
+    id: str = Field(..., description="卡片ID")
+    noteId: str = Field(..., description="笔记ID")
+    noteTitle: Optional[str] = Field(default=None, description="笔记标题")
+    term: str = Field(..., description="词条内容")
+    status: str = Field(..., description="学习状态：needsReview, needsImprove")
+    createdAt: datetime = Field(..., description="创建时间")
+    lastReviewedAt: Optional[datetime] = Field(default=None, description="最后复习时间")
+
+
+class ReviewFlashCardsResponse(BaseModel):
+    """复习闪词卡片列表响应模型"""
+    cards: List[ReviewFlashCardResponse] = Field(..., description="闪词卡片列表")
+    total: int = Field(..., description="总卡片数")
+
+
+@app.get("/review/cards", response_model=ReviewFlashCardsResponse)
+def get_review_flash_cards(include_all: bool = False) -> ReviewFlashCardsResponse:
+    """
+    获取闪词卡片列表
+    
+    默认返回所有状态为 needsReview 或 needsImprove 的闪词卡片。
+    如果 include_all=True，则返回所有状态的词条。
+    """
+    try:
+        cards = db.get_review_flash_cards(include_all=include_all)
+        
+        card_responses = []
+        for card in cards:
+            # 获取笔记信息以包含笔记标题
+            note = db.get_note(card.note_id)
+            
+            card_responses.append(ReviewFlashCardResponse(
+                id=card.id,
+                noteId=card.note_id,
+                noteTitle=note.title if note else None,
+                term=card.term,
+                status=card.status,
+                createdAt=card.created_at,  # type: ignore
+                lastReviewedAt=card.last_reviewed_at,  # type: ignore
+            ))
+        
+        return ReviewFlashCardsResponse(
+            cards=card_responses,
+            total=len(card_responses),
         )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc

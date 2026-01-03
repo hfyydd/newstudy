@@ -5,6 +5,9 @@ class CreateNoteState {
   /// 笔记内容
   final RxString noteContent = ''.obs;
 
+  /// 笔记标题（用于编辑模式）
+  final RxString noteTitle = ''.obs;
+
   /// 是否正在保存
   final RxBool isSaving = false.obs;
 
@@ -16,6 +19,12 @@ class CreateNoteState {
 
   /// 音频文件路径
   final RxString audioPath = ''.obs;
+
+  /// 是否是编辑模式
+  final RxBool isEdit = false.obs;
+
+  /// 笔记ID（编辑模式时使用）
+  final RxString noteId = ''.obs;
 
   /// 内容输入是否有效
   bool get isContentValid => noteContent.value.trim().isNotEmpty;
