@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'note_detail_controller.dart';
@@ -14,7 +15,6 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
-    final cardColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
     final borderColor = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
 
     return Scaffold(
@@ -54,24 +54,43 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 闪词学习区域（放在顶部）
-                    _buildFlashCardSection(isDark, textColor, secondaryColor, cardColor, borderColor),
-                    const SizedBox(height: 24),
+                    // 闪词学习区域（突出显示，使用渐变背景）
+                    _buildFlashCardSection(isDark, textColor, secondaryColor),
+                    
+                    // 笔记内容区域
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 笔记内容标题
+                          Row(
+                            children: [
+                              Icon(Icons.article_outlined, size: 18, color: secondaryColor),
+                              const SizedBox(width: 8),
+                              Text(
+                                '笔记内容',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: secondaryColor,
+                                ),
+                              ),
+                              const Spacer(),
+                              // 笔记元信息
+                              _buildMetaInfo(secondaryColor),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
 
-                    // 分割线
-                    Divider(color: borderColor, height: 1),
-                    const SizedBox(height: 20),
-
-                    // 笔记元信息
-                    _buildMetaInfo(secondaryColor),
-                    const SizedBox(height: 16),
-
-                    // 笔记内容
-                    _buildNoteContent(textColor, secondaryColor),
+                          // 笔记内容（Markdown 渲染）
+                          _buildNoteContent(isDark, textColor, secondaryColor),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -91,45 +110,117 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       final note = controller.state.note.value;
       if (note == null) return const SizedBox.shrink();
 
-      return Row(
-        children: [
-          Icon(Icons.access_time, size: 14, color: secondaryColor),
-          const SizedBox(width: 4),
-          Text(
-            '创建于 ${controller.formatDate(note.createdAt)}',
-            style: TextStyle(fontSize: 12, color: secondaryColor),
-          ),
-          const SizedBox(width: 16),
-          Icon(Icons.edit_outlined, size: 14, color: secondaryColor),
-          const SizedBox(width: 4),
-          Text(
-            '更新于 ${controller.formatDate(note.updatedAt)}',
-            style: TextStyle(fontSize: 12, color: secondaryColor),
-          ),
-        ],
+      return Text(
+        controller.formatDate(note.updatedAt),
+        style: TextStyle(fontSize: 12, color: secondaryColor),
       );
     });
   }
 
-  /// 构建笔记内容
-  Widget _buildNoteContent(Color textColor, Color? secondaryColor) {
+  /// 构建笔记内容（Markdown 渲染）
+  Widget _buildNoteContent(bool isDark, Color textColor, Color? secondaryColor) {
     return Obx(() {
       final content = controller.state.noteContent;
       if (content.isEmpty) {
         return Center(
-          child: Text(
-            '暂无内容',
-            style: TextStyle(color: secondaryColor, fontSize: 14),
+          child: Padding(
+            padding: const EdgeInsets.all(40),
+            child: Text(
+              '暂无内容',
+              style: TextStyle(color: secondaryColor, fontSize: 14),
+            ),
           ),
         );
       }
 
-      return Text(
-        content,
-        style: TextStyle(
-          fontSize: 15,
-          color: textColor,
-          height: 1.8,
+      return MarkdownBody(
+        data: content,
+        selectable: true,
+        styleSheet: MarkdownStyleSheet(
+          p: TextStyle(
+            fontSize: 15,
+            color: textColor,
+            height: 1.8,
+          ),
+          h1: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+            height: 2,
+          ),
+          h2: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+            height: 1.8,
+          ),
+          h3: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+            height: 1.8,
+          ),
+          h4: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+            height: 1.6,
+          ),
+          strong: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+          em: TextStyle(
+            fontStyle: FontStyle.italic,
+            color: textColor,
+          ),
+          code: TextStyle(
+            fontSize: 14,
+            color: isDark ? const Color(0xFF4ECDC4) : const Color(0xFF007ACC),
+            backgroundColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5),
+          ),
+          codeblockDecoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF8F8F8),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+            ),
+          ),
+          blockquote: TextStyle(
+            fontSize: 15,
+            color: secondaryColor,
+            fontStyle: FontStyle.italic,
+            height: 1.6,
+          ),
+          blockquoteDecoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: AppTheme.darkPrimary.withOpacity(0.5),
+                width: 4,
+              ),
+            ),
+          ),
+          listBullet: TextStyle(
+            fontSize: 15,
+            color: textColor,
+          ),
+          tableHead: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+          tableBody: TextStyle(
+            color: textColor,
+          ),
+          tableBorder: TableBorder.all(
+            color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+          ),
+          horizontalRuleDecoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+              ),
+            ),
+          ),
         ),
       );
     });
@@ -140,52 +231,157 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     bool isDark,
     Color textColor,
     Color? secondaryColor,
-    Color cardColor,
-    Color borderColor,
   ) {
     return Obx(() {
       final hasFlashCards = controller.state.hasFlashCards;
       final progress = controller.state.progress.value;
       final isGenerating = controller.state.isGenerating.value;
 
-      if (isGenerating) {
-        return _buildGeneratingCard(isDark, cardColor, borderColor);
-      }
-
-      if (!hasFlashCards) {
-        return _buildNoFlashCardsCard(isDark, textColor, secondaryColor, cardColor, borderColor);
-      }
-
-      return _buildProgressCard(isDark, textColor, secondaryColor, cardColor, borderColor, progress!);
+      // 整个闪词区域的包装容器，添加明显的背景区分
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          // 使用渐变背景，与页面背景形成对比
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    const Color(0xFF1A2A3A), // 深蓝色调
+                    const Color(0xFF1C2433), // 深色渐变
+                    const Color(0xFF1A1F2E),
+                  ]
+                : [
+                    const Color(0xFFF0F7FF), // 浅蓝色调
+                    const Color(0xFFF5F0FF), // 紫色调
+                    const Color(0xFFFFF5F5), // 粉色调
+                  ],
+          ),
+          // 底部圆角
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(24),
+            bottomRight: Radius.circular(24),
+          ),
+          // 添加微妙的内阴影效果
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withOpacity(0.3)
+                  : AppTheme.darkPrimary.withOpacity(0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // 装饰性背景元素
+            Positioned(
+              top: -30,
+              right: -30,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.statusMastered.withOpacity(isDark ? 0.15 : 0.1),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 20,
+              left: -40,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.statusNeedsReview.withOpacity(isDark ? 0.12 : 0.08),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // 主要内容
+            if (isGenerating)
+              _buildGeneratingCard(isDark)
+            else if (!hasFlashCards)
+              _buildNoFlashCardsCard(isDark, textColor, secondaryColor)
+            else
+              _buildProgressCard(isDark, textColor, secondaryColor, progress!),
+          ],
+        ),
+      );
     });
   }
 
   /// 构建"正在生成"卡片
-  Widget _buildGeneratingCard(bool isDark, Color cardColor, Color borderColor) {
+  Widget _buildGeneratingCard(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        // 使用半透明背景，与渐变背景融合
+        color: isDark 
+            ? Colors.white.withOpacity(0.05)
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : AppTheme.darkPrimary.withOpacity(0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.darkPrimary.withOpacity(isDark ? 0.2 : 0.1),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          const SizedBox(
-            width: 48,
-            height: 48,
-            child: CircularProgressIndicator(strokeWidth: 3),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.darkPrimary.withOpacity(0.2),
+                  AppTheme.darkSecondary.withOpacity(0.2),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.darkPrimary),
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
             'AI 正在分析笔记内容...',
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             '正在提取核心概念和关键词',
             style: TextStyle(
@@ -203,66 +399,96 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     bool isDark,
     Color textColor,
     Color? secondaryColor,
-    Color cardColor,
-    Color borderColor,
   ) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        // 使用半透明背景，与渐变背景融合
+        color: isDark 
+            ? Colors.white.withOpacity(0.05)
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : AppTheme.darkPrimary.withOpacity(0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.darkPrimary.withOpacity(isDark ? 0.15 : 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: AppTheme.darkPrimary.withOpacity(0.1),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.darkPrimary.withOpacity(0.25),
+                  AppTheme.darkSecondary.withOpacity(0.2),
+                ],
+              ),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.darkPrimary.withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Icon(
+            child: const Icon(
               Icons.auto_awesome,
-              size: 32,
-              color: AppTheme.darkPrimary,
+              size: 40,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
-            '此笔记尚未生成闪词卡片',
+            '开启 AI 闪词学习',
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: textColor,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
-            'AI 将从笔记中提取核心概念，帮助你更好地记忆',
+            'AI 将从笔记中提取核心概念\n通过费曼学习法帮助你深度记忆',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: secondaryColor,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+              height: 1.6,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 28),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 54,
             child: ElevatedButton.icon(
               onPressed: controller.generateFlashCards,
-              icon: const Icon(Icons.auto_awesome, size: 20),
+              icon: const Icon(Icons.auto_awesome, size: 22),
               label: const Text(
                 '生成闪词卡片',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.darkPrimary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                elevation: 0,
+                elevation: 4,
+                shadowColor: AppTheme.darkPrimary.withOpacity(0.5),
               ),
             ),
           ),
@@ -276,204 +502,257 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     bool isDark,
     Color textColor,
     Color? secondaryColor,
-    Color cardColor,
-    Color borderColor,
     FlashCardProgress progress,
   ) {
+    final total = progress.total;
+    
     return Container(
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 28),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题
-          Row(
-            children: [
-              Icon(Icons.school_outlined, size: 20, color: AppTheme.darkPrimary),
-              const SizedBox(width: 8),
-              Text(
-                '闪词学习进度',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 进度条
-          _buildProgressBar(progress, isDark),
-          const SizedBox(height: 20),
-
-          // 统计数据
-          _buildProgressStats(progress, isDark, textColor, secondaryColor),
-          const SizedBox(height: 20),
-
-          // 操作按钮
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: controller.regenerateFlashCards,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: secondaryColor,
-                    side: BorderSide(color: borderColor),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('重新生成'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: controller.viewLearningRecords,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: secondaryColor,
-                    side: BorderSide(color: borderColor),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('学习记录'),
-                ),
-              ),
-            ],
+        // 使用半透明背景，与渐变背景融合
+        color: isDark 
+            ? Colors.white.withOpacity(0.06)
+            : Colors.white.withOpacity(0.75),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : AppTheme.statusMastered.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.statusMastered.withOpacity(isDark ? 0.15 : 0.1),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-    );
-  }
-
-  /// 构建进度条
-  Widget _buildProgressBar(FlashCardProgress progress, bool isDark) {
-    final masteredPercent = progress.masteredPercent;
-    final reviewPercent = progress.needsReview / progress.total;
-    final improvePercent = progress.needsImprove / progress.total;
-
-    return Column(
-      children: [
-        // 进度条
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: SizedBox(
-            height: 12,
+      child: Column(
+        children: [
+          // 顶部标题栏
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             child: Row(
               children: [
-                // 已掌握（绿色）
-                Expanded(
-                  flex: (masteredPercent * 100).round(),
-                  child: Container(color: const Color(0xFF4ECDC4)),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.statusMastered.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.school_rounded,
+                    size: 20,
+                    color: AppTheme.statusMastered,
+                  ),
                 ),
-                // 待复习（蓝色）
+                const SizedBox(width: 12),
                 Expanded(
-                  flex: (reviewPercent * 100).round(),
-                  child: Container(color: const Color(0xFF5B8DEF)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '闪词学习进度',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '共 $total 个闪词',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: secondaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                // 需改进（橙色）
-                Expanded(
-                  flex: (improvePercent * 100).round(),
-                  child: Container(color: const Color(0xFFFFAA33)),
-                ),
-                // 未学习（灰色）
-                Expanded(
-                  flex: ((1 - masteredPercent - reviewPercent - improvePercent) * 100).round(),
-                  child: Container(
-                    color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+                // 掌握百分比
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.statusMastered.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${(progress.masteredPercent * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.statusMastered,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        // 百分比
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '${(progress.progressPercent * 100).round()}% 已学习',
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
+
+          // 进度条
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildSegmentedProgressBar(progress, isDark),
+          ),
+          const SizedBox(height: 20),
+
+          // 统计网格
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                _buildStatCard('已掌握', progress.mastered, AppTheme.statusMastered, isDark),
+                _buildStatCard('待复习', progress.needsReview, AppTheme.statusNeedsReview, isDark),
+                _buildStatCard('需改进', progress.needsImprove, AppTheme.statusNeedsImprove, isDark),
+                _buildStatCard('未学习', progress.notStarted, AppTheme.statusNotStarted, isDark),
+              ],
             ),
+          ),
+          const SizedBox(height: 16),
+
+          // 分割线
+          Divider(
+            height: 1,
+            color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5),
+          ),
+
+          // 底部操作按钮
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: controller.regenerateFlashCards,
+                    icon: Icon(
+                      Icons.refresh_rounded,
+                      size: 18,
+                      color: secondaryColor,
+                    ),
+                    label: Text(
+                      '重新生成',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: secondaryColor,
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 24,
+                  color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5),
+                ),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: controller.viewLearningRecords,
+                    icon: Icon(
+                      Icons.history_rounded,
+                      size: 18,
+                      color: secondaryColor,
+                    ),
+                    label: Text(
+                      '学习记录',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: secondaryColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建分段进度条
+  Widget _buildSegmentedProgressBar(FlashCardProgress progress, bool isDark) {
+    final total = progress.total;
+    if (total == 0) return const SizedBox.shrink();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        height: 10,
+        child: Row(
+          children: [
+            // 已掌握
+            if (progress.mastered > 0)
+              Expanded(
+                flex: progress.mastered,
+                child: Container(color: AppTheme.statusMastered),
+              ),
+            // 待复习
+            if (progress.needsReview > 0)
+              Expanded(
+                flex: progress.needsReview,
+                child: Container(color: AppTheme.statusNeedsReview),
+              ),
+            // 需改进
+            if (progress.needsImprove > 0)
+              Expanded(
+                flex: progress.needsImprove,
+                child: Container(color: AppTheme.statusNeedsImprove),
+              ),
+            // 未学习
+            if (progress.notStarted > 0)
+              Expanded(
+                flex: progress.notStarted,
+                child: Container(
+                  color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 构建统计卡片
+  Widget _buildStatCard(String label, int count, Color color, bool isDark) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             Text(
-              '${progress.mastered}/${progress.total} 已掌握',
+              label,
               style: TextStyle(
-                fontSize: 13,
-                color: const Color(0xFF4ECDC4),
-                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: isDark ? Colors.grey[500] : Colors.grey[600],
               ),
             ),
           ],
         ),
-      ],
-    );
-  }
-
-  /// 构建进度统计
-  Widget _buildProgressStats(
-    FlashCardProgress progress,
-    bool isDark,
-    Color textColor,
-    Color? secondaryColor,
-  ) {
-    return Row(
-      children: [
-        _buildStatItem('已掌握', progress.mastered, const Color(0xFF4ECDC4), isDark),
-        _buildStatItem('待复习', progress.needsReview, const Color(0xFF5B8DEF), isDark),
-        _buildStatItem('需改进', progress.needsImprove, const Color(0xFFFFAA33), isDark),
-        _buildStatItem('未学习', progress.notStarted, isDark ? Colors.grey[600]! : Colors.grey[400]!, isDark),
-      ],
-    );
-  }
-
-  /// 构建统计项
-  Widget _buildStatItem(String label, int count, Color color, bool isDark) {
-    return Expanded(
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? Colors.grey[500] : Colors.grey[600],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -492,13 +771,13 @@ class NoteDetailPage extends GetView<NoteDetailController> {
         ),
         child: SizedBox(
           width: double.infinity,
-          height: 50,
+          height: 52,
           child: ElevatedButton.icon(
             onPressed: controller.continueLearning,
-            icon: const Icon(Icons.play_arrow_rounded, size: 24),
+            icon: const Icon(Icons.play_arrow_rounded, size: 26),
             label: const Text(
               '继续学习',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.darkPrimary,
@@ -506,7 +785,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
-              elevation: 0,
+              elevation: 2,
+              shadowColor: AppTheme.darkPrimary.withOpacity(0.4),
             ),
           ),
         ),
@@ -580,4 +860,3 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     );
   }
 }
-

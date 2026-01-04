@@ -12,7 +12,7 @@ class AppTheme {
   static const Color darkTextPrimary = Color(0xFFFFFFFF);
   static const Color darkTextSecondary = Color(0xFF9E9E9E);
   static const Color darkBorder = Color(0xFF333333);
-  
+
   // ============== Light 主题颜色 ==============
   static const Color lightBackground = Color(0xFFFFFFFF);
   static const Color lightSurface = Color(0xFFF5F7FA);
@@ -26,20 +26,34 @@ class AppTheme {
   static const Color accent1 = Color(0xFFFF6B6B);
   static const Color accent2 = Color(0xFFFFD93D);
   static const Color accent3 = Color(0xFF95E1D3);
-  
+
+  // ============== 闪词学习状态颜色 ==============
+  /// 已掌握 - 绿色
+  static const Color statusMastered = Color(0xFF10B981);
+
+  /// 待复习 - 蓝色
+  static const Color statusNeedsReview = Color(0xFF3B82F6);
+
+  /// 需改进 - 橙色
+  static const Color statusNeedsImprove = Color(0xFFF59E0B);
+
+  /// 未学习 - 灰色
+  static const Color statusNotStarted = Color(0xFF6B7280);
+
+  /// 未掌握 - 红色
+  static const Color statusNotMastered = Color(0xFFEF4444);
+
   // ============== Dark 主题 ==============
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
     primaryColor: darkPrimary,
     scaffoldBackgroundColor: darkBackground,
-    
     colorScheme: const ColorScheme.dark(
       primary: darkPrimary,
       secondary: darkSecondary,
       surface: darkSurface,
       error: accent1,
     ),
-    
     appBarTheme: const AppBarTheme(
       backgroundColor: darkBackground,
       elevation: 0,
@@ -51,7 +65,6 @@ class AppTheme {
         fontWeight: FontWeight.bold,
       ),
     ),
-    
     cardTheme: CardTheme(
       color: darkSurface,
       elevation: 0,
@@ -59,7 +72,6 @@ class AppTheme {
         borderRadius: BorderRadius.circular(20),
       ),
     ),
-    
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: darkPrimary,
@@ -71,7 +83,6 @@ class AppTheme {
         ),
       ),
     ),
-    
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: darkSurface,
@@ -89,20 +100,18 @@ class AppTheme {
       ),
     ),
   );
-  
+
   // ============== Light 主题 ==============
   static ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
     primaryColor: lightPrimary,
     scaffoldBackgroundColor: lightBackground,
-    
     colorScheme: const ColorScheme.light(
       primary: lightPrimary,
       secondary: lightSecondary,
       surface: lightSurface,
       error: accent1,
     ),
-    
     appBarTheme: const AppBarTheme(
       backgroundColor: lightBackground,
       elevation: 0,
@@ -114,7 +123,6 @@ class AppTheme {
         fontWeight: FontWeight.bold,
       ),
     ),
-    
     cardTheme: CardTheme(
       color: lightSurface,
       elevation: 0,
@@ -122,7 +130,6 @@ class AppTheme {
         borderRadius: BorderRadius.circular(20),
       ),
     ),
-    
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: lightPrimary,
@@ -134,7 +141,6 @@ class AppTheme {
         ),
       ),
     ),
-    
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: lightSurface,
