@@ -1,8 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io' show Platform;
 import 'package:newstudyapp/pages/note_creation/note_creation_state.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 import 'package:newstudyapp/services/http_service.dart';
+import 'package:newstudyapp/services/harmonyos_file_picker_service.dart';
 
 class NoteCreationController extends GetxController {
   final httpService = HttpService();
@@ -67,28 +71,56 @@ class NoteCreationController extends GetxController {
 
   Future<void> pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['pdf', 'docx', 'txt', 'md'],
-        withData: false,
-      );
-      if (result == null || result.files.isEmpty) {
-        return;
-      }
-
-      final file = result.files.first;
-      if (file.path == null) {
-        Get.snackbar(
-          '错误',
-          '无法获取文件路径，请重试',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(milliseconds: 1800),
+      // 在 HarmonyOS 平台上使用原生文件选择器
+      if (Platform.isAndroid || Platform.isIOS) {
+        // 使用 file_picker 插件（Android/iOS）
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['pdf', 'docx', 'txt', 'md'],
+          withData: false,
         );
-        return;
-      }
+        if (result == null || result.files.isEmpty) {
+          return;
+        }
 
-      state.selectedFileName.value = file.name;
-      state.selectedFilePath.value = file.path;
+        final file = result.files.first;
+        if (file.path == null) {
+          Get.snackbar(
+            '错误',
+            '无法获取文件路径，请重试',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(milliseconds: 1800),
+          );
+          return;
+        }
+
+        state.selectedFileName.value = file.name;
+        state.selectedFilePath.value = file.path;
+      } else {
+        // 在 HarmonyOS 平台上使用原生实现
+        try {
+          final files = await HarmonyOSFilePickerService.pickFiles(
+            allowedExtensions: const ['pdf', 'docx', 'txt', 'md'],
+          );
+          
+          if (files.isEmpty) {
+            return; // 用户取消选择
+          }
+
+          final file = files.first;
+          state.selectedFileName.value = file['name'] as String? ?? '未知文件';
+          // 优先使用 path，如果没有则使用 uri
+          state.selectedFilePath.value = file['path'] as String? ?? file['uri'] as String? ?? '';
+        } catch (e) {
+          // 如果原生实现失败，回退到 file_picker（如果支持）
+          Get.snackbar(
+            '错误',
+            '选择文件失败：$e',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(milliseconds: 2000),
+          );
+        }
+      }
     } catch (e) {
       Get.snackbar(
         '错误',
@@ -99,13 +131,62 @@ class NoteCreationController extends GetxController {
     }
   }
 
+  /// 从相册或相机选择图片
+  Future<void> pickImage(ImageSource source) async {
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(
+          source: source,
+          maxWidth: 1920,
+          maxHeight: 1080,
+          imageQuality: 85,
+        );
+        
+        if (image == null) return;
+        
+        state.selectedFileName.value = image.name;
+        state.selectedFilePath.value = image.path;
+      } else {
+        // HarmonyOS 原生实现
+        if (source == ImageSource.camera) {
+          // 使用拍照功能
+          final photos = await HarmonyOSFilePickerService.takePhoto();
+          if (photos.isEmpty) return;
+
+          final photo = photos.first;
+          state.selectedFileName.value = photo['name'] as String? ?? '未知照片';
+          state.selectedFilePath.value = photo['path'] as String? ?? photo['uri'] as String? ?? '';
+        } else {
+          // 使用相册选择
+          final images = await HarmonyOSFilePickerService.pickImages();
+          if (images.isEmpty) return;
+
+          final image = images.first;
+          state.selectedFileName.value = image['name'] as String? ?? '未知图片';
+          state.selectedFilePath.value = image['path'] as String? ?? image['uri'] as String? ?? '';
+        }
+      }
+      
+      // 跳转到文件上传流程
+      Get.toNamed(AppRoutes.noteCreation);
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '选择图片失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+
   Future<void> extractTermsFromSelectedFile() async {
     final path = state.selectedFilePath.value;
     final name = state.selectedFileName.value;
     if (path == null || name == null) {
       Get.snackbar(
         '提示',
-        '请先选择文件（PDF/DOCX/TXT）',
+        '请先选择文件（PDF/DOCX/图片）',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(milliseconds: 1600),
       );

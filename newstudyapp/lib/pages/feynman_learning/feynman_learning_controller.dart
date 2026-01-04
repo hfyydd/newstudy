@@ -1,18 +1,25 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_state.dart';
 import 'package:newstudyapp/services/http_service.dart';
+import 'package:newstudyapp/services/speech_recognizer_service.dart';
 
 class FeynmanLearningController extends GetxController {
   // 使用 HttpService 单例
   final httpService = HttpService();
   late final FeynmanLearningState state;
+  
+  // 语音识别事件订阅
+  StreamSubscription<SpeechRecognizerEvent>? _speechEventSubscription;
 
   @override
   void onInit() {
     super.onInit();
     state = FeynmanLearningState();
+    _initializeSpeech();
+    _setupSpeechEventListeners();
     
     // 从路由参数获取主题信息
     final arguments = Get.arguments as Map<String, dynamic>?;
@@ -27,7 +34,8 @@ class FeynmanLearningController extends GetxController {
             .toList(growable: false);
         if (terms.isNotEmpty) {
           state.topicName.value = arguments['topic'] as String? ?? '我的笔记';
-          state.topicId.value = null;
+          // 重要：保存 noteId，即使有自定义词表也要保存，用于标记已掌握功能
+          state.topicId.value = arguments['noteId'] as String?;
           state.activeCategory.value = 'note';
           state.isCustomDeck.value = true;
           state.terms.value = List.of(terms);
@@ -38,7 +46,8 @@ class FeynmanLearningController extends GetxController {
       }
 
       state.topicName.value = arguments['topic'] as String?;
-      state.topicId.value = arguments['topicId'] as String?;
+      // 优先使用 noteId，如果没有则使用 topicId
+      state.topicId.value = arguments['noteId'] as String? ?? arguments['topicId'] as String?;
       
       // 使用 topicId 作为 category 加载词汇
       final category = state.topicId.value ?? FeynmanLearningState.defaultCategory;
@@ -52,8 +61,55 @@ class FeynmanLearningController extends GetxController {
 
   @override
   void onClose() {
+    _speechEventSubscription?.cancel();
+    SpeechRecognizerService.shutdown();
     state.dispose();
     super.onClose();
+  }
+
+  /// 设置语音识别事件监听
+  void _setupSpeechEventListeners() {
+    _speechEventSubscription = SpeechRecognizerService.events.listen((event) {
+      switch (event.type) {
+        case SpeechEventType.onStart:
+          state.isListening.value = true;
+          debugPrint('[SpeechRecognizer] Started listening');
+          break;
+        case SpeechEventType.onResult:
+          if (event.result != null && event.result!.isNotEmpty) {
+            // 更新输入框内容
+            final currentText = state.textInputController.text;
+            if (event.isFinal) {
+              // 最终结果：追加到现有文本
+              final newText = currentText.isEmpty
+                  ? event.result!
+                  : '$currentText ${event.result!}';
+              state.textInputController.text = newText;
+              state.textInputController.selection = TextSelection.fromPosition(
+                TextPosition(offset: newText.length),
+              );
+            } else {
+              // 中间结果：可以实时显示（可选）
+              debugPrint('[SpeechRecognizer] Partial result: ${event.result}');
+            }
+          }
+          break;
+        case SpeechEventType.onComplete:
+          state.isListening.value = false;
+          debugPrint('[SpeechRecognizer] Completed');
+          break;
+        case SpeechEventType.onError:
+          state.isListening.value = false;
+          state.speechError.value = event.errorMessage ?? '语音识别错误';
+          Get.snackbar(
+            '语音识别错误',
+            event.errorMessage ?? '未知错误',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+          debugPrint('[SpeechRecognizer] Error: ${event.errorMessage}');
+          break;
+      }
+    });
   }
 
   Future<void> loadTerms({String? category}) async {
@@ -90,6 +146,101 @@ class FeynmanLearningController extends GetxController {
   void previousCard() {
     if (state.currentCardIndex.value > 0) {
       state.currentCardIndex.value--;
+    }
+  }
+
+  /// 根据学习结果自动更新词条状态（学习成功）
+  Future<void> _updateCardStatusOnSuccess() async {
+    final noteId = state.topicId.value;
+    final currentTerm = state.currentExplainingTerm.value;
+    
+    if (noteId == null || currentTerm == null) {
+      debugPrint('[FeynmanLearningController] 无法自动更新状态：noteId或term为空');
+      return;
+    }
+
+    try {
+      // 学习成功，设置为已掌握
+      await httpService.updateFlashCardStatus(noteId, currentTerm, 'mastered');
+      debugPrint('[FeynmanLearningController] 学习成功，已自动标记为掌握: $currentTerm');
+      
+      // 添加到已掌握集合（用于UI显示）
+      state.masteredTerms.add(currentTerm);
+    } catch (e) {
+      debugPrint('[FeynmanLearningController] 自动更新状态失败: $e');
+      // 不显示错误提示，避免干扰用户体验
+    }
+  }
+
+  /// 根据学习结果自动更新词条状态（学习失败）
+  Future<void> _updateCardStatusOnFailure() async {
+    final noteId = state.topicId.value;
+    final currentTerm = state.currentExplainingTerm.value;
+    
+    if (noteId == null || currentTerm == null) {
+      debugPrint('[FeynmanLearningController] 无法自动更新状态：noteId或term为空');
+      return;
+    }
+
+    try {
+      // 学习失败（有不清楚的词汇），设置为需要复习（困难词条）
+      // 如果词条当前状态是notStarted，设置为needsReview
+      // 如果词条当前状态是needsImprove，升级为needsReview（更困难）
+      // 如果词条当前状态是mastered，降级为needsReview（复习时又困难了）
+      // 如果词条当前状态是needsReview，保持needsReview
+      await httpService.updateFlashCardStatus(noteId, currentTerm, 'needsReview');
+      debugPrint('[FeynmanLearningController] 学习失败，已自动标记为需要复习: $currentTerm');
+    } catch (e) {
+      debugPrint('[FeynmanLearningController] 自动更新状态失败: $e');
+      // 不显示错误提示，避免干扰用户体验
+    }
+  }
+
+  /// 标记词条为已掌握
+  Future<void> markAsMastered(String term) async {
+    final noteId = state.topicId.value;
+    if (noteId == null) {
+      // 如果没有 noteId，说明不是从笔记进入的，只做本地处理
+      // 添加到本地已掌握集合
+      state.masteredTerms.add(term);
+      Get.snackbar(
+        '提示',
+        '已标记为掌握（仅本地，未保存到数据库）',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 3),
+      );
+      nextCard();
+      return;
+    }
+
+    try {
+      // 调用后端API更新状态
+      await httpService.updateFlashCardStatus(noteId, term, 'mastered');
+      
+      // 添加到已掌握集合（用于UI显示）
+      state.masteredTerms.add(term);
+      
+      Get.snackbar(
+        '成功',
+        '已标记为掌握',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.withOpacity(0.9),
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle, color: Colors.white),
+      );
+      
+      // 不删除词条，保留在列表中但标记为已掌握
+      // 这样用户翻回来时还能看到，但会显示为已掌握状态
+      
+      // 继续下一张卡片
+      nextCard();
+    } catch (e) {
+      debugPrint('标记已掌握失败: $e');
+      Get.snackbar(
+        '错误',
+        '标记失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 
@@ -175,6 +326,9 @@ class FeynmanLearningController extends GetxController {
           state.learningPhase.value = LearningPhase.success;
           state.confusedWords.clear();
           state.textInputController.clear();
+          
+          // 自动更新词条状态为已掌握
+          await _updateCardStatusOnSuccess();
         } else {
           Get.snackbar(
             '提示',
@@ -190,6 +344,9 @@ class FeynmanLearningController extends GetxController {
       state.confusedWords.value = List.of(extracted);
       state.learningPhase.value = LearningPhase.reviewing;
       state.textInputController.clear();
+      
+      // 自动更新词条状态为需要复习
+      await _updateCardStatusOnFailure();
       
     } catch (error) {
       Get.snackbar(
@@ -455,16 +612,8 @@ class FeynmanLearningController extends GetxController {
   
   /// 完成学习，返回卡片选择界面
   void finishLearning() {
-    // 先保存要移除的词汇（在重置状态之前）
-    final originalTerm = state.explanationHistory.isNotEmpty 
-        ? state.explanationHistory.first 
-        : null;
-    
-    // 从术语列表中移除已成功学习的词汇
-    if (originalTerm != null && state.terms.value != null) {
-      state.terms.value!.remove(originalTerm);
-      state.terms.refresh();
-    }
+    // 注意：不再从列表中移除词条，因为状态已经更新到数据库
+    // 词条会保留在列表中，但会显示为已掌握状态
     
     // 重置学习状态
     state.resetLearningState();
@@ -482,6 +631,104 @@ class FeynmanLearningController extends GetxController {
     state.isExplanationViewVisible.value = false;
     state.inputMode.value = InputMode.voice;
     state.textInputController.clear();
+  }
+
+  // ========== 语音识别相关方法 ==========
+
+  /// 初始化语音识别（使用 HarmonyOS 原生 API）
+  Future<void> _initializeSpeech() async {
+    try {
+      // 先尝试检查是否可用
+      final isAvailable = await SpeechRecognizerService.isAvailable();
+      if (isAvailable) {
+        state.speechAvailable.value = true;
+        debugPrint('[SpeechRecognizer] Already available');
+        return;
+      }
+      
+      // 如果不可用，尝试初始化
+      final available = await SpeechRecognizerService.initialize();
+      state.speechAvailable.value = available;
+      if (!available) {
+        // 初始化失败，但不阻止使用（可能是权限问题，稍后可以重试）
+        debugPrint('[SpeechRecognizer] Initialize returned false, but will allow retry');
+        // 仍然设置为 true，允许用户尝试使用
+        state.speechAvailable.value = true;
+      } else {
+        debugPrint('[SpeechRecognizer] Initialized successfully');
+      }
+    } catch (e) {
+      debugPrint('Speech initialization error: $e');
+      // 即使初始化失败，也允许用户尝试（可能是权限问题）
+      // 实际使用时会再次尝试初始化
+      state.speechAvailable.value = true;
+      state.speechError.value = null; // 清除错误，允许重试
+    }
+  }
+
+  /// 开始语音识别（使用 HarmonyOS 原生 API）
+  Future<void> startListening() async {
+    // 确保已初始化
+    try {
+      final isAvailable = await SpeechRecognizerService.isAvailable();
+      if (!isAvailable) {
+        // 如果不可用，尝试初始化
+        final initialized = await SpeechRecognizerService.initialize();
+        if (!initialized) {
+          Get.snackbar(
+            '语音识别初始化失败',
+            '请检查权限设置或稍后重试',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Check/Initialize error: $e');
+      // 即使检查失败，也尝试启动（可能是权限问题）
+    }
+
+    try {
+      state.speechError.value = null;
+      final success = await SpeechRecognizerService.startListening();
+      if (!success) {
+        Get.snackbar(
+          '错误',
+          '启动语音识别失败，请检查权限设置',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (e) {
+      debugPrint('Start listening error: $e');
+      state.isListening.value = false;
+      Get.snackbar(
+        '错误',
+        '启动语音识别失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  /// 停止语音识别
+  Future<void> stopListening() async {
+    try {
+      await SpeechRecognizerService.stopListening();
+      state.isListening.value = false;
+    } catch (e) {
+      debugPrint('Stop listening error: $e');
+      state.isListening.value = false;
+    }
+  }
+
+  /// 取消语音识别
+  Future<void> cancelListening() async {
+    try {
+      await SpeechRecognizerService.cancel();
+      state.isListening.value = false;
+    } catch (e) {
+      debugPrint('Cancel listening error: $e');
+      state.isListening.value = false;
+    }
   }
 }
 

@@ -57,14 +57,14 @@ class CreateNotePage extends GetView<CreateNoteController> {
                 ),
                 Expanded(
                   child: Center(
-                    child: Text(
-                      '创建笔记',
+                    child: Obx(() => Text(
+                      controller.state.isEdit.value ? '编辑笔记' : '创建笔记',
                       style: TextStyle(
                         color: textColor,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
-                    ),
+                    )),
                   ),
                 ),
                 // 占位，保持标题居中

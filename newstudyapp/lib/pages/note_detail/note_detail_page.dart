@@ -820,7 +820,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               const SizedBox(height: 20),
               _buildOptionItem(Icons.edit_outlined, '编辑笔记', isDark, () {
                 Get.back();
-                Get.snackbar('提示', '编辑功能开发中', snackPosition: SnackPosition.BOTTOM);
+                controller.editNote();
               }),
               _buildOptionItem(Icons.share_outlined, '分享笔记', isDark, () {
                 Get.back();
@@ -828,7 +828,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               }),
               _buildOptionItem(Icons.delete_outline, '删除笔记', isDark, () {
                 Get.back();
-                Get.snackbar('提示', '删除功能开发中', snackPosition: SnackPosition.BOTTOM);
+                controller.deleteNote();
               }, isDestructive: true),
               const SizedBox(height: 8),
             ],

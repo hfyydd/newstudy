@@ -25,4 +25,7 @@ class AppRoutes {
 
   /// 笔记详情页
   static const noteDetail = '/note-detail';
+
+  /// 笔记列表页
+  static const notes = '/notes';
 }
