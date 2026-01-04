@@ -193,39 +193,21 @@ class CreateNoteController extends GetxController {
       return;
     }
 
-    state.isSaving.value = true;
+    // 获取用户输入的内容
+    final userInput = state.noteContent.value;
 
-    try {
-      // 获取用户输入的内容
-      final userInput = state.noteContent.value;
+    // 关闭创建笔记弹窗
+    Get.back();
+    // 再关闭创建来源选择弹窗
+    Get.back();
 
-      // 关闭创建笔记弹窗
-      Get.back();
-      // 再关闭创建来源选择弹窗
-      Get.back();
-
-      // 跳转到笔记详情页，传递用户输入内容
-      // 笔记详情页会调用后端API生成智能笔记
-      Get.toNamed(
-        AppRoutes.noteDetail,
-        arguments: {
-          'userInput': userInput,
-        },
-      );
-    } catch (e) {
-      Get.snackbar(
-        '错误',
-        '笔记创建失败：$e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF6B6B),
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.all(16),
-        borderRadius: 12,
-      );
-    } finally {
-      state.isSaving.value = false;
-    }
+    // 直接跳转到笔记详情页，传递userInput，让详情页负责创建笔记并显示loading
+    Get.toNamed(
+      AppRoutes.noteDetail,
+      arguments: {
+        'userInput': userInput,
+      },
+    );
   }
 
   /// 清空内容

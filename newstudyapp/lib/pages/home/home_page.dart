@@ -4,6 +4,7 @@ import 'package:newstudyapp/routes/app_routes.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
+import 'package:newstudyapp/pages/home/home_controller.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,10 +17,13 @@ class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   late AnimationController _fabAnimationController;
   late Animation<double> _fabScaleAnimation;
+  late HomeController _homeController;
 
   @override
   void initState() {
     super.initState();
+    _homeController = Get.put(HomeController());
+
     _fabAnimationController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
@@ -307,7 +311,6 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildNotesSection(bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black;
-    final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,53 +323,111 @@ class _HomePageState extends State<HomePage>
               style: TextStyle(
                   fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
             ),
-            TextButton(
-              onPressed: () {},
-              child: Text('查看全部',
-                  style: TextStyle(color: secondaryColor, fontSize: 14)),
-            ),
+            Obx(() => Text(
+                  '共 ${_homeController.totalNotes.value} 条',
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.grey[500] : Colors.grey[600]),
+                )),
           ],
         ),
         const SizedBox(height: 16),
-        _buildNoteCard(
-          isDark: isDark,
-          title: '经济学基础',
-          progress: 12,
-          total: 30,
-          reviewCount: 5,
-          color: const Color(0xFF4ECDC4),
-        ),
-        const SizedBox(height: 12),
-        _buildNoteCard(
-          isDark: isDark,
-          title: '机器学习笔记',
-          progress: 5,
-          total: 15,
-          reviewCount: 3,
-          color: const Color(0xFFFF6B6B),
-        ),
-        const SizedBox(height: 12),
-        _buildAddNoteButton(isDark),
+        Obx(() {
+          if (_homeController.isLoading.value) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          if (_homeController.notes.isEmpty) {
+            return _buildEmptyNotes(isDark);
+          }
+
+          return Column(
+            children: [
+              ..._homeController.notes.map((note) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildNoteCard(
+                      isDark: isDark,
+                      note: note,
+                    ),
+                  )),
+              const SizedBox(height: 12),
+              _buildAddNoteButton(isDark),
+            ],
+          );
+        }),
       ],
+    );
+  }
+
+  Widget _buildEmptyNotes(bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
+    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor!, width: 1),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.note_add_outlined,
+            size: 48,
+            color: secondaryColor,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '还没有笔记',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '创建你的第一条笔记开始学习吧',
+            style: TextStyle(
+              fontSize: 14,
+              color: secondaryColor,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildAddNoteButton(isDark),
+        ],
+      ),
     );
   }
 
   Widget _buildNoteCard({
     required bool isDark,
-    required String title,
-    required int progress,
-    required int total,
-    required int reviewCount,
-    required Color color,
+    required note,
   }) {
-    final percentage = (progress / total * 100).toInt();
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[600] : Colors.grey[600];
+    final percentage = note.flashCardCount > 0
+        ? (note.masteredCount / note.flashCardCount * 100).toInt()
+        : 0;
 
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        Get.toNamed(
+          AppRoutes.noteDetail,
+          arguments: {
+            'noteId': note.id,
+          },
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -379,23 +440,16 @@ class _HomePageState extends State<HomePage>
           children: [
             Row(
               children: [
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                      color: color, borderRadius: BorderRadius.circular(2)),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    title,
+                    note.title,
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: textColor),
                   ),
                 ),
-                if (reviewCount > 0)
+                if (note.needsReviewCount > 0)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -404,7 +458,7 @@ class _HomePageState extends State<HomePage>
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '$reviewCount 待复习',
+                      '${note.needsReviewCount} 待复习',
                       style: const TextStyle(
                           color: Colors.orange,
                           fontSize: 11,
@@ -423,14 +477,14 @@ class _HomePageState extends State<HomePage>
                       Row(
                         children: [
                           Text(
-                            '$progress',
+                            '${note.masteredCount}',
                             style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: color),
+                                color: AppTheme.darkPrimary),
                           ),
                           Text(
-                            '/$total',
+                            '/${note.flashCardCount}',
                             style:
                                 TextStyle(fontSize: 16, color: secondaryColor),
                           ),
@@ -453,11 +507,14 @@ class _HomePageState extends State<HomePage>
                           width: 60,
                           height: 60,
                           child: CircularProgressIndicator(
-                            value: progress / total,
+                            value: note.flashCardCount > 0
+                                ? note.masteredCount / note.flashCardCount
+                                : 0,
                             strokeWidth: 5,
                             backgroundColor:
                                 isDark ? Colors.grey[800] : Colors.grey[300],
-                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                                AppTheme.darkPrimary),
                           ),
                         ),
                       ),

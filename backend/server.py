@@ -2,7 +2,7 @@ import logging
 import sys
 from typing import List
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Depends
 from fastapi import File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -24,6 +24,8 @@ try:
     from .note_terms_extractor import extract_terms_from_note
     from .file_text_extractor import extract_text_from_upload
     from .smart_note_generator import generate_smart_note
+    from .db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
+    from .get_default_user import get_default_user_id
 except ImportError:  # pragma: no cover
     from curious_student_agent import run_curious_student_agent
     from simple_explainer_agent import run_simple_explainer_agent
@@ -31,6 +33,8 @@ except ImportError:  # pragma: no cover
     from note_terms_extractor import extract_terms_from_note
     from file_text_extractor import extract_text_from_upload
     from smart_note_generator import generate_smart_note
+    from db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
+    from get_default_user import get_default_user_id
 
 
 app = FastAPI(title="Agent Service")
@@ -89,6 +93,35 @@ class SmartNoteResponse(BaseModel):
     note_content: str = Field(..., description="Markdown格式的笔记内容")
     terms: List[str] = Field(..., description="闪词列表")
     input_chars: int = Field(..., ge=0, description="用户输入字符数")
+
+
+class CreateNoteRequest(BaseModel):
+    """创建笔记请求"""
+    user_input: str = Field(..., min_length=1, description="用户输入的学习内容")
+    max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+
+
+class CreateNoteResponse(BaseModel):
+    """创建笔记响应"""
+    note_id: int = Field(..., description="笔记ID")
+    title: str = Field(..., description="笔记标题")
+    flash_card_count: int = Field(..., ge=0, description="闪词数量")
+
+
+class NoteListItem(BaseModel):
+    """笔记列表项"""
+    id: int
+    title: str
+    created_at: str
+    flash_card_count: int = Field(..., description="闪词总数")
+    mastered_count: int = Field(default=0, description="已掌握数量")
+    needs_review_count: int = Field(default=0, description="待复习数量")
+
+
+class NotesListResponse(BaseModel):
+    """笔记列表响应"""
+    notes: List[NoteListItem] = Field(..., description="笔记列表")
+    total: int = Field(..., ge=0, description="总数")
 
 
 TERMS_LIBRARY = {
@@ -285,7 +318,7 @@ async def extract_terms_from_file(
 @app.post("/notes/generate-smart-note", response_model=SmartNoteResponse)
 def generate_smart_note_api(payload: SmartNoteRequest) -> SmartNoteResponse:
     """
-    根据用户输入生成智能笔记和闪词列表。
+    根据用户输入生成智能笔记和闪词列表（不保存到数据库）。
     
     - 调用 LLM 生成结构化的 Markdown 笔记
     - 同时提取核心词语作为闪词列表
@@ -312,6 +345,247 @@ def generate_smart_note_api(payload: SmartNoteRequest) -> SmartNoteResponse:
         terms=terms,
         input_chars=len(payload.user_input),
     )
+
+
+@app.post("/notes/create", response_model=CreateNoteResponse)
+def create_note(
+    payload: CreateNoteRequest,
+    cur = Depends(get_db_cursor)
+) -> CreateNoteResponse:
+    """
+    创建笔记并保存到数据库（纯 SQL 方式）。
+    
+    - 调用 AI 生成智能笔记和闪词列表
+    - 使用 SQL INSERT 保存笔记到数据库
+    - 使用 SQL INSERT 保存闪词列表到数据库
+    """
+    logger.info(f"📝 开始创建笔记，输入长度: {len(payload.user_input)} 字符")
+    
+    try:
+        # 获取默认用户ID
+        user_id = get_default_user_id()
+        
+        # 生成智能笔记和闪词
+        note_content, terms = generate_smart_note(
+            payload.user_input,
+            max_terms=payload.max_terms
+        )
+        
+        # 从Markdown内容中提取标题（取第一行，移除#号）
+        title = "智能笔记"
+        for line in note_content.split('\n'):
+            line = line.strip()
+            if line:
+                # 移除Markdown标题符号
+                title = line.replace('#', '').strip()
+                if title:
+                    # 限制标题长度
+                    if len(title) > 50:
+                        title = title[:50] + "..."
+                    break
+        
+        # 使用 SQL INSERT 创建笔记
+        insert_note_sql = """
+            INSERT INTO notes (user_id, title, content, markdown_content, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, NOW(), NOW())
+            RETURNING id
+        """
+        cur.execute(insert_note_sql, (user_id, title, payload.user_input, note_content))
+        result = cur.fetchone()
+        logger.info(f"🔍 INSERT 执行结果: {result}, 类型: {type(result)}")
+        
+        if not result:
+            raise ValueError("插入笔记失败，未返回笔记ID")
+        
+        # RealDictRow 支持字典方式访问
+        note_id = result['id']
+        
+        if not note_id:
+            raise ValueError(f"插入笔记失败，返回的ID无效: {result}")
+        
+        logger.info(f"✅ 获取到笔记ID: {note_id}")
+        
+        # 使用 SQL INSERT 批量创建闪词卡片
+        if terms:
+            # 注意：数据库枚举值是大写，需要转换为大写
+            insert_flashcard_sql = """
+                INSERT INTO flash_cards (note_id, term, status, review_count, created_at, updated_at)
+                VALUES (%s, %s, %s::card_status, 0, NOW(), NOW())
+            """
+            # 使用大写的枚举值
+            flashcard_data = [(note_id, term, 'NOT_STARTED') for term in terms]
+            cur.executemany(insert_flashcard_sql, flashcard_data)
+            affected_rows = cur.rowcount
+            logger.info(f"✅ 插入 {len(flashcard_data)} 个闪词卡片，影响行数: {affected_rows}")
+            
+            # 验证插入是否成功
+            if affected_rows != len(flashcard_data):
+                logger.warning(f"⚠️ 插入闪词数量不匹配: 期望 {len(flashcard_data)}, 实际 {affected_rows}")
+        
+        logger.info(f"✅ 笔记创建成功！")
+        logger.info(f"   - 笔记ID: {note_id}")
+        logger.info(f"   - 标题: {title}")
+        logger.info(f"   - 闪词数量: {len(terms)}")
+        
+        return CreateNoteResponse(
+            note_id=note_id,
+            title=title,
+            flash_card_count=len(terms),
+        )
+        
+    except Exception as exc:  # noqa: BLE001
+        error_msg = str(exc)
+        logger.error(f"❌ 创建笔记失败: {error_msg}", exc_info=True)
+        # 如果错误信息是 "0"，可能是 rowcount 返回的，需要更详细的错误信息
+        if error_msg == "0":
+            logger.error("⚠️ 错误信息是 '0'，可能是数据库操作返回的行数为 0")
+            error_msg = "数据库操作失败，未插入任何记录"
+        raise HTTPException(status_code=500, detail=error_msg) from exc
+
+
+@app.get("/notes/list", response_model=NotesListResponse)
+def list_notes(
+    cur = Depends(get_db_cursor),
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(100, ge=1, le=100, description="返回数量")
+) -> NotesListResponse:
+    """
+    获取笔记列表（纯 SQL 方式）。
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        # 查询笔记列表（使用 SQL）
+        query_notes_sql = """
+            SELECT 
+                n.id,
+                n.title,
+                n.created_at,
+                COUNT(fc.id) as flash_card_count,
+                COUNT(CASE WHEN fc.status = 'MASTERED' THEN 1 END) as mastered_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_REVIEW' THEN 1 END) as needs_review_count
+            FROM notes n
+            LEFT JOIN flash_cards fc ON n.id = fc.note_id
+            WHERE n.user_id = %s
+            GROUP BY n.id, n.title, n.created_at
+            ORDER BY n.created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        cur.execute(query_notes_sql, (user_id, limit, skip))
+        notes = cur.fetchall()
+        
+        # 统计总数
+        count_sql = "SELECT COUNT(*) as count FROM notes WHERE user_id = %s"
+        cur.execute(count_sql, (user_id,))
+        total_row = cur.fetchone()
+        total = total_row['count']
+        
+        # 构建响应
+        note_items = []
+        for note in notes:
+            note_items.append(NoteListItem(
+                id=note['id'],
+                title=note['title'],
+                created_at=note['created_at'].isoformat() if note['created_at'] else "",
+                flash_card_count=note['flash_card_count'] or 0,
+                mastered_count=note['mastered_count'] or 0,
+                needs_review_count=note['needs_review_count'] or 0,
+            ))
+        
+        logger.info(f"📋 获取笔记列表: 总数={total}, 返回={len(note_items)}")
+        
+        return NotesListResponse(
+            notes=note_items,
+            total=total,
+        )
+        
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"❌ 获取笔记列表失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class NoteDetailResponse(BaseModel):
+    """笔记详情响应"""
+    id: int
+    title: str
+    content: str | None
+    markdown_content: str | None
+    created_at: str
+    updated_at: str
+    flash_cards: List[dict] = Field(..., description="闪词列表")
+
+
+@app.get("/notes/{note_id}", response_model=NoteDetailResponse)
+def get_note_detail(
+    note_id: int,
+    cur = Depends(get_db_cursor)
+) -> NoteDetailResponse:
+    """
+    获取笔记详情（纯 SQL 方式）。
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        # 查询笔记详情（使用 SQL）
+        query_note_sql = """
+            SELECT id, title, content, markdown_content, created_at, updated_at
+            FROM notes
+            WHERE id = %s AND user_id = %s
+        """
+        cur.execute(query_note_sql, (note_id, user_id))
+        note = cur.fetchone()
+        
+        if not note:
+            raise HTTPException(status_code=404, detail="笔记不存在")
+        
+        # 查询闪词列表（使用 SQL）
+        query_flashcards_sql = """
+            SELECT id, term, status, review_count
+            FROM flash_cards
+            WHERE note_id = %s
+            ORDER BY id
+        """
+        cur.execute(query_flashcards_sql, (note_id,))
+        flashcard_rows = cur.fetchall()
+        
+        # 构建闪词列表
+        flash_cards = []
+        for fc in flashcard_rows:
+            flash_cards.append({
+                "id": fc['id'],
+                "term": fc['term'],
+                "status": fc['status'],
+                "review_count": fc['review_count'],
+            })
+        
+        # 处理时间格式
+        created_at = note['created_at']
+        if hasattr(created_at, 'isoformat'):
+            created_at_str = created_at.isoformat()
+        else:
+            created_at_str = str(created_at) if created_at else ""
+        
+        updated_at = note['updated_at']
+        if hasattr(updated_at, 'isoformat'):
+            updated_at_str = updated_at.isoformat()
+        else:
+            updated_at_str = str(updated_at) if updated_at else ""
+        
+        return NoteDetailResponse(
+            id=note['id'],
+            title=note['title'],
+            content=note['content'],
+            markdown_content=note['markdown_content'],
+            created_at=created_at_str,
+            updated_at=updated_at_str,
+            flash_cards=flash_cards,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"❌ 获取笔记详情失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 if __name__ == "__main__":

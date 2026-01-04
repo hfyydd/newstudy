@@ -179,6 +179,49 @@ class HttpService {
     }
   }
 
+  /// 创建笔记（生成并保存到数据库）
+  Future<CreateNoteResponse> createNote({
+    required String userInput,
+    int maxTerms = 30,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.createNote,
+        data: {
+          'user_input': userInput,
+          'max_terms': maxTerms,
+        },
+        options: Options(
+          // 创建笔记可能需要较长时间（AI生成+数据库保存）
+          receiveTimeout: const Duration(seconds: 90),
+          sendTimeout: const Duration(seconds: 90),
+        ),
+      );
+      return CreateNoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取笔记列表
+  Future<NotesListResponse> listNotes({
+    int skip = 0,
+    int limit = 100,
+  }) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.listNotes,
+        queryParameters: {
+          'skip': skip,
+          'limit': limit,
+        },
+      );
+      return NotesListResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // ==================== 通用请求方法 ====================
 
   /// 通用 GET 请求

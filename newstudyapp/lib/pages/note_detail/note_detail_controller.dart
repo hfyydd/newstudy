@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/services/http_service.dart';
+import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
+import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'note_detail_state.dart';
 
 /// 笔记详情页控制器
@@ -12,25 +14,86 @@ class NoteDetailController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // 获取从创建笔记页面传入的用户输入
+    // 获取传入的参数
     final args = Get.arguments;
     if (args != null && args is Map<String, dynamic>) {
+      // 优先检查是否有noteId（从笔记列表进入）
+      final noteId = args['noteId'] as int?;
+      if (noteId != null) {
+        _loadNoteById(noteId);
+        return;
+      }
+      
+      // 检查是否有userInput（创建新笔记）
       final userInput = args['userInput'] as String?;
       if (userInput != null && userInput.isNotEmpty) {
         state.userInput.value = userInput;
-        // 调用AI生成智能笔记
-        _generateSmartNote(userInput);
-      } else {
-        // 如果没有传入内容，显示空状态
-        state.isLoading.value = false;
+        // 调用API创建笔记（保存到数据库）
+        _createNote(userInput);
+        return;
       }
-    } else {
-      // 加载已有笔记（从笔记列表进入的情况）
-      _loadNote();
+    }
+    
+    // 如果没有传入任何参数，显示空状态
+    state.isLoading.value = false;
+  }
+
+  /// 创建笔记（保存到数据库）
+  Future<void> _createNote(String userInput) async {
+    state.isLoading.value = true;
+    state.isGenerating.value = true;
+    state.generatingStatus.value = 'AI 正在分析内容...';
+
+    try {
+      // 调用后端API创建笔记（生成并保存到数据库）
+      final response = await _httpService.createNote(
+        userInput: userInput,
+        maxTerms: 30,
+      );
+
+      // 创建成功后，通过noteId加载笔记详情
+      await _loadNoteById(response.noteId);
+
+      // 刷新首页的笔记列表
+      try {
+        final homeController = Get.find<HomeController>();
+        homeController.loadNotes();
+      } catch (e) {
+        // 如果首页控制器不存在，忽略错误
+        print('首页控制器未找到，跳过刷新: $e');
+      }
+
+      // 显示成功提示
+      Get.snackbar(
+        '成功',
+        '笔记创建成功',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF4ECDC4),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+
+    } catch (e) {
+      Get.snackbar(
+        '创建失败',
+        '笔记创建失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFFF6B6B),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+    } finally {
+      state.isLoading.value = false;
+      state.isGenerating.value = false;
+      state.generatingStatus.value = '';
     }
   }
 
-  /// 调用AI生成智能笔记
+  /// 调用AI生成智能笔记（不保存，仅预览）
   Future<void> _generateSmartNote(String userInput) async {
     state.isLoading.value = true;
     state.isGenerating.value = true;
@@ -97,48 +160,74 @@ class NoteDetailController extends GetxController {
     }
   }
 
-  /// 加载已有笔记数据（模拟）
-  Future<void> _loadNote() async {
+  /// 根据noteId加载笔记详情
+  Future<void> _loadNoteById(int noteId) async {
     state.isLoading.value = true;
 
     try {
-      // TODO: 从后端或本地数据库加载笔记
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // 模拟笔记数据
-      state.note.value = NoteModel(
-        id: '1',
-        title: '经济学基础概念',
-        content: '经济学是研究人类在稀缺资源条件下如何做出选择的学科。',
-        markdownContent: '''# 经济学基础概念
-
-经济学是研究人类在稀缺资源条件下如何做出选择的学科。以下是一些核心概念：
-
-## 供需关系
-
-供给是指生产者愿意在特定价格下出售的商品数量，需求是指消费者愿意在特定价格下购买的商品数量。当供给等于需求时，市场达到均衡状态。
-
-## 通货膨胀
-
-通货膨胀是指货币购买力下降，物价普遍上涨的现象。适度的通胀有利于经济发展，但过高的通胀会损害经济稳定。
-
-## GDP（国内生产总值）
-
-GDP是衡量一国经济活动的重要指标，代表一定时期内一国境内生产的所有最终商品和服务的市场价值总和。
-''',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-        updatedAt: DateTime.now().subtract(const Duration(hours: 5)),
-        termCount: 10,
-        terms: ['通货膨胀', '货币政策', 'GDP', '供需关系', '市场均衡'],
+      // 调用后端API获取笔记详情
+      final response = await _httpService.get<Map<String, dynamic>>(
+        ApiConfig.getNoteDetail(noteId),
       );
 
-      // 模拟闪词学习进度
+      // 解析响应数据
+      final id = response['id'] as int;
+      final title = response['title'] as String;
+      final content = response['content'] as String?;
+      final markdownContent = response['markdown_content'] as String?;
+      final createdAtStr = response['created_at'] as String;
+      final flashCardsRaw = response['flash_cards'] as List;
+
+      // 解析闪词列表
+      final terms = flashCardsRaw
+          .map((fc) => fc['term'] as String)
+          .toList();
+
+      // 统计闪词状态
+      int mastered = 0;
+      int needsReview = 0;
+      int needsImprove = 0;
+      int notStarted = 0;
+
+      for (final fc in flashCardsRaw) {
+        final status = fc['status'] as String;
+        switch (status) {
+          case 'mastered':
+            mastered++;
+            break;
+          case 'needs_review':
+            needsReview++;
+            break;
+          case 'needs_improve':
+            needsImprove++;
+            break;
+          case 'not_started':
+            notStarted++;
+            break;
+        }
+      }
+
+      // 创建笔记模型
+      state.note.value = NoteModel(
+        id: id.toString(),
+        title: title,
+        content: content ?? '',
+        markdownContent: markdownContent ?? '',
+        createdAt: DateTime.tryParse(createdAtStr) ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+        termCount: terms.length,
+        terms: terms,
+      );
+
+      // 闪词内容已通过note.value设置，无需单独设置
+
+      // 设置学习进度
       state.progress.value = FlashCardProgress(
-        total: 10,
-        mastered: 4,
-        needsReview: 3,
-        needsImprove: 2,
-        notStarted: 1,
+        total: terms.length,
+        mastered: mastered,
+        needsReview: needsReview,
+        needsImprove: needsImprove,
+        notStarted: notStarted,
       );
     } catch (e) {
       Get.snackbar(

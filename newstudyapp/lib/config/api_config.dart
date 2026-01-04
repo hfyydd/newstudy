@@ -32,6 +32,15 @@ class ApiConfig {
   /// 生成智能笔记（AI生成markdown笔记+闪词列表）
   static const String generateSmartNote = '/notes/generate-smart-note';
 
+  /// 创建笔记（生成并保存到数据库）
+  static const String createNote = '/notes/create';
+
+  /// 获取笔记列表
+  static const String listNotes = '/notes/list';
+
+  /// 获取笔记详情
+  static String getNoteDetail(int noteId) => '/notes/$noteId';
+
   // ==================== 辅助方法 ====================
 
   /// 构建完整的 API URL

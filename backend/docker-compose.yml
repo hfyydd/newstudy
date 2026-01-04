@@ -1,0 +1,23 @@
+services:
+  # PostgreSQL 数据库服务（带 pgvector 扩展）
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: newstudy-postgres
+    environment:
+      POSTGRES_USER: newstudy
+      POSTGRES_PASSWORD: newstudy123
+      POSTGRES_DB: newstudy_db
+    ports:
+      - "5433:5432"  # 映射到 5433 端口，避免与本地 PostgreSQL 冲突
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newstudy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+

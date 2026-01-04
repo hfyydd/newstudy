@@ -331,14 +331,13 @@ class CreateNotePage extends GetView<CreateNoteController> {
         ),
       ),
       child: Obx(() {
-        final isSaving = controller.state.isSaving.value;
         final isFormValid = controller.state.isFormValid;
 
         return SizedBox(
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: (isSaving || !isFormValid) ? null : controller.saveNote,
+            onPressed: !isFormValid ? null : controller.saveNote,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.darkPrimary,
               foregroundColor: Colors.white,
@@ -351,29 +350,20 @@ class CreateNotePage extends GetView<CreateNoteController> {
               ),
               elevation: 0,
             ),
-            child: isSaving
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.auto_awesome, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        '开始学习',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.auto_awesome, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  '开始学习',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+              ],
+            ),
           ),
         );
       }),
