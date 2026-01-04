@@ -155,6 +155,30 @@ class HttpService {
     }
   }
 
+  /// 生成智能笔记（AI生成Markdown笔记+闪词列表）
+  Future<SmartNoteResponse> generateSmartNote({
+    required String userInput,
+    int maxTerms = 30,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.generateSmartNote,
+        data: {
+          'user_input': userInput,
+          'max_terms': maxTerms,
+        },
+        options: Options(
+          // 智能笔记生成可能需要较长时间
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
+        ),
+      );
+      return SmartNoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // ==================== 通用请求方法 ====================
 
   /// 通用 GET 请求

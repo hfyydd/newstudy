@@ -1,59 +1,144 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:newstudyapp/services/http_service.dart';
+import 'package:newstudyapp/routes/app_routes.dart';
 import 'note_detail_state.dart';
 
 /// 笔记详情页控制器
 class NoteDetailController extends GetxController {
   final NoteDetailState state = NoteDetailState();
+  final HttpService _httpService = HttpService();
 
   @override
   void onInit() {
     super.onInit();
-    // 加载笔记数据（目前使用模拟数据）
-    _loadNote();
+    // 获取从创建笔记页面传入的用户输入
+    final args = Get.arguments;
+    if (args != null && args is Map<String, dynamic>) {
+      final userInput = args['userInput'] as String?;
+      if (userInput != null && userInput.isNotEmpty) {
+        state.userInput.value = userInput;
+        // 调用AI生成智能笔记
+        _generateSmartNote(userInput);
+      } else {
+        // 如果没有传入内容，显示空状态
+        state.isLoading.value = false;
+      }
+    } else {
+      // 加载已有笔记（从笔记列表进入的情况）
+      _loadNote();
+    }
   }
 
-  /// 加载笔记数据
+  /// 调用AI生成智能笔记
+  Future<void> _generateSmartNote(String userInput) async {
+    state.isLoading.value = true;
+    state.isGenerating.value = true;
+    state.generatingStatus.value = 'AI 正在分析内容...';
+
+    try {
+      // 调用后端API生成智能笔记
+      final response = await _httpService.generateSmartNote(
+        userInput: userInput,
+        maxTerms: 30,
+      );
+
+      // 从内容中提取标题（取第一行或前20个字符）
+      String title = '智能笔记';
+      final lines = response.noteContent.split('\n');
+      for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.isNotEmpty) {
+          // 移除Markdown标题符号
+          title = trimmed.replaceAll(RegExp(r'^#+\s*'), '');
+          if (title.length > 20) {
+            title = '${title.substring(0, 20)}...';
+          }
+          break;
+        }
+      }
+
+      // 创建笔记模型
+      state.note.value = NoteModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title,
+        content: userInput,
+        markdownContent: response.noteContent,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        termCount: response.terms.length,
+        terms: response.terms,
+      );
+
+      // 初始化学习进度
+      state.progress.value = FlashCardProgress(
+        total: response.terms.length,
+        mastered: 0,
+        needsReview: 0,
+        needsImprove: 0,
+        notStarted: response.terms.length,
+      );
+
+    } catch (e) {
+      Get.snackbar(
+        '生成失败',
+        '智能笔记生成失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFFF6B6B),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+    } finally {
+      state.isLoading.value = false;
+      state.isGenerating.value = false;
+      state.generatingStatus.value = '';
+    }
+  }
+
+  /// 加载已有笔记数据（模拟）
   Future<void> _loadNote() async {
     state.isLoading.value = true;
 
     try {
       // TODO: 从后端或本地数据库加载笔记
-      // 目前使用模拟数据
       await Future.delayed(const Duration(milliseconds: 500));
 
       // 模拟笔记数据
       state.note.value = NoteModel(
         id: '1',
         title: '经济学基础概念',
-        content: '''经济学是研究人类在稀缺资源条件下如何做出选择的学科。以下是一些核心概念：
+        content: '经济学是研究人类在稀缺资源条件下如何做出选择的学科。',
+        markdownContent: '''# 经济学基础概念
 
-1. 供需关系
+经济学是研究人类在稀缺资源条件下如何做出选择的学科。以下是一些核心概念：
+
+## 供需关系
+
 供给是指生产者愿意在特定价格下出售的商品数量，需求是指消费者愿意在特定价格下购买的商品数量。当供给等于需求时，市场达到均衡状态。
 
-2. 通货膨胀
+## 通货膨胀
+
 通货膨胀是指货币购买力下降，物价普遍上涨的现象。适度的通胀有利于经济发展，但过高的通胀会损害经济稳定。
 
-3. GDP（国内生产总值）
+## GDP（国内生产总值）
+
 GDP是衡量一国经济活动的重要指标，代表一定时期内一国境内生产的所有最终商品和服务的市场价值总和。
-
-4. 利率
-利率是借贷资金的价格，由中央银行通过货币政策调控。利率影响储蓄、投资和消费行为。
-
-5. 货币政策
-货币政策是中央银行通过调节货币供应量和利率来影响经济的手段，包括公开市场操作、调整准备金率等。''',
+''',
         createdAt: DateTime.now().subtract(const Duration(days: 2)),
         updatedAt: DateTime.now().subtract(const Duration(hours: 5)),
-        termCount: 30, // 已生成30个闪词
+        termCount: 10,
+        terms: ['通货膨胀', '货币政策', 'GDP', '供需关系', '市场均衡'],
       );
 
       // 模拟闪词学习进度
       state.progress.value = FlashCardProgress(
-        total: 30,
-        mastered: 12,
-        needsReview: 8,
-        needsImprove: 5,
-        notStarted: 5,
+        total: 10,
+        mastered: 4,
+        needsReview: 3,
+        needsImprove: 2,
+        notStarted: 1,
       );
     } catch (e) {
       Get.snackbar(
@@ -69,33 +154,25 @@ GDP是衡量一国经济活动的重要指标，代表一定时期内一国境�
   /// 生成闪词卡片
   Future<void> generateFlashCards() async {
     state.isGenerating.value = true;
+    state.generatingStatus.value = '正在提取核心概念...';
 
     try {
-      // TODO: 调用后端AI接口生成闪词
-      await Future.delayed(const Duration(seconds: 2));
-
-      // 模拟生成结果
-      state.note.value = NoteModel(
-        id: state.note.value!.id,
-        title: state.note.value!.title,
-        content: state.note.value!.content,
-        createdAt: state.note.value!.createdAt,
-        updatedAt: DateTime.now(),
-        termCount: 25,
-      );
-
-      state.progress.value = FlashCardProgress(
-        total: 25,
-        mastered: 0,
-        needsReview: 0,
-        needsImprove: 0,
-        notStarted: 25,
-      );
+      // 重新调用AI生成
+      if (state.userInput.value.isNotEmpty) {
+        await _generateSmartNote(state.userInput.value);
+      } else if (state.note.value != null) {
+        await _generateSmartNote(state.note.value!.content);
+      }
 
       Get.snackbar(
         '成功',
-        '已生成 25 个闪词卡片',
+        '已生成 ${state.terms.length} 个闪词卡片',
         snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF4ECDC4),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
       );
     } catch (e) {
       Get.snackbar(
@@ -105,17 +182,49 @@ GDP是衡量一国经济活动的重要指标，代表一定时期内一国境�
       );
     } finally {
       state.isGenerating.value = false;
+      state.generatingStatus.value = '';
     }
   }
 
-  /// 继续学习
+  /// 继续学习（跳转到费曼学习页面）
   void continueLearning() {
-    // TODO: 跳转到费曼学习页面
+    if (state.terms.isEmpty) {
+      Get.snackbar(
+        '提示',
+        '暂无闪词可学习',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    
+    // 跳转到费曼学习页面，传递闪词列表
+    Get.toNamed(
+      AppRoutes.feynmanLearning,
+      arguments: {
+        'terms': state.terms,
+        'noteId': state.note.value?.id,
+        'noteTitle': state.note.value?.title,
+      },
+    );
+  }
+  
+  /// Ask AI（与AI对话）
+  void askAI() {
     Get.snackbar(
       '提示',
-      '即将进入费曼学习页面',
+      'Ask AI 功能开发中',
       snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFF5B8DEF),
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+      margin: const EdgeInsets.all(16),
+      borderRadius: 12,
     );
+  }
+  
+  /// 费曼学习
+  void startFeynmanLearning() {
+    continueLearning();
   }
 
   /// 重新生成闪词
@@ -159,7 +268,6 @@ GDP是衡量一国经济活动的重要指标，代表一定时期内一国境�
 
   /// 查看学习记录
   void viewLearningRecords() {
-    // TODO: 跳转到学习记录页面
     Get.snackbar(
       '提示',
       '学习记录功能开发中',
@@ -186,4 +294,3 @@ GDP是衡量一国经济活动的重要指标，代表一定时期内一国境�
     }
   }
 }
-

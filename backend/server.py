@@ -1,9 +1,21 @@
+import logging
+import sys
 from typing import List
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi import File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 try:
     from .curious_student_agent import run_curious_student_agent
@@ -11,12 +23,14 @@ try:
     from .terms_generator import generate_terms_for_topic
     from .note_terms_extractor import extract_terms_from_note
     from .file_text_extractor import extract_text_from_upload
+    from .smart_note_generator import generate_smart_note
 except ImportError:  # pragma: no cover
     from curious_student_agent import run_curious_student_agent
     from simple_explainer_agent import run_simple_explainer_agent
     from terms_generator import generate_terms_for_topic
     from note_terms_extractor import extract_terms_from_note
     from file_text_extractor import extract_text_from_upload
+    from smart_note_generator import generate_smart_note
 
 
 app = FastAPI(title="Agent Service")
@@ -28,6 +42,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """记录所有HTTP请求"""
+    logger.info(f"📥 收到请求: {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"📤 响应状态: {response.status_code}")
+    return response
 
 
 class AgentRequest(BaseModel):
@@ -53,6 +76,19 @@ class NoteExtractResponse(BaseModel):
     title: str | None = Field(default=None, description="笔记标题（回显）")
     terms: List[str] = Field(..., description="抽取出的词语列表（可编辑）")
     total_chars: int = Field(..., ge=0, description="笔记字符数")
+
+
+class SmartNoteRequest(BaseModel):
+    """智能笔记生成请求"""
+    user_input: str = Field(..., min_length=1, description="用户输入的学习内容")
+    max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+
+
+class SmartNoteResponse(BaseModel):
+    """智能笔记生成响应"""
+    note_content: str = Field(..., description="Markdown格式的笔记内容")
+    terms: List[str] = Field(..., description="闪词列表")
+    input_chars: int = Field(..., ge=0, description="用户输入字符数")
 
 
 TERMS_LIBRARY = {
@@ -243,6 +279,38 @@ async def extract_terms_from_file(
         title=file.filename,
         terms=terms,
         total_chars=len(text),
+    )
+
+
+@app.post("/notes/generate-smart-note", response_model=SmartNoteResponse)
+def generate_smart_note_api(payload: SmartNoteRequest) -> SmartNoteResponse:
+    """
+    根据用户输入生成智能笔记和闪词列表。
+    
+    - 调用 LLM 生成结构化的 Markdown 笔记
+    - 同时提取核心词语作为闪词列表
+    - LLM 不可用时使用规则兜底
+    """
+    logger.info(f"🚀 开始生成智能笔记，输入长度: {len(payload.user_input)} 字符")
+    logger.info(f"📝 用户输入前100字: {payload.user_input[:100]}...")
+    
+    try:
+        note_content, terms = generate_smart_note(
+            payload.user_input, 
+            max_terms=payload.max_terms
+        )
+        logger.info(f"✅ 智能笔记生成成功！")
+        logger.info(f"   - 笔记长度: {len(note_content)} 字符")
+        logger.info(f"   - 提取闪词: {len(terms)} 个")
+        logger.info(f"   - 闪词列表: {terms[:10]}{'...' if len(terms) > 10 else ''}")
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"❌ 智能笔记生成失败: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return SmartNoteResponse(
+        note_content=note_content,
+        terms=terms,
+        input_chars=len(payload.user_input),
     )
 
 

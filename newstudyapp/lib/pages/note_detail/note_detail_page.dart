@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'note_detail_controller.dart';
@@ -45,7 +46,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       ),
       body: Obx(() {
         if (controller.state.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
+          return _buildLoadingState(isDark, textColor, secondaryColor);
         }
 
         return Column(
@@ -70,8 +71,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                     _buildMetaInfo(secondaryColor),
                     const SizedBox(height: 16),
 
-                    // 笔记内容
-                    _buildNoteContent(textColor, secondaryColor),
+                    // 笔记内容（Markdown渲染）
+                    _buildNoteContent(isDark, textColor, secondaryColor),
                   ],
                 ),
               ),
@@ -82,6 +83,54 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           ],
         );
       }),
+    );
+  }
+
+  /// 构建加载状态
+  Widget _buildLoadingState(bool isDark, Color textColor, Color? secondaryColor) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppTheme.darkPrimary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.darkPrimary),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Obx(() => Text(
+            controller.state.generatingStatus.value.isNotEmpty
+                ? controller.state.generatingStatus.value
+                : 'AI 正在生成笔记...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          )),
+          const SizedBox(height: 8),
+          Text(
+            '正在分析内容并提取核心概念',
+            style: TextStyle(
+              fontSize: 14,
+              color: secondaryColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -111,10 +160,22 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     });
   }
 
-  /// 构建笔记内容
-  Widget _buildNoteContent(Color textColor, Color? secondaryColor) {
+  /// 构建笔记内容（Markdown渲染）
+  Widget _buildNoteContent(bool isDark, Color textColor, Color? secondaryColor) {
     return Obx(() {
+      final markdownContent = controller.state.markdownContent;
       final content = controller.state.noteContent;
+      
+      // 优先使用Markdown内容
+      if (markdownContent.isNotEmpty) {
+        return MarkdownBody(
+          data: markdownContent,
+          selectable: true,
+          styleSheet: _buildMarkdownStyleSheet(isDark, textColor),
+        );
+      }
+      
+      // 回退到普通文本
       if (content.isEmpty) {
         return Center(
           child: Text(
@@ -133,6 +194,46 @@ class NoteDetailPage extends GetView<NoteDetailController> {
         ),
       );
     });
+  }
+
+  /// 构建Markdown样式表
+  MarkdownStyleSheet _buildMarkdownStyleSheet(bool isDark, Color textColor) {
+    final codeBackground = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5);
+    final blockquoteColor = isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE8E8E8);
+    // 标题使用主题紫色
+    const headingColor = Color(0xFF667EEA);
+    // 二级标题使用稍浅的紫色
+    final h2Color = isDark ? const Color(0xFF8B9EF0) : const Color(0xFF5A6FD1);
+    // 三级标题使用青色
+    const h3Color = Color(0xFF4ECDC4);
+    
+    return MarkdownStyleSheet(
+      p: TextStyle(fontSize: 15, color: textColor, height: 1.8),
+      h1: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: headingColor, height: 1.5),
+      h2: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: h2Color, height: 1.5),
+      h3: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: h3Color, height: 1.5),
+      h4: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor, height: 1.5),
+      listBullet: TextStyle(fontSize: 15, color: textColor),
+      code: TextStyle(fontSize: 14, color: AppTheme.darkPrimary, backgroundColor: codeBackground),
+      codeblockDecoration: BoxDecoration(color: codeBackground, borderRadius: BorderRadius.circular(8)),
+      codeblockPadding: const EdgeInsets.all(12),
+      blockquote: TextStyle(fontSize: 15, color: isDark ? Colors.grey[400] : Colors.grey[700], fontStyle: FontStyle.italic, height: 1.6),
+      blockquoteDecoration: BoxDecoration(
+        border: Border(left: BorderSide(color: AppTheme.darkPrimary, width: 3)),
+        color: blockquoteColor,
+      ),
+      blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      tableHead: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
+      tableBody: TextStyle(fontSize: 14, color: textColor),
+      tableBorder: TableBorder.all(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5), width: 1),
+      tableCellsPadding: const EdgeInsets.all(8),
+      strong: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+      em: TextStyle(fontStyle: FontStyle.italic, color: textColor),
+      a: TextStyle(color: AppTheme.darkPrimary, decoration: TextDecoration.underline),
+      horizontalRuleDecoration: BoxDecoration(
+        border: Border(top: BorderSide(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5), width: 1)),
+      ),
+    );
   }
 
   /// 构建闪词学习区域
@@ -165,24 +266,41 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        // 与首页今日复习卡片一致的紫色渐变背景
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
           const SizedBox(
             width: 48,
             height: 48,
-            child: CircularProgressIndicator(strokeWidth: 3),
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'AI 正在分析笔记内容...',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 8),
@@ -190,7 +308,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             '正在提取核心概念和关键词',
             style: TextStyle(
               fontSize: 14,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
+              color: Colors.white.withOpacity(0.8),
             ),
           ),
         ],
@@ -209,31 +327,45 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        // 与首页今日复习卡片一致的紫色渐变背景
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.darkPrimary.withOpacity(0.1),
+              color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.auto_awesome,
               size: 32,
-              color: AppTheme.darkPrimary,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             '此笔记尚未生成闪词卡片',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: textColor,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 8),
@@ -242,7 +374,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: secondaryColor,
+              color: Colors.white.withOpacity(0.8),
             ),
           ),
           const SizedBox(height: 20),
@@ -257,8 +389,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.darkPrimary,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF667EEA),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -283,9 +415,23 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        // 与首页今日复习卡片一致的紫色渐变背景
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,14 +439,14 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           // 标题
           Row(
             children: [
-              Icon(Icons.school_outlined, size: 20, color: AppTheme.darkPrimary),
+              const Icon(Icons.school_outlined, size: 20, color: Colors.white),
               const SizedBox(width: 8),
-              Text(
+              const Text(
                 '闪词学习进度',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: textColor,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -322,8 +468,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 child: OutlinedButton(
                   onPressed: controller.regenerateFlashCards,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: secondaryColor,
-                    side: BorderSide(color: borderColor),
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.5)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -337,8 +483,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 child: OutlinedButton(
                   onPressed: controller.viewLearningRecords,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: secondaryColor,
-                    side: BorderSide(color: borderColor),
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.5)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -362,33 +508,28 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
     return Column(
       children: [
-        // 进度条
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: SizedBox(
             height: 12,
             child: Row(
               children: [
-                // 已掌握（绿色）
                 Expanded(
                   flex: (masteredPercent * 100).round(),
                   child: Container(color: const Color(0xFF4ECDC4)),
                 ),
-                // 待复习（蓝色）
                 Expanded(
                   flex: (reviewPercent * 100).round(),
-                  child: Container(color: const Color(0xFF5B8DEF)),
+                  child: Container(color: const Color(0xFF87CEEB)),
                 ),
-                // 需改进（橙色）
                 Expanded(
                   flex: (improvePercent * 100).round(),
-                  child: Container(color: const Color(0xFFFFAA33)),
+                  child: Container(color: const Color(0xFFFFD700)),
                 ),
-                // 未学习（灰色）
                 Expanded(
                   flex: ((1 - masteredPercent - reviewPercent - improvePercent) * 100).round(),
                   child: Container(
-                    color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+                    color: Colors.white.withOpacity(0.3),
                   ),
                 ),
               ],
@@ -396,7 +537,6 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           ),
         ),
         const SizedBox(height: 8),
-        // 百分比
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -404,14 +544,14 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               '${(progress.progressPercent * 100).round()}% 已学习',
               style: TextStyle(
                 fontSize: 13,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                color: Colors.white.withOpacity(0.8),
               ),
             ),
             Text(
               '${progress.mastered}/${progress.total} 已掌握',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
-                color: const Color(0xFF4ECDC4),
+                color: Color(0xFF4ECDC4),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -430,16 +570,16 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   ) {
     return Row(
       children: [
-        _buildStatItem('已掌握', progress.mastered, const Color(0xFF4ECDC4), isDark),
-        _buildStatItem('待复习', progress.needsReview, const Color(0xFF5B8DEF), isDark),
-        _buildStatItem('需改进', progress.needsImprove, const Color(0xFFFFAA33), isDark),
-        _buildStatItem('未学习', progress.notStarted, isDark ? Colors.grey[600]! : Colors.grey[400]!, isDark),
+        _buildStatItem('已掌握', progress.mastered, const Color(0xFF4ECDC4)),
+        _buildStatItem('待复习', progress.needsReview, const Color(0xFF87CEEB)),
+        _buildStatItem('需改进', progress.needsImprove, const Color(0xFFFFD700)),
+        _buildStatItem('未学习', progress.notStarted, Colors.white.withOpacity(0.5)),
       ],
     );
   }
 
   /// 构建统计项
-  Widget _buildStatItem(String label, int count, Color color, bool isDark) {
+  Widget _buildStatItem(String label, int count, Color color) {
     return Expanded(
       child: Column(
         children: [
@@ -457,10 +597,10 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               const SizedBox(width: 4),
               Text(
                 '$count',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -470,7 +610,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isDark ? Colors.grey[500] : Colors.grey[600],
+              color: Colors.white.withOpacity(0.7),
             ),
           ),
         ],
@@ -481,8 +621,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   /// 构建底部操作按钮
   Widget _buildBottomActions(bool isDark, Color bgColor, Color borderColor) {
     return Obx(() {
-      final hasFlashCards = controller.state.hasFlashCards;
-      if (!hasFlashCards) return const SizedBox.shrink();
+      final hasContent = controller.state.note.value != null;
+      if (!hasContent) return const SizedBox.shrink();
 
       return Container(
         padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.of(Get.context!).padding.bottom),
@@ -490,25 +630,73 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           color: bgColor,
           border: Border(top: BorderSide(color: borderColor)),
         ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton.icon(
-            onPressed: controller.continueLearning,
-            icon: const Icon(Icons.play_arrow_rounded, size: 24),
-            label: const Text(
-              '继续学习',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.darkPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+        child: Row(
+          children: [
+            // Ask AI 按钮
+            Expanded(
+              child: SizedBox(
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: controller.askAI,
+                  icon: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF9B7DFF).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: Text('🦝', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                  label: const Text(
+                    'Ask AI',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : Colors.black,
+                    side: BorderSide(color: borderColor),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
               ),
-              elevation: 0,
             ),
-          ),
+            const SizedBox(width: 12),
+            // Feynman 按钮
+            Expanded(
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: controller.startFeynmanLearning,
+                  icon: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: Text('🐷', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                  label: const Text(
+                    'Feynman',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4ECDC4),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     });
@@ -538,6 +726,10 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 ),
               ),
               const SizedBox(height: 20),
+              _buildOptionItem(Icons.refresh, '重新生成', isDark, () {
+                Get.back();
+                controller.regenerateFlashCards();
+              }),
               _buildOptionItem(Icons.edit_outlined, '编辑笔记', isDark, () {
                 Get.back();
                 Get.snackbar('提示', '编辑功能开发中', snackPosition: SnackPosition.BOTTOM);
@@ -580,4 +772,3 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     );
   }
 }
-

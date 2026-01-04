@@ -29,6 +29,9 @@ class ApiConfig {
   /// 从笔记文件中抽取待学习词语（multipart/form-data）
   static const String extractNoteTermsFile = '/notes/extract-terms/file';
 
+  /// 生成智能笔记（AI生成markdown笔记+闪词列表）
+  static const String generateSmartNote = '/notes/generate-smart-note';
+
   // ==================== 辅助方法 ====================
 
   /// 构建完整的 API URL

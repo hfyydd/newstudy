@@ -177,7 +177,7 @@ class CreateNoteController extends GetxController {
     state.recordDuration.value = 0;
   }
 
-  /// 保存笔记
+  /// 保存笔记并跳转到笔记详情页
   Future<void> saveNote() async {
     if (!state.isFormValid) {
       Get.snackbar(
@@ -196,26 +196,21 @@ class CreateNoteController extends GetxController {
     state.isSaving.value = true;
 
     try {
-      // TODO: 调用后端API保存笔记
-      await Future.delayed(const Duration(seconds: 1)); // 模拟网络请求
+      // 获取用户输入的内容
+      final userInput = state.noteContent.value;
 
       // 关闭创建笔记弹窗
       Get.back();
       // 再关闭创建来源选择弹窗
       Get.back();
 
-      // 跳转到笔记详情页
-      Get.toNamed(AppRoutes.noteDetail);
-
-      Get.snackbar(
-        '成功',
-        '笔记创建成功',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF4ECDC4),
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.all(16),
-        borderRadius: 12,
+      // 跳转到笔记详情页，传递用户输入内容
+      // 笔记详情页会调用后端API生成智能笔记
+      Get.toNamed(
+        AppRoutes.noteDetail,
+        arguments: {
+          'userInput': userInput,
+        },
       );
     } catch (e) {
       Get.snackbar(
