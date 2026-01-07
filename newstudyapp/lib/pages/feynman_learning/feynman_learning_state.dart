@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:newstudyapp/models/note_models.dart';
 
 enum FloatingPhase { idle, flyingUp, flyingDown }
 enum InputMode { voice, text }
@@ -8,8 +9,14 @@ enum InputMode { voice, text }
 enum LearningPhase {
   /// 选择卡片阶段
   selecting,
+  /// 选择角色阶段
+  selectingRole,
   /// 解释中（输入解释）
   explaining,
+  /// 等待AI评估
+  evaluating,
+  /// 查看评估结果
+  result,
   /// 查看不清楚的词汇列表
   reviewing,
   /// 学习成功
@@ -72,6 +79,7 @@ class FeynmanLearningState {
   final isExplaining = false.obs;
   final isSubmittingSuggestion = false.obs;
   final textInputController = TextEditingController();
+  final inputText = ''.obs; // 用于跟踪输入文本内容
   final isAppending = false.obs;
 
   // ========== 学习流程状态 ==========
@@ -102,6 +110,42 @@ class FeynmanLearningState {
   /// 用户当前输入的解释内容
   final userExplanation = Rxn<String>();
 
+  // ========== 新增：角色选择和评估相关状态 ==========
+  
+  // ========== 语音输入相关状态 ==========
+  /// 是否正在语音识别
+  final isListening = false.obs;
+  
+  /// 语音识别的文本结果
+  final speechText = ''.obs;
+  
+  /// 可用的学习角色列表
+  final roles = <LearningRole>[].obs;
+  
+  /// 是否正在加载角色列表
+  final isLoadingRoles = false.obs;
+  
+  /// 当前选中的角色
+  final selectedRole = Rxn<LearningRole>();
+  
+  /// 当前学习的卡片信息
+  final currentCard = Rxn<Map<String, dynamic>>();
+  
+  /// 当前笔记ID
+  final currentNoteId = Rxn<int>();
+  
+  /// 笔记的默认角色（从笔记详情获取）
+  final noteDefaultRole = Rxn<String>();
+  
+  /// 是否正在提交评估
+  final isEvaluating = false.obs;
+  
+  /// 评估结果
+  final evaluationResult = Rxn<EvaluateResponse>();
+  
+  /// 当前卡片的学习历史
+  final cardLearningHistory = <LearningRecord>[].obs;
+
   void dispose() {
     textInputController.dispose();
   }
@@ -117,6 +161,12 @@ class FeynmanLearningState {
     wordExplanations.clear();
     isLoadingExplanation.value = false;
     userExplanation.value = null;
+    selectedRole.value = null;
+    currentCard.value = null;
+    evaluationResult.value = null;
+    isEvaluating.value = false;
+    // 使用赋值空列表而不是 clear()，避免固定长度列表的问题
+    cardLearningHistory.value = <LearningRecord>[];
   }
 }
 

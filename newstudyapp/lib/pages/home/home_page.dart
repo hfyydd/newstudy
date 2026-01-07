@@ -449,18 +449,51 @@ class _HomePageState extends State<HomePage>
                         color: textColor),
                   ),
                 ),
-                if (note.needsReviewCount > 0)
+                // 显示优先级最高的状态标签（未掌握 > 需改进 > 待复习）
+                if (note.notMasteredCount > 0)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.2),
+                      color: AppTheme.statusNotMastered.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${note.notMasteredCount} 未掌握',
+                      style: TextStyle(
+                          color: AppTheme.statusNotMastered,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  )
+                else if (note.needsImproveCount > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.statusNeedsImprove.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${note.needsImproveCount} 需改进',
+                      style: TextStyle(
+                          color: AppTheme.statusNeedsImprove,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  )
+                else if (note.needsReviewCount > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.statusNeedsReview.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '${note.needsReviewCount} 待复习',
-                      style: const TextStyle(
-                          color: Colors.orange,
+                      style: TextStyle(
+                          color: AppTheme.statusNeedsReview,
                           fontSize: 11,
                           fontWeight: FontWeight.w600),
                     ),
@@ -481,7 +514,7 @@ class _HomePageState extends State<HomePage>
                             style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.darkPrimary),
+                                color: AppTheme.statusMastered),
                           ),
                           Text(
                             '/${note.flashCardCount}',
@@ -514,7 +547,7 @@ class _HomePageState extends State<HomePage>
                             backgroundColor:
                                 isDark ? Colors.grey[800] : Colors.grey[300],
                             valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppTheme.darkPrimary),
+                                AppTheme.statusMastered),
                           ),
                         ),
                       ),
@@ -592,7 +625,7 @@ class _HomePageState extends State<HomePage>
             const SizedBox(width: 12),
             Expanded(
                 child: _buildStatCard(isDark, Icons.psychology_rounded, '25',
-                    '已掌握', const Color(0xFF4ECDC4))),
+                    '已掌握', AppTheme.statusMastered)),
           ],
         ),
         const SizedBox(height: 12),
@@ -784,7 +817,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                 textColor: textColor,
                 title: '文档',
                 icon: Icons.description_outlined,
-                iconColor: const Color(0xFF4ECDC4),
+                iconColor: AppTheme.statusMastered,
                 items: [
                   _SourceItem(
                       icon: Icons.picture_as_pdf,

@@ -26,6 +26,7 @@ try:
     from .smart_note_generator import generate_smart_note
     from .db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from .get_default_user import get_default_user_id
+    from .feynman_evaluator import evaluate_explanation, get_available_roles
 except ImportError:  # pragma: no cover
     from curious_student_agent import run_curious_student_agent
     from simple_explainer_agent import run_simple_explainer_agent
@@ -35,6 +36,7 @@ except ImportError:  # pragma: no cover
     from smart_note_generator import generate_smart_note
     from db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from get_default_user import get_default_user_id
+    from feynman_evaluator import evaluate_explanation, get_available_roles
 
 
 app = FastAPI(title="Agent Service")
@@ -116,6 +118,8 @@ class NoteListItem(BaseModel):
     flash_card_count: int = Field(..., description="闪词总数")
     mastered_count: int = Field(default=0, description="已掌握数量")
     needs_review_count: int = Field(default=0, description="待复习数量")
+    needs_improve_count: int = Field(default=0, description="需改进数量")
+    not_mastered_count: int = Field(default=0, description="未掌握数量")
 
 
 class NotesListResponse(BaseModel):
@@ -463,7 +467,9 @@ def list_notes(
                 n.created_at,
                 COUNT(fc.id) as flash_card_count,
                 COUNT(CASE WHEN fc.status = 'MASTERED' THEN 1 END) as mastered_count,
-                COUNT(CASE WHEN fc.status = 'NEEDS_REVIEW' THEN 1 END) as needs_review_count
+                COUNT(CASE WHEN fc.status = 'NEEDS_REVIEW' THEN 1 END) as needs_review_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_IMPROVE' THEN 1 END) as needs_improve_count,
+                COUNT(CASE WHEN fc.status = 'NOT_MASTERED' THEN 1 END) as not_mastered_count
             FROM notes n
             LEFT JOIN flash_cards fc ON n.id = fc.note_id
             WHERE n.user_id = %s
@@ -490,6 +496,8 @@ def list_notes(
                 flash_card_count=note['flash_card_count'] or 0,
                 mastered_count=note['mastered_count'] or 0,
                 needs_review_count=note['needs_review_count'] or 0,
+                needs_improve_count=note['needs_improve_count'] or 0,
+                not_mastered_count=note['not_mastered_count'] or 0,
             ))
         
         logger.info(f"📋 获取笔记列表: 总数={total}, 返回={len(note_items)}")
@@ -512,7 +520,58 @@ class NoteDetailResponse(BaseModel):
     markdown_content: str | None
     created_at: str
     updated_at: str
+    default_role: str | None = Field(default=None, description="笔记的默认学习角色")
     flash_cards: List[dict] = Field(..., description="闪词列表")
+
+
+# ========== 学习相关模型 ==========
+
+class LearningRole(BaseModel):
+    """学习角色"""
+    id: str
+    name: str
+    description: str
+
+
+class RolesResponse(BaseModel):
+    """角色列表响应"""
+    roles: List[LearningRole]
+
+
+class EvaluateRequest(BaseModel):
+    """评估请求"""
+    card_id: int = Field(..., description="闪词卡片ID")
+    note_id: int = Field(..., description="笔记ID")
+    selected_role: str = Field(..., min_length=1, description="选择的角色ID")
+    user_explanation: str = Field(..., min_length=1, description="用户的解释")
+
+
+class EvaluateResponse(BaseModel):
+    """评估响应"""
+    score: int = Field(..., ge=0, le=100, description="评分 0-100")
+    status: str = Field(..., description="学习状态")
+    feedback: str = Field(..., description="AI反馈（简短版）")
+    highlights: List[str] = Field(default=[], description="做得好的点")
+    suggestions: List[str] = Field(default=[], description="改进建议")
+    learning_record_id: int = Field(..., description="学习记录ID")
+
+
+class UpdateCardStatusRequest(BaseModel):
+    """更新卡片状态请求"""
+    status: str = Field(..., description="新状态")
+
+
+class CardStatusResponse(BaseModel):
+    """卡片状态响应"""
+    id: int
+    term: str
+    status: str
+    review_count: int
+
+
+class SetNoteDefaultRoleRequest(BaseModel):
+    """设置笔记默认角色请求"""
+    role_id: str = Field(..., min_length=1, description="角色ID")
 
 
 @app.get("/notes/{note_id}", response_model=NoteDetailResponse)
@@ -528,7 +587,7 @@ def get_note_detail(
         
         # 查询笔记详情（使用 SQL）
         query_note_sql = """
-            SELECT id, title, content, markdown_content, created_at, updated_at
+            SELECT id, title, content, markdown_content, created_at, updated_at, default_role
             FROM notes
             WHERE id = %s AND user_id = %s
         """
@@ -578,6 +637,7 @@ def get_note_detail(
             markdown_content=note['markdown_content'],
             created_at=created_at_str,
             updated_at=updated_at_str,
+            default_role=note.get('default_role'),
             flash_cards=flash_cards,
         )
         
@@ -585,6 +645,297 @@ def get_note_detail(
         raise
     except Exception as exc:  # noqa: BLE001
         logger.error(f"❌ 获取笔记详情失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ========== 学习相关 API ==========
+
+@app.get("/learning/roles", response_model=RolesResponse)
+def get_learning_roles() -> RolesResponse:
+    """
+    获取可用的学习角色列表
+    """
+    roles = get_available_roles()
+    return RolesResponse(
+        roles=[LearningRole(**role) for role in roles]
+    )
+
+
+@app.post("/learning/evaluate", response_model=EvaluateResponse)
+def evaluate_user_explanation(
+    payload: EvaluateRequest,
+    cur = Depends(get_db_cursor)
+) -> EvaluateResponse:
+    """
+    评估用户对词条的解释，并保存学习记录。
+    
+    流程：
+    1. 获取闪词卡片信息
+    2. 调用 AI 评估用户的解释
+    3. 保存学习记录
+    4. 更新闪词卡片状态
+    """
+    import json
+    
+    logger.info(f"📝 开始评估，卡片ID: {payload.card_id}, 角色: {payload.selected_role}")
+    
+    try:
+        # 1. 获取闪词卡片信息
+        query_card_sql = """
+            SELECT id, note_id, term, status, review_count
+            FROM flash_cards
+            WHERE id = %s
+        """
+        cur.execute(query_card_sql, (payload.card_id,))
+        card = cur.fetchone()
+        
+        if not card:
+            raise HTTPException(status_code=404, detail="闪词卡片不存在")
+        
+        term = card['term']
+        current_review_count = card['review_count'] or 0
+        
+        # 2. 获取角色名称（用于AI评估）
+        roles = get_available_roles()
+        role_name = payload.selected_role
+        for role in roles:
+            if role['id'] == payload.selected_role:
+                role_name = role['name']
+                break
+        
+        # 3. 调用 AI 评估
+        score, status, ai_feedback = evaluate_explanation(
+            term=term,
+            user_explanation=payload.user_explanation,
+            selected_role=role_name,
+        )
+        
+        logger.info(f"✅ AI评估完成: 分数={score}, 状态={status}")
+        
+        # 4. 保存学习记录
+        attempt_number = current_review_count + 1
+        insert_record_sql = """
+            INSERT INTO learning_records 
+            (card_id, note_id, selected_role, user_explanation, score, ai_feedback, status, attempt_number, attempted_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            RETURNING id
+        """
+        cur.execute(insert_record_sql, (
+            payload.card_id,
+            payload.note_id,
+            role_name,  # 保持原有逻辑，存储角色名称（前端会兼容处理）
+            payload.user_explanation,
+            score,
+            ai_feedback,
+            status.upper(),  # 数据库枚举是大写
+            attempt_number,
+        ))
+        record_result = cur.fetchone()
+        learning_record_id = record_result['id']
+        
+        logger.info(f"✅ 学习记录已保存，ID: {learning_record_id}")
+        
+        # 5. 更新闪词卡片状态和复习次数
+        update_card_sql = """
+            UPDATE flash_cards
+            SET status = %s::card_status, review_count = %s, updated_at = NOW()
+            WHERE id = %s
+        """
+        cur.execute(update_card_sql, (status.upper(), attempt_number, payload.card_id))
+        
+        logger.info(f"✅ 卡片状态已更新: {status.upper()}")
+        
+        # 6. 解析 AI 反馈并构建响应
+        try:
+            feedback_data = json.loads(ai_feedback)
+            feedback_text = feedback_data.get('feedback', '感谢你的解释！')
+            highlights = feedback_data.get('highlights', [])
+            suggestions = feedback_data.get('suggestions', [])
+        except (json.JSONDecodeError, TypeError):
+            feedback_text = "感谢你的解释！继续加油！"
+            highlights = []
+            suggestions = []
+        
+        return EvaluateResponse(
+            score=score,
+            status=status,
+            feedback=feedback_text,
+            highlights=highlights,
+            suggestions=suggestions,
+            learning_record_id=learning_record_id,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 评估失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.patch("/flash-cards/{card_id}/status", response_model=CardStatusResponse)
+def update_card_status(
+    card_id: int,
+    payload: UpdateCardStatusRequest,
+    cur = Depends(get_db_cursor)
+) -> CardStatusResponse:
+    """
+    直接更新闪词卡片状态（如标记为已掌握）
+    """
+    logger.info(f"📝 更新卡片状态，ID: {card_id}, 新状态: {payload.status}")
+    
+    try:
+        # 验证状态值
+        valid_statuses = ['NOT_STARTED', 'NEEDS_REVIEW', 'NEEDS_IMPROVE', 'NOT_MASTERED', 'MASTERED']
+        status_upper = payload.status.upper()
+        if status_upper not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"无效的状态值，有效值为: {valid_statuses}")
+        
+        # 更新卡片状态
+        update_sql = """
+            UPDATE flash_cards
+            SET status = %s::card_status, updated_at = NOW()
+            WHERE id = %s
+            RETURNING id, term, status, review_count
+        """
+        cur.execute(update_sql, (status_upper, card_id))
+        result = cur.fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="闪词卡片不存在")
+        
+        logger.info(f"✅ 卡片状态更新成功: {result['status']}")
+        
+        return CardStatusResponse(
+            id=result['id'],
+            term=result['term'],
+            status=result['status'],
+            review_count=result['review_count'] or 0,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 更新卡片状态失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/flash-cards/{card_id}", response_model=dict)
+def get_flash_card_detail(
+    card_id: int,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    获取闪词卡片详情（包含学习历史）
+    """
+    try:
+        # 获取卡片信息
+        query_card_sql = """
+            SELECT id, note_id, term, status, review_count, created_at, updated_at
+            FROM flash_cards
+            WHERE id = %s
+        """
+        cur.execute(query_card_sql, (card_id,))
+        card = cur.fetchone()
+        
+        if not card:
+            raise HTTPException(status_code=404, detail="闪词卡片不存在")
+        
+        # 获取学习历史
+        query_history_sql = """
+            SELECT id, selected_role, user_explanation, score, ai_feedback, status, attempt_number, attempted_at
+            FROM learning_records
+            WHERE card_id = %s
+            ORDER BY attempted_at DESC
+            LIMIT 10
+        """
+        cur.execute(query_history_sql, (card_id,))
+        history_rows = cur.fetchall()
+        
+        # 构建学习历史
+        learning_history = []
+        for record in history_rows:
+            learning_history.append({
+                "id": record['id'],
+                "selected_role": record['selected_role'],
+                "user_explanation": record['user_explanation'],
+                "score": record['score'],
+                "ai_feedback": record['ai_feedback'],
+                "status": record['status'],
+                "attempt_number": record['attempt_number'],
+                "attempted_at": record['attempted_at'].isoformat() if record['attempted_at'] else "",
+            })
+        
+        return {
+            "id": card['id'],
+            "note_id": card['note_id'],
+            "term": card['term'],
+            "status": card['status'],
+            "review_count": card['review_count'] or 0,
+            "created_at": card['created_at'].isoformat() if card['created_at'] else "",
+            "updated_at": card['updated_at'].isoformat() if card['updated_at'] else "",
+            "learning_history": learning_history,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 获取卡片详情失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.patch("/notes/{note_id}/default-role")
+def set_note_default_role(
+    note_id: int,
+    payload: SetNoteDefaultRoleRequest,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    设置笔记的默认学习角色
+    """
+    logger.info(f"📝 设置笔记默认角色，笔记ID: {note_id}, 角色ID: {payload.role_id}")
+    
+    try:
+        user_id = get_default_user_id()
+        
+        # 验证笔记是否存在且属于当前用户
+        check_note_sql = """
+            SELECT id FROM notes
+            WHERE id = %s AND user_id = %s
+        """
+        cur.execute(check_note_sql, (note_id, user_id))
+        note = cur.fetchone()
+        
+        if not note:
+            raise HTTPException(status_code=404, detail="笔记不存在")
+        
+        # 获取角色名称
+        roles = get_available_roles()
+        role_name = payload.role_id
+        for role in roles:
+            if role['id'] == payload.role_id:
+                role_name = role['name']
+                break
+        
+        # 更新笔记的默认角色
+        update_sql = """
+            UPDATE notes
+            SET default_role = %s, updated_at = NOW()
+            WHERE id = %s
+        """
+        cur.execute(update_sql, (role_name, note_id))
+        
+        logger.info(f"✅ 笔记默认角色已设置: {role_name}")
+        
+        return {
+            "note_id": note_id,
+            "default_role": role_name,
+            "role_id": payload.role_id,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 设置笔记默认角色失败: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

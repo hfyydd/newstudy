@@ -78,8 +78,6 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               ),
             ),
 
-            // 底部操作按钮
-            _buildBottomActions(isDark, bgColor, borderColor),
           ],
         );
       }),
@@ -461,7 +459,34 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           _buildProgressStats(progress, isDark, textColor, secondaryColor),
           const SizedBox(height: 20),
 
-          // 操作按钮
+          // 主要操作按钮：开始学习
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: controller.startFeynmanLearning,
+              icon: const Icon(Icons.school, size: 20),
+              label: const Text(
+                '开始学习',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.visible,
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF667EEA),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 次要操作按钮
           Row(
             children: [
               Expanded(
@@ -505,6 +530,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     final masteredPercent = progress.masteredPercent;
     final reviewPercent = progress.needsReview / progress.total;
     final improvePercent = progress.needsImprove / progress.total;
+    final notMasteredPercent = progress.notMastered / progress.total;
+    final notStartedPercent = progress.notStarted / progress.total;
 
     return Column(
       children: [
@@ -516,20 +543,24 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               children: [
                 Expanded(
                   flex: (masteredPercent * 100).round(),
-                  child: Container(color: const Color(0xFF4ECDC4)),
+                  child: Container(color: AppTheme.statusMastered),
                 ),
                 Expanded(
                   flex: (reviewPercent * 100).round(),
-                  child: Container(color: const Color(0xFF87CEEB)),
+                  child: Container(color: AppTheme.statusNeedsReview),
                 ),
                 Expanded(
                   flex: (improvePercent * 100).round(),
-                  child: Container(color: const Color(0xFFFFD700)),
+                  child: Container(color: AppTheme.statusNeedsImprove),
                 ),
                 Expanded(
-                  flex: ((1 - masteredPercent - reviewPercent - improvePercent) * 100).round(),
+                  flex: (notMasteredPercent * 100).round(),
+                  child: Container(color: AppTheme.statusNotMastered),
+                ),
+                Expanded(
+                  flex: (notStartedPercent * 100).round(),
                   child: Container(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withOpacity(0.3), // 未开始 - 半透明白色
                   ),
                 ),
               ],
@@ -549,9 +580,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             ),
             Text(
               '${progress.mastered}/${progress.total} 已掌握',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF4ECDC4),
+                color: AppTheme.statusMastered,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -570,10 +601,11 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   ) {
     return Row(
       children: [
-        _buildStatItem('已掌握', progress.mastered, const Color(0xFF4ECDC4)),
-        _buildStatItem('待复习', progress.needsReview, const Color(0xFF87CEEB)),
-        _buildStatItem('需改进', progress.needsImprove, const Color(0xFFFFD700)),
-        _buildStatItem('未学习', progress.notStarted, Colors.white.withOpacity(0.5)),
+        _buildStatItem('已掌握', progress.mastered, AppTheme.statusMastered),
+        _buildStatItem('待复习', progress.needsReview, AppTheme.statusNeedsReview),
+        _buildStatItem('需改进', progress.needsImprove, AppTheme.statusNeedsImprove),
+        _buildStatItem('未掌握', progress.notMastered, AppTheme.statusNotMastered),
+        _buildStatItem('未学习', progress.notStarted, AppTheme.statusNotStarted),
       ],
     );
   }
@@ -618,89 +650,6 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     );
   }
 
-  /// 构建底部操作按钮
-  Widget _buildBottomActions(bool isDark, Color bgColor, Color borderColor) {
-    return Obx(() {
-      final hasContent = controller.state.note.value != null;
-      if (!hasContent) return const SizedBox.shrink();
-
-      return Container(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.of(Get.context!).padding.bottom),
-        decoration: BoxDecoration(
-          color: bgColor,
-          border: Border(top: BorderSide(color: borderColor)),
-        ),
-        child: Row(
-          children: [
-            // Ask AI 按钮
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: controller.askAI,
-                  icon: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF9B7DFF).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Text('🦝', style: TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                  label: const Text(
-                    'Ask AI',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : Colors.black,
-                    side: BorderSide(color: borderColor),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Feynman 按钮
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: controller.startFeynmanLearning,
-                  icon: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Text('🐷', style: TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                  label: const Text(
-                    'Feynman',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4ECDC4),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    });
-  }
 
   /// 显示更多选项
   void _showMoreOptions(BuildContext context, bool isDark) {

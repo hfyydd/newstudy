@@ -222,6 +222,98 @@ class HttpService {
     }
   }
 
+  /// 获取笔记详情
+  Future<Map<String, dynamic>> getNoteDetail(int noteId) async {
+    try {
+      final response = await _dio.get(ApiConfig.getNoteDetail(noteId));
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 设置笔记默认角色
+  Future<Map<String, dynamic>> setNoteDefaultRole({
+    required int noteId,
+    required String roleId,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        ApiConfig.setNoteDefaultRole(noteId),
+        data: {'role_id': roleId},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== 学习相关接口 ====================
+
+  /// 获取学习角色列表
+  Future<RolesResponse> getLearningRoles() async {
+    try {
+      final response = await _dio.get(ApiConfig.learningRoles);
+      return RolesResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 评估用户解释
+  Future<EvaluateResponse> evaluateExplanation({
+    required int cardId,
+    required int noteId,
+    required String selectedRole,
+    required String userExplanation,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.evaluateExplanation,
+        data: {
+          'card_id': cardId,
+          'note_id': noteId,
+          'selected_role': selectedRole,
+          'user_explanation': userExplanation,
+        },
+        options: Options(
+          // AI 评估可能需要较长时间
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
+        ),
+      );
+      return EvaluateResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 更新闪词卡片状态
+  Future<CardStatusResponse> updateCardStatus({
+    required int cardId,
+    required String status,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        ApiConfig.updateCardStatus(cardId),
+        data: {'status': status},
+      );
+      return CardStatusResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取闪词卡片详情（包含学习历史）
+  Future<FlashCard> getCardDetail(int cardId) async {
+    try {
+      final response = await _dio.get(ApiConfig.getCardDetail(cardId));
+      return FlashCard.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // ==================== 通用请求方法 ====================
 
   /// 通用 GET 请求

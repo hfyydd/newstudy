@@ -67,6 +67,7 @@ class FlashCardProgress {
   final int mastered;
   final int needsReview;
   final int needsImprove;
+  final int notMastered;
   final int notStarted;
 
   FlashCardProgress({
@@ -74,14 +75,16 @@ class FlashCardProgress {
     required this.mastered,
     required this.needsReview,
     required this.needsImprove,
+    this.notMastered = 0,
     required this.notStarted,
   });
 
   /// 已掌握百分比
   double get masteredPercent => total > 0 ? mastered / total : 0;
 
-  /// 学习进度百分比（已掌握 + 待复习）
-  double get progressPercent => total > 0 ? (mastered + needsReview) / total : 0;
+  /// 学习进度百分比（已掌握 + 待复习 + 需改进 + 未掌握）
+  /// 只要学习过就算进度，包括已掌握、待复习、需改进和未掌握
+  double get progressPercent => total > 0 ? (mastered + needsReview + needsImprove + notMastered) / total : 0;
 }
 
 /// 笔记详情页状态
@@ -121,4 +124,7 @@ class NoteDetailState {
   
   /// 闪词列表
   List<String> get terms => note.value?.terms ?? [];
+  
+  /// 笔记的默认学习角色
+  final RxString defaultRole = ''.obs;
 }

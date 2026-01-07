@@ -41,6 +41,23 @@ class ApiConfig {
   /// 获取笔记详情
   static String getNoteDetail(int noteId) => '/notes/$noteId';
 
+  /// 设置笔记默认角色
+  static String setNoteDefaultRole(int noteId) => '/notes/$noteId/default-role';
+
+  // ==================== 学习相关接口 ====================
+
+  /// 获取学习角色列表
+  static const String learningRoles = '/learning/roles';
+
+  /// 评估用户解释
+  static const String evaluateExplanation = '/learning/evaluate';
+
+  /// 更新闪词卡片状态
+  static String updateCardStatus(int cardId) => '/flash-cards/$cardId/status';
+
+  /// 获取闪词卡片详情
+  static String getCardDetail(int cardId) => '/flash-cards/$cardId';
+
   // ==================== 辅助方法 ====================
 
   /// 构建完整的 API URL

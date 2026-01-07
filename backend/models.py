@@ -72,7 +72,7 @@ class FlashCard(Base):
         nullable=False,
         comment="学习状态"
     )
-    # 学习记录
+    # 学习统计
     review_count = Column(Integer, default=0, comment="复习次数")
     last_reviewed_at = Column(DateTime(timezone=True), nullable=True, comment="最后复习时间")
     mastered_at = Column(DateTime(timezone=True), nullable=True, comment="掌握时间")
@@ -82,7 +82,41 @@ class FlashCard(Base):
 
     # 关系
     note = relationship("Note", back_populates="flash_cards")
+    learning_records = relationship("LearningRecord", back_populates="flash_card", cascade="all, delete-orphan", order_by="LearningRecord.attempted_at.desc()")
 
     def __repr__(self):
         return f"<FlashCard(id={self.id}, term='{self.term}', status='{self.status}')>"
+
+
+class LearningRecord(Base):
+    """学习记录表 - 记录每次费曼学习的详细信息"""
+    __tablename__ = "learning_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    card_id = Column(Integer, ForeignKey("flash_cards.id", ondelete="CASCADE"), nullable=False, index=True, comment="闪词卡片ID")
+    note_id = Column(Integer, ForeignKey("notes.id", ondelete="CASCADE"), nullable=False, index=True, comment="笔记ID（冗余，便于查询）")
+    
+    # 学习信息
+    selected_role = Column(String(50), nullable=False, comment="选择的角色（如5岁孩子、同事等）")
+    user_explanation = Column(Text, nullable=False, comment="用户的解释内容")
+    score = Column(Integer, nullable=False, comment="AI评估分数（0-100）")
+    ai_feedback = Column(Text, nullable=False, comment="AI反馈内容")
+    status = Column(
+        SQLEnum(CardStatus, name="card_status"),
+        nullable=False,
+        comment="本次评估的状态"
+    )
+    
+    # 尝试信息
+    attempt_number = Column(Integer, nullable=False, default=1, comment="第几次尝试（同一卡片）")
+    
+    # 时间戳
+    attempted_at = Column(DateTime(timezone=True), server_default=func.now(), comment="尝试时间")
+
+    # 关系
+    flash_card = relationship("FlashCard", back_populates="learning_records")
+    note = relationship("Note")
+
+    def __repr__(self):
+        return f"<LearningRecord(id={self.id}, card_id={self.card_id}, score={self.score}, status='{self.status}')>"
 

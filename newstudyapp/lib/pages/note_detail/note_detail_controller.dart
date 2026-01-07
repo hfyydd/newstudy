@@ -10,6 +10,9 @@ import 'note_detail_state.dart';
 class NoteDetailController extends GetxController {
   final NoteDetailState state = NoteDetailState();
   final HttpService _httpService = HttpService();
+  
+  /// 保存完整的闪词卡片数据（包含ID）
+  List<Map<String, dynamic>> _flashCardsData = [];
 
   @override
   void onInit() {
@@ -139,6 +142,7 @@ class NoteDetailController extends GetxController {
         mastered: 0,
         needsReview: 0,
         needsImprove: 0,
+        notMastered: 0,
         notStarted: response.terms.length,
       );
 
@@ -176,36 +180,56 @@ class NoteDetailController extends GetxController {
       final content = response['content'] as String?;
       final markdownContent = response['markdown_content'] as String?;
       final createdAtStr = response['created_at'] as String;
+      final defaultRole = response['default_role'] as String?;
       final flashCardsRaw = response['flash_cards'] as List;
+      
+      // 保存默认角色
+      state.defaultRole.value = defaultRole ?? '';
 
+      // 保存完整的闪词卡片数据（包含ID）
+      _flashCardsData = flashCardsRaw.cast<Map<String, dynamic>>().toList();
+      
       // 解析闪词列表
       final terms = flashCardsRaw
           .map((fc) => fc['term'] as String)
           .toList();
 
-      // 统计闪词状态
+      // 统计闪词状态（后端返回的状态可能是大写或小写，统一转换为大写比较）
       int mastered = 0;
       int needsReview = 0;
       int needsImprove = 0;
+      int notMastered = 0;
       int notStarted = 0;
 
       for (final fc in flashCardsRaw) {
-        final status = fc['status'] as String;
+        final statusRaw = fc['status'] as String? ?? 'NOT_STARTED';
+        final status = statusRaw.toUpperCase(); // 统一转换为大写比较
         switch (status) {
-          case 'mastered':
+          case 'MASTERED':
             mastered++;
             break;
-          case 'needs_review':
+          case 'NEEDS_REVIEW':
             needsReview++;
             break;
-          case 'needs_improve':
+          case 'NEEDS_IMPROVE':
             needsImprove++;
             break;
-          case 'not_started':
+          case 'NOT_MASTERED':
+            notMastered++;
+            break;
+          case 'NOT_STARTED':
+            notStarted++;
+            break;
+          default:
+            // 如果状态不匹配，默认为未开始
+            debugPrint('[NoteDetailController] 未知状态: $statusRaw');
             notStarted++;
             break;
         }
       }
+      
+      final total = mastered + needsReview + needsImprove + notMastered + notStarted;
+      debugPrint('[NoteDetailController] 进度统计: 总数=$total, 已掌握=$mastered, 待复习=$needsReview, 需改进=$needsImprove, 未掌握=$notMastered, 未开始=$notStarted');
 
       // 创建笔记模型
       state.note.value = NoteModel(
@@ -227,6 +251,7 @@ class NoteDetailController extends GetxController {
         mastered: mastered,
         needsReview: needsReview,
         needsImprove: needsImprove,
+        notMastered: notMastered,
         notStarted: notStarted,
       );
     } catch (e) {
@@ -238,6 +263,13 @@ class NoteDetailController extends GetxController {
     } finally {
       state.isLoading.value = false;
     }
+  }
+
+  /// 刷新笔记数据（从服务器重新加载）
+  Future<void> refreshNoteData(int noteId) async {
+    debugPrint('[NoteDetailController] 开始刷新笔记数据，noteId: $noteId');
+    await _loadNoteById(noteId);
+    debugPrint('[NoteDetailController] 笔记数据刷新完成');
   }
 
   /// 生成闪词卡片
@@ -277,7 +309,7 @@ class NoteDetailController extends GetxController {
 
   /// 继续学习（跳转到费曼学习页面）
   void continueLearning() {
-    if (state.terms.isEmpty) {
+    if (state.terms.isEmpty || _flashCardsData.isEmpty) {
       Get.snackbar(
         '提示',
         '暂无闪词可学习',
@@ -286,13 +318,22 @@ class NoteDetailController extends GetxController {
       return;
     }
     
-    // 跳转到费曼学习页面，传递闪词列表
+    // 获取笔记ID
+    int? noteId;
+    final noteIdStr = state.note.value?.id;
+    if (noteIdStr != null) {
+      noteId = int.tryParse(noteIdStr);
+    }
+    
+    // 跳转到费曼学习页面，传递完整的闪词卡片数据（包含ID）和默认角色
     Get.toNamed(
       AppRoutes.feynmanLearning,
       arguments: {
-        'terms': state.terms,
-        'noteId': state.note.value?.id,
-        'noteTitle': state.note.value?.title,
+        'flashCards': _flashCardsData,  // 完整的卡片数据，包含ID
+        'terms': state.terms,  // 保留兼容
+        'noteId': noteId,
+        'topic': state.note.value?.title ?? '我的笔记',
+        'defaultRole': state.defaultRole.value,  // 笔记的默认角色
       },
     );
   }
