@@ -100,7 +100,7 @@ COMMENT ON COLUMN notes.content IS '原始内容';
 COMMENT ON COLUMN notes.markdown_content IS 'Markdown格式的笔记内容';
 COMMENT ON COLUMN flash_cards.note_id IS '笔记ID';
 COMMENT ON COLUMN flash_cards.term IS '闪词内容';
-COMMENT ON COLUMN flash_cards.status IS '学习状态: not_started, needs_review, needs_improve, not_mastered, mastered';
+COMMENT ON COLUMN flash_cards.status IS '学习状态: not_started, needs_review（需巩固）, needs_improve, not_mastered, mastered';
 COMMENT ON COLUMN flash_cards.review_count IS '复习次数';
 COMMENT ON COLUMN flash_cards.last_reviewed_at IS '最后复习时间';
 COMMENT ON COLUMN flash_cards.mastered_at IS '掌握时间';

@@ -117,7 +117,7 @@ class NoteListItem(BaseModel):
     created_at: str
     flash_card_count: int = Field(..., description="闪词总数")
     mastered_count: int = Field(default=0, description="已掌握数量")
-    needs_review_count: int = Field(default=0, description="待复习数量")
+    needs_review_count: int = Field(default=0, description="需巩固数量（70-89分）")
     needs_improve_count: int = Field(default=0, description="需改进数量")
     not_mastered_count: int = Field(default=0, description="未掌握数量")
 
@@ -574,6 +574,54 @@ class SetNoteDefaultRoleRequest(BaseModel):
     role_id: str = Field(..., min_length=1, description="角色ID")
 
 
+# ==================== 学习中心相关模型 ====================
+
+class StudyCenterStatisticsResponse(BaseModel):
+    """学习中心统计数据响应"""
+    today_review_count: int = Field(default=0, description="今日复习数量")
+    mastered_count: int = Field(default=0, description="已掌握数量")
+    needs_review_count: int = Field(default=0, description="需巩固数量（70-89分）")
+    needs_improve_count: int = Field(default=0, description="需改进数量")
+    not_mastered_count: int = Field(default=0, description="未掌握数量")
+    total_cards_count: int = Field(default=0, description="全部词条数量")
+
+
+class FlashCardListItem(BaseModel):
+    """闪词卡片列表项"""
+    id: int
+    term: str
+    status: str
+    note_id: int
+    note_title: str = Field(default="", description="笔记标题")
+    review_count: int = Field(default=0, description="复习次数")
+    last_studied_at: str | None = Field(default=None, description="最后学习时间")
+    best_score: int | None = Field(default=None, description="最高分")
+    attempt_count: int = Field(default=0, description="学习次数")
+
+
+class FlashCardListResponse(BaseModel):
+    """闪词卡片列表响应"""
+    cards: List[FlashCardListItem] = Field(default_factory=list, description="词条列表")
+    total: int = Field(default=0, description="总数")
+
+
+class CardsByNoteItem(BaseModel):
+    """按笔记分类的词条统计项"""
+    note_id: int
+    note_title: str
+    total_count: int = Field(default=0, description="总词条数")
+    mastered_count: int = Field(default=0, description="已掌握数量")
+    needs_review_count: int = Field(default=0, description="需巩固数量（70-89分）")
+    needs_improve_count: int = Field(default=0, description="需改进数量")
+    not_mastered_count: int = Field(default=0, description="未掌握数量")
+
+
+class CardsByNoteResponse(BaseModel):
+    """按笔记分类的词条列表响应"""
+    notes: List[CardsByNoteItem] = Field(default_factory=list, description="笔记列表")
+    total: int = Field(default=0, description="总数")
+
+
 @app.get("/notes/{note_id}", response_model=NoteDetailResponse)
 def get_note_detail(
     note_id: int,
@@ -735,12 +783,31 @@ def evaluate_user_explanation(
         
         logger.info(f"✅ 学习记录已保存，ID: {learning_record_id}")
         
-        # 5. 更新闪词卡片状态和复习次数
-        update_card_sql = """
-            UPDATE flash_cards
-            SET status = %s::card_status, review_count = %s, updated_at = NOW()
-            WHERE id = %s
-        """
+        # 5. 更新闪词卡片状态、复习次数和最后复习时间
+        # 根据状态设置mastered_at（如果达到已掌握状态）
+        mastered_at_value = None
+        if status.upper() == 'MASTERED':
+            mastered_at_value = 'NOW()'
+        
+        if mastered_at_value:
+            update_card_sql = """
+                UPDATE flash_cards
+                SET status = %s::card_status, 
+                    review_count = %s, 
+                    last_reviewed_at = NOW(),
+                    mastered_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = %s
+            """
+        else:
+            update_card_sql = """
+                UPDATE flash_cards
+                SET status = %s::card_status, 
+                    review_count = %s, 
+                    last_reviewed_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = %s
+            """
         cur.execute(update_card_sql, (status.upper(), attempt_number, payload.card_id))
         
         logger.info(f"✅ 卡片状态已更新: {status.upper()}")
@@ -791,12 +858,36 @@ def update_card_status(
             raise HTTPException(status_code=400, detail=f"无效的状态值，有效值为: {valid_statuses}")
         
         # 更新卡片状态
-        update_sql = """
-            UPDATE flash_cards
-            SET status = %s::card_status, updated_at = NOW()
-            WHERE id = %s
-            RETURNING id, term, status, review_count
-        """
+        # 如果状态变为需要复习的状态，更新last_reviewed_at
+        # 如果状态变为已掌握，同时更新mastered_at
+        if status_upper == 'MASTERED':
+            update_sql = """
+                UPDATE flash_cards
+                SET status = %s::card_status, 
+                    last_reviewed_at = NOW(),
+                    mastered_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = %s
+                RETURNING id, term, status, review_count
+            """
+        elif status_upper in ('NEEDS_REVIEW', 'NEEDS_IMPROVE', 'NOT_MASTERED'):
+            # 这些状态表示需要复习，更新last_reviewed_at
+            update_sql = """
+                UPDATE flash_cards
+                SET status = %s::card_status, 
+                    last_reviewed_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = %s
+                RETURNING id, term, status, review_count
+            """
+        else:
+            # NOT_STARTED 等状态不需要更新last_reviewed_at
+            update_sql = """
+                UPDATE flash_cards
+                SET status = %s::card_status, updated_at = NOW()
+                WHERE id = %s
+                RETURNING id, term, status, review_count
+            """
         cur.execute(update_sql, (status_upper, card_id))
         result = cur.fetchone()
         
@@ -936,6 +1027,518 @@ def set_note_default_role(
         raise
     except Exception as exc:
         logger.error(f"❌ 设置笔记默认角色失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ==================== 学习中心相关接口 ====================
+
+@app.get("/study-center/statistics", response_model=StudyCenterStatisticsResponse)
+def get_study_center_statistics(
+    cur = Depends(get_db_cursor)
+) -> StudyCenterStatisticsResponse:
+    """
+    获取学习中心统计数据
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        # 统计各状态词条数量
+        stats_sql = """
+            SELECT 
+                COUNT(CASE WHEN fc.status = 'MASTERED' THEN 1 END) as mastered_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_REVIEW' THEN 1 END) as needs_review_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_IMPROVE' THEN 1 END) as needs_improve_count,
+                COUNT(CASE WHEN fc.status = 'NOT_MASTERED' THEN 1 END) as not_mastered_count,
+                COUNT(fc.id) as total_cards_count,
+                COUNT(CASE 
+                    WHEN (
+                        (fc.status = 'NOT_MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '4 hours' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'NEEDS_IMPROVE' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '3 days' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'NEEDS_REVIEW' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '1 day' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '7 days' <= NOW()
+                        ))
+                    )
+                    THEN 1 
+                END) as today_review_count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            WHERE n.user_id = %s
+        """
+        cur.execute(stats_sql, (user_id,))
+        stats = cur.fetchone()
+        
+        return StudyCenterStatisticsResponse(
+            today_review_count=stats['today_review_count'] or 0,
+            mastered_count=stats['mastered_count'] or 0,
+            needs_review_count=stats['needs_review_count'] or 0,
+            needs_improve_count=stats['needs_improve_count'] or 0,
+            not_mastered_count=stats['not_mastered_count'] or 0,
+            total_cards_count=stats['total_cards_count'] or 0,
+        )
+        
+    except Exception as exc:
+        logger.error(f"❌ 获取学习中心统计数据失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/study-center/today-review", response_model=FlashCardListResponse)
+def get_today_review_cards(
+    cur = Depends(get_db_cursor),
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(100, ge=1, le=100, description="返回数量")
+) -> FlashCardListResponse:
+    """
+    获取今日复习词条列表
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        # 查询今日需要复习的词条
+        # 根据状态和复习间隔判断：
+        # - NOT_MASTERED: 4小时后（即 last_reviewed_at + 4小时 <= NOW()）
+        # - NEEDS_IMPROVE: 3天后（即 last_reviewed_at + 3天 <= NOW()）
+        # - NEEDS_REVIEW（需巩固）: 1天后（即 last_reviewed_at + 1天 <= NOW()）
+        # - MASTERED: 7天后（即 last_reviewed_at + 7天 <= NOW()）
+        query_sql = """
+            SELECT 
+                fc.id,
+                fc.term,
+                fc.status,
+                fc.note_id,
+                n.title as note_title,
+                fc.review_count,
+                MAX(lr.attempted_at) as last_studied_at,
+                MAX(lr.score) as best_score,
+                COUNT(lr.id) as attempt_count,
+                fc.last_reviewed_at
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            LEFT JOIN learning_records lr ON fc.id = lr.card_id
+            WHERE n.user_id = %s
+                AND (
+                    -- 未掌握：4小时后需要复习
+                    (fc.status = 'NOT_MASTERED' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '4 hours' <= NOW()
+                    ))
+                    OR
+                    -- 需改进：3天后需要复习
+                    (fc.status = 'NEEDS_IMPROVE' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '3 days' <= NOW()
+                    ))
+                    OR
+                    -- 需巩固：1天后需要复习
+                    (fc.status = 'NEEDS_REVIEW' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '1 day' <= NOW()
+                    ))
+                    OR
+                    -- 已掌握：7天后需要复习（长期巩固）
+                    (fc.status = 'MASTERED' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '7 days' <= NOW()
+                    ))
+                )
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count, fc.last_reviewed_at
+            ORDER BY 
+                CASE fc.status
+                    WHEN 'NOT_MASTERED' THEN 1  -- 未掌握优先
+                    WHEN 'NEEDS_IMPROVE' THEN 2
+                    WHEN 'NEEDS_REVIEW' THEN 3
+                    WHEN 'MASTERED' THEN 4
+                    ELSE 5
+                END,
+                fc.last_reviewed_at ASC NULLS FIRST,
+                fc.id ASC
+            LIMIT %s OFFSET %s
+        """
+        cur.execute(query_sql, (user_id, limit, skip))
+        cards = cur.fetchall()
+        
+        # 统计总数（使用相同的复习间隔逻辑）
+        count_sql = """
+            SELECT COUNT(DISTINCT fc.id) as count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            WHERE n.user_id = %s
+                AND (
+                    (fc.status = 'NOT_MASTERED' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '4 hours' <= NOW()
+                    ))
+                    OR
+                    (fc.status = 'NEEDS_IMPROVE' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '3 days' <= NOW()
+                    ))
+                    OR
+                    (fc.status = 'NEEDS_REVIEW' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '1 day' <= NOW()
+                    ))
+                    OR
+                    (fc.status = 'MASTERED' AND (
+                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at + INTERVAL '7 days' <= NOW()
+                    ))
+                )
+        """
+        cur.execute(count_sql, (user_id,))
+        total_row = cur.fetchone()
+        total = total_row['count'] or 0
+        
+        # 构建响应
+        card_items = []
+        for card in cards:
+            last_studied_at = card['last_studied_at']
+            last_studied_at_str = None
+            if last_studied_at:
+                if hasattr(last_studied_at, 'isoformat'):
+                    last_studied_at_str = last_studied_at.isoformat()
+                else:
+                    last_studied_at_str = str(last_studied_at)
+            
+            card_items.append(FlashCardListItem(
+                id=card['id'],
+                term=card['term'],
+                status=card['status'],
+                note_id=card['note_id'],
+                note_title=card['note_title'] or '',
+                review_count=card['review_count'] or 0,
+                last_studied_at=last_studied_at_str,
+                best_score=card['best_score'],
+                attempt_count=card['attempt_count'] or 0,
+            ))
+        
+        return FlashCardListResponse(cards=card_items, total=total)
+        
+    except Exception as exc:
+        logger.error(f"❌ 获取今日复习词条列表失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/study-center/weak-cards", response_model=FlashCardListResponse)
+def get_weak_cards(
+    cur = Depends(get_db_cursor),
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(100, ge=1, le=100, description="返回数量"),
+    status: str | None = Query(None, description="状态筛选：NEEDS_REVIEW（需巩固）, NEEDS_IMPROVE, NOT_MASTERED")
+) -> FlashCardListResponse:
+    """
+    获取薄弱词条列表（需巩固、需改进、未掌握）
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        # 构建状态筛选条件（安全处理）
+        valid_statuses = ['NEEDS_REVIEW', 'NEEDS_IMPROVE', 'NOT_MASTERED']
+        if status and status.upper() in valid_statuses:
+            status_list = [status.upper()]
+        else:
+            status_list = valid_statuses
+        
+        # 构建参数化查询
+        placeholders = ','.join(['%s'] * len(status_list))
+        query_sql = f"""
+            SELECT 
+                fc.id,
+                fc.term,
+                fc.status,
+                fc.note_id,
+                n.title as note_title,
+                fc.review_count,
+                MAX(lr.attempted_at) as last_studied_at,
+                MAX(lr.score) as best_score,
+                COUNT(lr.id) as attempt_count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            LEFT JOIN learning_records lr ON fc.id = lr.card_id
+            WHERE n.user_id = %s
+                AND fc.status IN ({placeholders})
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count
+            ORDER BY 
+                CASE fc.status
+                    WHEN 'NOT_MASTERED' THEN 1
+                    WHEN 'NEEDS_IMPROVE' THEN 2
+                    WHEN 'NEEDS_REVIEW' THEN 3
+                    ELSE 4
+                END,
+                COALESCE(MAX(lr.score), 0) ASC,
+                fc.id ASC
+            LIMIT %s OFFSET %s
+        """
+        cur.execute(query_sql, (user_id, *status_list, limit, skip))
+        cards = cur.fetchall()
+        
+        # 统计总数
+        count_sql = f"""
+            SELECT COUNT(DISTINCT fc.id) as count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            WHERE n.user_id = %s
+                AND fc.status IN ({placeholders})
+        """
+        cur.execute(count_sql, (user_id, *status_list))
+        total_row = cur.fetchone()
+        total = total_row['count'] or 0
+        
+        # 构建响应
+        card_items = []
+        for card in cards:
+            last_studied_at = card['last_studied_at']
+            last_studied_at_str = None
+            if last_studied_at:
+                if hasattr(last_studied_at, 'isoformat'):
+                    last_studied_at_str = last_studied_at.isoformat()
+                else:
+                    last_studied_at_str = str(last_studied_at)
+            
+            card_items.append(FlashCardListItem(
+                id=card['id'],
+                term=card['term'],
+                status=card['status'],
+                note_id=card['note_id'],
+                note_title=card['note_title'] or '',
+                review_count=card['review_count'] or 0,
+                last_studied_at=last_studied_at_str,
+                best_score=card['best_score'],
+                attempt_count=card['attempt_count'] or 0,
+            ))
+        
+        return FlashCardListResponse(cards=card_items, total=total)
+        
+    except Exception as exc:
+        logger.error(f"❌ 获取薄弱词条列表失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/study-center/mastered-cards", response_model=FlashCardListResponse)
+def get_mastered_cards(
+    cur = Depends(get_db_cursor),
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(100, ge=1, le=100, description="返回数量")
+) -> FlashCardListResponse:
+    """
+    获取已掌握词条列表
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        query_sql = """
+            SELECT 
+                fc.id,
+                fc.term,
+                fc.status,
+                fc.note_id,
+                n.title as note_title,
+                fc.review_count,
+                MAX(lr.attempted_at) as last_studied_at,
+                MAX(lr.score) as best_score,
+                COUNT(lr.id) as attempt_count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            LEFT JOIN learning_records lr ON fc.id = lr.card_id
+            WHERE n.user_id = %s
+                AND fc.status = 'MASTERED'
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count
+            ORDER BY fc.mastered_at DESC NULLS LAST, fc.id ASC
+            LIMIT %s OFFSET %s
+        """
+        cur.execute(query_sql, (user_id, limit, skip))
+        cards = cur.fetchall()
+        
+        # 统计总数
+        count_sql = """
+            SELECT COUNT(DISTINCT fc.id) as count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            WHERE n.user_id = %s
+                AND fc.status = 'MASTERED'
+        """
+        cur.execute(count_sql, (user_id,))
+        total_row = cur.fetchone()
+        total = total_row['count'] or 0
+        
+        # 构建响应
+        card_items = []
+        for card in cards:
+            last_studied_at = card['last_studied_at']
+            last_studied_at_str = None
+            if last_studied_at:
+                if hasattr(last_studied_at, 'isoformat'):
+                    last_studied_at_str = last_studied_at.isoformat()
+                else:
+                    last_studied_at_str = str(last_studied_at)
+            
+            card_items.append(FlashCardListItem(
+                id=card['id'],
+                term=card['term'],
+                status=card['status'],
+                note_id=card['note_id'],
+                note_title=card['note_title'] or '',
+                review_count=card['review_count'] or 0,
+                last_studied_at=last_studied_at_str,
+                best_score=card['best_score'],
+                attempt_count=card['attempt_count'] or 0,
+            ))
+        
+        return FlashCardListResponse(cards=card_items, total=total)
+        
+    except Exception as exc:
+        logger.error(f"❌ 获取已掌握词条列表失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/study-center/all-cards", response_model=FlashCardListResponse)
+def get_all_cards(
+    cur = Depends(get_db_cursor),
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(100, ge=1, le=100, description="返回数量")
+) -> FlashCardListResponse:
+    """
+    获取全部词条列表
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        query_sql = """
+            SELECT 
+                fc.id,
+                fc.term,
+                fc.status,
+                fc.note_id,
+                n.title as note_title,
+                fc.review_count,
+                MAX(lr.attempted_at) as last_studied_at,
+                MAX(lr.score) as best_score,
+                COUNT(lr.id) as attempt_count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            LEFT JOIN learning_records lr ON fc.id = lr.card_id
+            WHERE n.user_id = %s
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count
+            ORDER BY fc.created_at DESC, fc.id ASC
+            LIMIT %s OFFSET %s
+        """
+        cur.execute(query_sql, (user_id, limit, skip))
+        cards = cur.fetchall()
+        
+        # 统计总数
+        count_sql = """
+            SELECT COUNT(DISTINCT fc.id) as count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            WHERE n.user_id = %s
+        """
+        cur.execute(count_sql, (user_id,))
+        total_row = cur.fetchone()
+        total = total_row['count'] or 0
+        
+        # 构建响应
+        card_items = []
+        for card in cards:
+            last_studied_at = card['last_studied_at']
+            last_studied_at_str = None
+            if last_studied_at:
+                if hasattr(last_studied_at, 'isoformat'):
+                    last_studied_at_str = last_studied_at.isoformat()
+                else:
+                    last_studied_at_str = str(last_studied_at)
+            
+            card_items.append(FlashCardListItem(
+                id=card['id'],
+                term=card['term'],
+                status=card['status'],
+                note_id=card['note_id'],
+                note_title=card['note_title'] or '',
+                review_count=card['review_count'] or 0,
+                last_studied_at=last_studied_at_str,
+                best_score=card['best_score'],
+                attempt_count=card['attempt_count'] or 0,
+            ))
+        
+        return FlashCardListResponse(cards=card_items, total=total)
+        
+    except Exception as exc:
+        logger.error(f"❌ 获取全部词条列表失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/study-center/cards-by-note", response_model=CardsByNoteResponse)
+def get_cards_by_note(
+    cur = Depends(get_db_cursor),
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(100, ge=1, le=100, description="返回数量")
+) -> CardsByNoteResponse:
+    """
+    按笔记分类获取词条列表
+    """
+    try:
+        user_id = get_default_user_id()
+        
+        query_sql = """
+            SELECT 
+                n.id as note_id,
+                n.title as note_title,
+                COUNT(fc.id) as total_count,
+                COUNT(CASE WHEN fc.status = 'MASTERED' THEN 1 END) as mastered_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_REVIEW' THEN 1 END) as needs_review_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_IMPROVE' THEN 1 END) as needs_improve_count,
+                COUNT(CASE WHEN fc.status = 'NOT_MASTERED' THEN 1 END) as not_mastered_count
+            FROM notes n
+            LEFT JOIN flash_cards fc ON n.id = fc.note_id
+            WHERE n.user_id = %s
+            GROUP BY n.id, n.title
+            HAVING COUNT(fc.id) > 0
+            ORDER BY n.created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        cur.execute(query_sql, (user_id, limit, skip))
+        notes = cur.fetchall()
+        
+        # 统计总数
+        count_sql = """
+            SELECT COUNT(DISTINCT n.id) as count
+            FROM notes n
+            INNER JOIN flash_cards fc ON n.id = fc.note_id
+            WHERE n.user_id = %s
+        """
+        cur.execute(count_sql, (user_id,))
+        total_row = cur.fetchone()
+        total = total_row['count'] or 0
+        
+        # 构建响应
+        note_items = []
+        for note in notes:
+            note_items.append(CardsByNoteItem(
+                note_id=note['note_id'],
+                note_title=note['note_title'] or '',
+                total_count=note['total_count'] or 0,
+                mastered_count=note['mastered_count'] or 0,
+                needs_review_count=note['needs_review_count'] or 0,
+                needs_improve_count=note['needs_improve_count'] or 0,
+                not_mastered_count=note['not_mastered_count'] or 0,
+            ))
+        
+        return CardsByNoteResponse(notes=note_items, total=total)
+        
+    except Exception as exc:
+        logger.error(f"❌ 按笔记分类获取词条列表失败: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

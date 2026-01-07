@@ -48,6 +48,13 @@ class FeynmanLearningController extends GetxController {
           state.topicId.value = null;
           state.activeCategory.value = 'note';
           state.isCustomDeck.value = true;
+          
+          // 保存分页信息（用于后续加载更多）
+          state.pageType.value = arguments['pageType'] as String?;
+          state.statusFilter.value = arguments['statusFilter'] as String?;
+          state.currentSkip.value = arguments['currentSkip'] as int? ?? cards.length;
+          state.totalCount.value = arguments['total'] as int? ?? cards.length;
+          
           // 从卡片信息中提取词条列表（过滤掉无效数据）
           state.terms.value = cards
               .where((c) => c['term'] != null && c['term'].toString().isNotEmpty)
@@ -63,7 +70,7 @@ class FeynmanLearningController extends GetxController {
             debugPrint('[FeynmanLearningController] 卡片: ${card['term']}, 状态: ${card['status']}, 复习次数: ${card['review_count']}');
           }
           
-          debugPrint('[FeynmanLearningController] 加载了 ${_flashCardsData.length} 张卡片');
+          debugPrint('[FeynmanLearningController] 加载了 ${_flashCardsData.length} 张卡片，总数: ${state.totalCount.value}');
           state.isLoading.value = false;
           state.errorMessage.value = null;
           // 加载角色列表
@@ -296,6 +303,107 @@ class FeynmanLearningController extends GetxController {
     final totalCards = state.terms.value?.length ?? 0;
     if (index >= 0 && index < totalCards) {
       state.currentCardIndex.value = index;
+      
+      // 如果滑动到接近末尾（剩余3张卡片），且还有更多数据，自动加载更多
+      if (index >= totalCards - 3 && 
+          state.currentSkip.value < state.totalCount.value &&
+          !state.isLoadingMore.value &&
+          state.pageType.value != null) {
+        _loadMoreCards();
+      }
+    }
+  }
+  
+  /// 加载更多词条（分页加载）
+  Future<void> _loadMoreCards() async {
+    if (state.isLoadingMore.value || 
+        state.currentSkip.value >= state.totalCount.value ||
+        state.pageType.value == null) {
+      return;
+    }
+    
+    try {
+      state.isLoadingMore.value = true;
+      final pageType = state.pageType.value!;
+      final statusFilter = state.statusFilter.value;
+      final skip = state.currentSkip.value;
+      const limit = 30; // 每次加载30条
+      
+      FlashCardListResponse response;
+      
+      // 根据页面类型加载数据
+      switch (pageType) {
+        case 'todayReview':
+          response = await httpService.getTodayReviewCards(
+            skip: skip,
+            limit: limit,
+          );
+          break;
+        case 'weakCards':
+          response = await httpService.getWeakCards(
+            skip: skip,
+            limit: limit,
+            status: statusFilter,
+          );
+          break;
+        case 'masteredCards':
+          response = await httpService.getMasteredCards(
+            skip: skip,
+            limit: limit,
+          );
+          break;
+        case 'allCards':
+          response = await httpService.getAllCards(
+            skip: skip,
+            limit: limit,
+          );
+          break;
+        default:
+          return;
+      }
+      
+      if (response.cards.isEmpty) {
+        // 没有更多数据了
+        return;
+      }
+      
+      // 转换为费曼学习页面需要的格式
+      final newFlashCards = response.cards
+          .map((card) => {
+                'id': card.id,
+                'term': card.term,
+                'status': card.status,
+                'review_count': card.reviewCount,
+                'last_reviewed_at': null,
+                'mastered_at': null,
+              })
+          .toList();
+      
+      // 添加到现有数据中
+      final newTerms = newFlashCards
+          .where((c) => c['term'] != null && c['term'].toString().isNotEmpty)
+          .map((c) => c['term'].toString())
+          .toList();
+      
+      // 更新词条列表和卡片数据
+      if (state.terms.value != null) {
+        state.terms.value!.addAll(newTerms);
+        state.terms.refresh();
+      }
+      
+      _flashCardsData.addAll(newFlashCards
+          .where((c) => c['term'] != null && c['id'] != null)
+          .toList());
+      
+      // 更新分页信息
+      state.currentSkip.value = skip + response.cards.length;
+      
+      debugPrint('[FeynmanLearningController] 加载了更多 ${newFlashCards.length} 张卡片，当前总数: ${state.terms.value?.length ?? 0}');
+    } catch (e) {
+      debugPrint('[FeynmanLearningController] 加载更多失败: $e');
+      // 不显示错误提示，避免打扰用户学习
+    } finally {
+      state.isLoadingMore.value = false;
     }
   }
 
@@ -1064,7 +1172,7 @@ class FeynmanLearningController extends GetxController {
       case 'MASTERED':
         return '已掌握';
       case 'NEEDS_REVIEW':
-        return '待复习';
+        return '需巩固';
       case 'NEEDS_IMPROVE':
         return '需改进';
       case 'NOT_MASTERED':

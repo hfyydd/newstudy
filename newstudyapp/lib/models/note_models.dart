@@ -424,3 +424,153 @@ class LearningRecord {
   final int attemptNumber;
   final String attemptedAt;
 }
+
+// ==================== 学习中心相关模型 ====================
+
+/// 学习中心统计数据模型
+class StudyCenterStatistics {
+  const StudyCenterStatistics({
+    required this.todayReviewCount,
+    required this.masteredCount,
+    required this.needsReviewCount,
+    required this.needsImproveCount,
+    required this.notMasteredCount,
+    required this.totalCardsCount,
+  });
+
+  factory StudyCenterStatistics.fromJson(Map<String, dynamic> json) {
+    return StudyCenterStatistics(
+      todayReviewCount: json['today_review_count'] as int? ?? 0,
+      masteredCount: json['mastered_count'] as int? ?? 0,
+      needsReviewCount: json['needs_review_count'] as int? ?? 0,
+      needsImproveCount: json['needs_improve_count'] as int? ?? 0,
+      notMasteredCount: json['not_mastered_count'] as int? ?? 0,
+      totalCardsCount: json['total_cards_count'] as int? ?? 0,
+    );
+  }
+
+  final int todayReviewCount;
+  final int masteredCount;
+  final int needsReviewCount;
+  final int needsImproveCount;
+  final int notMasteredCount;
+  final int totalCardsCount;
+}
+
+/// 闪词卡片列表项模型（用于学习中心）
+class FlashCardListItem {
+  const FlashCardListItem({
+    required this.id,
+    required this.term,
+    required this.status,
+    required this.noteId,
+    required this.noteTitle,
+    this.reviewCount = 0,
+    this.lastStudiedAt,
+    this.bestScore,
+    this.attemptCount = 0,
+  });
+
+  factory FlashCardListItem.fromJson(Map<String, dynamic> json) {
+    return FlashCardListItem(
+      id: json['id'] as int,
+      term: json['term'] as String,
+      status: json['status'] as String,
+      noteId: json['note_id'] as int,
+      noteTitle: json['note_title'] as String? ?? '',
+      reviewCount: json['review_count'] as int? ?? 0,
+      lastStudiedAt: json['last_studied_at'] as String?,
+      bestScore: json['best_score'] as int?,
+      attemptCount: json['attempt_count'] as int? ?? 0,
+    );
+  }
+
+  final int id;
+  final String term;
+  final String status;
+  final int noteId;
+  final String noteTitle;
+  final int reviewCount;
+  final String? lastStudiedAt;
+  final int? bestScore;
+  final int attemptCount;
+}
+
+/// 闪词卡片列表响应模型
+class FlashCardListResponse {
+  const FlashCardListResponse({
+    required this.cards,
+    required this.total,
+  });
+
+  factory FlashCardListResponse.fromJson(Map<String, dynamic> json) {
+    final cardsRaw = json['cards'] as List? ?? [];
+    final cards = cardsRaw
+        .map((e) => FlashCardListItem.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+
+    return FlashCardListResponse(
+      cards: cards,
+      total: json['total'] as int? ?? 0,
+    );
+  }
+
+  final List<FlashCardListItem> cards;
+  final int total;
+}
+
+/// 按笔记分类的词条统计模型
+class CardsByNoteItem {
+  const CardsByNoteItem({
+    required this.noteId,
+    required this.noteTitle,
+    required this.totalCount,
+    required this.masteredCount,
+    required this.needsReviewCount,
+    required this.needsImproveCount,
+    required this.notMasteredCount,
+  });
+
+  factory CardsByNoteItem.fromJson(Map<String, dynamic> json) {
+    return CardsByNoteItem(
+      noteId: json['note_id'] as int,
+      noteTitle: json['note_title'] as String? ?? '',
+      totalCount: json['total_count'] as int? ?? 0,
+      masteredCount: json['mastered_count'] as int? ?? 0,
+      needsReviewCount: json['needs_review_count'] as int? ?? 0,
+      needsImproveCount: json['needs_improve_count'] as int? ?? 0,
+      notMasteredCount: json['not_mastered_count'] as int? ?? 0,
+    );
+  }
+
+  final int noteId;
+  final String noteTitle;
+  final int totalCount;
+  final int masteredCount;
+  final int needsReviewCount;
+  final int needsImproveCount;
+  final int notMasteredCount;
+}
+
+/// 按笔记分类的词条列表响应模型
+class CardsByNoteResponse {
+  const CardsByNoteResponse({
+    required this.notes,
+    required this.total,
+  });
+
+  factory CardsByNoteResponse.fromJson(Map<String, dynamic> json) {
+    final notesRaw = json['notes'] as List? ?? [];
+    final notes = notesRaw
+        .map((e) => CardsByNoteItem.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+
+    return CardsByNoteResponse(
+      notes: notes,
+      total: json['total'] as int? ?? 0,
+    );
+  }
+
+  final List<CardsByNoteItem> notes;
+  final int total;
+}

@@ -16,7 +16,7 @@ except ImportError:
 class CardStatus(str, enum.Enum):
     """闪词卡片状态枚举"""
     NOT_STARTED = "not_started"  # 未学习
-    NEEDS_REVIEW = "needs_review"  # 待复习
+    NEEDS_REVIEW = "needs_review"  # 需巩固（70-89分）
     NEEDS_IMPROVE = "needs_improve"  # 需改进
     NOT_MASTERED = "not_mastered"  # 未掌握
     MASTERED = "mastered"  # 已掌握

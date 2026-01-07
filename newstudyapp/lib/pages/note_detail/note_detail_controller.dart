@@ -4,6 +4,8 @@ import 'package:newstudyapp/services/http_service.dart';
 import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
+import 'package:newstudyapp/pages/feynman_learning/feynman_learning_page.dart';
+import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.dart';
 import 'note_detail_state.dart';
 
 /// 笔记详情页控制器
@@ -14,12 +16,33 @@ class NoteDetailController extends GetxController {
   /// 保存完整的闪词卡片数据（包含ID）
   List<Map<String, dynamic>> _flashCardsData = [];
 
+  /// 是否自动开始学习（从学习中心跳转时使用）- 使用可观察变量，确保返回时页面能重新构建
+  final RxBool _autoStartLearning = false.obs;
+  Map<String, dynamic>? _autoStartLearningArgs;
+
+  /// 是否从学习中心跳转过来
+  bool _fromStudyCenter = false;
+
   @override
   void onInit() {
     super.onInit();
     // 获取传入的参数
     final args = Get.arguments;
     if (args != null && args is Map<String, dynamic>) {
+      // 检查是否需要自动开始学习
+      _autoStartLearning.value = args['autoStartLearning'] as bool? ?? false;
+      if (_autoStartLearning.value) {
+        // 标记从学习中心跳转过来
+        _fromStudyCenter = true;
+        // 保存自动学习所需的参数
+        _autoStartLearningArgs = {
+          'flashCards': args['flashCards'],
+          'noteId': args['noteId'],
+          'topic': args['topic'] ?? '我的笔记',
+          'defaultRole': args['defaultRole'] ?? '',
+        };
+      }
+
       // 优先检查是否有noteId（从笔记列表进入）
       final noteId = args['noteId'] as int?;
       if (noteId != null) {
@@ -166,7 +189,10 @@ class NoteDetailController extends GetxController {
 
   /// 根据noteId加载笔记详情
   Future<void> _loadNoteById(int noteId) async {
-    state.isLoading.value = true;
+    // 如果是自动学习模式，不显示加载状态，实现无感跳转
+    if (!_autoStartLearning.value) {
+      state.isLoading.value = true;
+    }
 
     try {
       // 调用后端API获取笔记详情
@@ -186,8 +212,22 @@ class NoteDetailController extends GetxController {
       // 保存默认角色
       state.defaultRole.value = defaultRole ?? '';
 
-      // 保存完整的闪词卡片数据（包含ID）
-      _flashCardsData = flashCardsRaw.cast<Map<String, dynamic>>().toList();
+      // 如果是从学习中心跳转过来的，使用传入的闪词卡片数据
+      // 否则使用从API获取的数据
+      if (_autoStartLearning.value && _autoStartLearningArgs != null) {
+        final flashCardsFromArgs = _autoStartLearningArgs!['flashCards'] as List?;
+        if (flashCardsFromArgs != null && flashCardsFromArgs.isNotEmpty) {
+          _flashCardsData = flashCardsFromArgs
+              .whereType<Map<String, dynamic>>()
+              .where((card) => card['term'] != null && card['id'] != null)
+              .toList();
+        } else {
+          _flashCardsData = flashCardsRaw.cast<Map<String, dynamic>>().toList();
+        }
+      } else {
+        // 保存完整的闪词卡片数据（包含ID）
+        _flashCardsData = flashCardsRaw.cast<Map<String, dynamic>>().toList();
+      }
       
       // 解析闪词列表
       final terms = flashCardsRaw
@@ -229,7 +269,7 @@ class NoteDetailController extends GetxController {
       }
       
       final total = mastered + needsReview + needsImprove + notMastered + notStarted;
-      debugPrint('[NoteDetailController] 进度统计: 总数=$total, 已掌握=$mastered, 待复习=$needsReview, 需改进=$needsImprove, 未掌握=$notMastered, 未开始=$notStarted');
+      debugPrint('[NoteDetailController] 进度统计: 总数=$total, 已掌握=$mastered, 需巩固=$needsReview, 需改进=$needsImprove, 未掌握=$notMastered, 未开始=$notStarted');
 
       // 创建笔记模型
       state.note.value = NoteModel(
@@ -254,6 +294,18 @@ class NoteDetailController extends GetxController {
         notMastered: notMastered,
         notStarted: notStarted,
       );
+
+      // 设置加载完成（数据已加载，即使自动学习模式也要设置，以便返回时能正常显示）
+      state.isLoading.value = false;
+
+      // 如果需要自动开始学习，立即跳转（使用下一帧，确保路由替换完成）
+      if (_autoStartLearning.value && _autoStartLearningArgs != null) {
+        // 使用下一帧确保路由替换完成后再跳转，实现完全无感
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _startAutoLearning();
+        });
+        return;
+      }
     } catch (e) {
       Get.snackbar(
         '错误',
@@ -261,7 +313,10 @@ class NoteDetailController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
-      state.isLoading.value = false;
+      // 确保加载状态被设置（如果上面没有设置）
+      if (state.isLoading.value) {
+        state.isLoading.value = false;
+      }
     }
   }
 
@@ -355,6 +410,59 @@ class NoteDetailController extends GetxController {
   /// 费曼学习
   void startFeynmanLearning() {
     continueLearning();
+  }
+
+  /// 检查是否是自动开始学习模式（用于页面显示判断）
+  /// 返回可观察变量，供 Obx 使用
+  RxBool get autoStartLearning => _autoStartLearning;
+
+  /// 检查是否从学习中心跳转过来
+  bool isFromStudyCenter() {
+    return _fromStudyCenter;
+  }
+
+  /// 自动开始学习（从学习中心跳转时调用）
+  void _startAutoLearning() {
+    if (_autoStartLearningArgs == null) {
+      return;
+    }
+
+    final flashCards = _autoStartLearningArgs!['flashCards'] as List?;
+    if (flashCards == null || flashCards.isEmpty) {
+      return;
+    }
+
+    // 转换为费曼学习页面需要的格式
+    final flashCardsFormatted = flashCards
+        .whereType<Map<String, dynamic>>()
+        .where((card) => card['term'] != null && card['id'] != null)
+        .toList();
+
+    if (flashCardsFormatted.isEmpty) {
+      return;
+    }
+
+    // 跳转到费曼学习页面（使用无动画跳转，避免闪动）
+    Get.to(
+      () {
+        // 确保控制器被注册
+        if (!Get.isRegistered<FeynmanLearningController>()) {
+          Get.lazyPut<FeynmanLearningController>(() => FeynmanLearningController());
+        }
+        return const FeynmanLearningPage();
+      },
+      arguments: {
+        'flashCards': flashCardsFormatted,
+        'noteId': _autoStartLearningArgs!['noteId'],
+        'topic': _autoStartLearningArgs!['topic'] ?? state.note.value?.title ?? '我的笔记',
+        'defaultRole': _autoStartLearningArgs!['defaultRole'] ?? state.defaultRole.value,
+      },
+      transition: Transition.noTransition, // 无动画跳转
+    );
+
+    // 清除自动学习标记（使用可观察变量，会自动触发页面重新构建）
+    _autoStartLearning.value = false;
+    _autoStartLearningArgs = null;
   }
 
   /// 重新生成闪词

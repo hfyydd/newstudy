@@ -49,8 +49,15 @@ class FeynmanLearningState {
   final topicId = Rxn<String>();
   
   /// 是否使用自定义词表（例如：笔记抽取的词表）
-  /// - true：不自动从 /topics/terms 补充牌库，避免“跑偏”
+  /// - true：不自动从 /topics/terms 补充牌库，避免"跑偏"
   final isCustomDeck = false.obs;
+  
+  // 分页加载相关（用于从学习中心跳转时的分页加载）
+  final RxnString pageType = RxnString(); // 页面类型：todayReview, weakCards, masteredCards, allCards
+  final RxnString statusFilter = RxnString(); // 状态筛选：NEEDS_REVIEW, NEEDS_IMPROVE, NOT_MASTERED
+  final currentSkip = 0.obs; // 当前已加载的数量
+  final totalCount = 0.obs; // 总数
+  final isLoadingMore = false.obs; // 是否正在加载更多
 
   // 加载状态
   final isLoading = true.obs;

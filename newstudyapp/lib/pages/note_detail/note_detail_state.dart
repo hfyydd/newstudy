@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 /// 闪词卡片状态枚举
 enum CardStatus {
   notStarted,   // 未学习
-  needsReview,  // 待复习（良好）
+  needsReview,  // 需巩固（良好）
   needsImprove, // 需改进
   notMastered,  // 未掌握
   mastered,     // 已掌握
@@ -82,8 +82,8 @@ class FlashCardProgress {
   /// 已掌握百分比
   double get masteredPercent => total > 0 ? mastered / total : 0;
 
-  /// 学习进度百分比（已掌握 + 待复习 + 需改进 + 未掌握）
-  /// 只要学习过就算进度，包括已掌握、待复习、需改进和未掌握
+  /// 学习进度百分比（已掌握 + 需巩固 + 需改进 + 未掌握）
+  /// 只要学习过就算进度，包括已掌握、需巩固、需改进和未掌握
   double get progressPercent => total > 0 ? (mastered + needsReview + needsImprove + notMastered) / total : 0;
 }
 

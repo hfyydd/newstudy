@@ -31,7 +31,7 @@
 | id | INTEGER | 主键，自增 |
 | note_id | INTEGER | 笔记ID，外键关联 notes.id |
 | term | VARCHAR(100) | 闪词内容 |
-| status | VARCHAR(20) | 学习状态：not_started, needs_review, needs_improve, not_mastered, mastered |
+| status | VARCHAR(20) | 学习状态：not_started, needs_review（需巩固）, needs_improve, not_mastered, mastered |
 | review_count | INTEGER | 复习次数，默认0 |
 | last_reviewed_at | TIMESTAMP | 最后复习时间，可选 |
 | mastered_at | TIMESTAMP | 掌握时间，可选 |
@@ -180,9 +180,9 @@ notes = user.notes
 note = db.query(Note).filter(Note.id == 1).first()
 flash_cards = note.flash_cards
 
-# 查询特定状态的闪词
-needs_review = db.query(FlashCard).filter(
-    FlashCard.status == CardStatus.NEEDS_REVIEW
+# 查询特定状态的闪词（需巩固状态）
+needs_consolidation = db.query(FlashCard).filter(
+    FlashCard.status == CardStatus.NEEDS_REVIEW  # 需巩固状态（70-89分）
 ).all()
 ```
 

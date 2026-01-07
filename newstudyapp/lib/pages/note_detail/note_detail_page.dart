@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/config/app_theme.dart';
+import 'package:newstudyapp/pages/main/main_controller.dart';
 import 'note_detail_controller.dart';
 import 'note_detail_state.dart';
 
@@ -18,70 +20,97 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     final cardColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
     final borderColor = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
+    // 如果是自动学习模式，完全不渲染页面（包括AppBar），实现完全无感
+    // 使用 Obx 监听 _autoStartLearning 的变化，返回时自动重新构建
+    return Obx(() {
+      if (controller.autoStartLearning.value) {
+        return const SizedBox.shrink();
+      }
+
+      return Scaffold(
+
         backgroundColor: bgColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: textColor, size: 20),
-          onPressed: () => Get.back(),
+        appBar: AppBar(
+          backgroundColor: bgColor,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios, color: textColor, size: 20),
+            onPressed: () {
+              // 如果是从学习中心跳转过来的，返回到学习中心
+              if (controller.isFromStudyCenter()) {
+                // 返回到 MainPage，并切换到学习中心 tab
+                Get.back();
+                // 延迟一下，确保返回完成后再切换 tab
+                Future.delayed(const Duration(milliseconds: 200), () {
+                  try {
+                    final mainController = Get.find<MainController>();
+                    mainController.changeTab(1); // 学习中心是第2个tab（index 1）
+                  } catch (e) {
+                    // 如果找不到 MainController，说明可能不在 MainPage，忽略错误
+                    debugPrint('无法切换到学习中心 tab: $e');
+                  }
+                });
+              } else {
+                // 正常返回
+                Get.back();
+              }
+            },
+          ),
+          title: Obx(() => Text(
+            controller.state.noteTitle,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          )),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.more_horiz, color: textColor),
+              onPressed: () => _showMoreOptions(context, isDark),
+            ),
+          ],
         ),
-        title: Obx(() => Text(
-          controller.state.noteTitle,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        )),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.more_horiz, color: textColor),
-            onPressed: () => _showMoreOptions(context, isDark),
-          ),
-        ],
-      ),
-      body: Obx(() {
-        if (controller.state.isLoading.value) {
-          return _buildLoadingState(isDark, textColor, secondaryColor);
-        }
+        body: Obx(() {
+          if (controller.state.isLoading.value) {
+            return _buildLoadingState(isDark, textColor, secondaryColor);
+          }
 
-        return Column(
-          children: [
-            // 主要内容区域
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 闪词学习区域（放在顶部）
-                    _buildFlashCardSection(isDark, textColor, secondaryColor, cardColor, borderColor),
-                    const SizedBox(height: 24),
+          return Column(
+            children: [
+              // 主要内容区域
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 闪词学习区域（放在顶部）
+                      _buildFlashCardSection(isDark, textColor, secondaryColor, cardColor, borderColor),
+                      const SizedBox(height: 24),
 
-                    // 分割线
-                    Divider(color: borderColor, height: 1),
-                    const SizedBox(height: 20),
+                      // 分割线
+                      Divider(color: borderColor, height: 1),
+                      const SizedBox(height: 20),
 
-                    // 笔记元信息
-                    _buildMetaInfo(secondaryColor),
-                    const SizedBox(height: 16),
+                      // 笔记元信息
+                      _buildMetaInfo(secondaryColor),
+                      const SizedBox(height: 16),
 
-                    // 笔记内容（Markdown渲染）
-                    _buildNoteContent(isDark, textColor, secondaryColor),
-                  ],
+                      // 笔记内容（Markdown渲染）
+                      _buildNoteContent(isDark, textColor, secondaryColor),
+                    ],
+                  ),
                 ),
               ),
-            ),
-
-          ],
-        );
-      }),
-    );
+            ],
+          );
+        }),
+      );
+    });
   }
 
   /// 构建加载状态
@@ -602,7 +631,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     return Row(
       children: [
         _buildStatItem('已掌握', progress.mastered, AppTheme.statusMastered),
-        _buildStatItem('待复习', progress.needsReview, AppTheme.statusNeedsReview),
+        _buildStatItem('需巩固', progress.needsReview, AppTheme.statusNeedsReview),
         _buildStatItem('需改进', progress.needsImprove, AppTheme.statusNeedsImprove),
         _buildStatItem('未掌握', progress.notMastered, AppTheme.statusNotMastered),
         _buildStatItem('未学习', progress.notStarted, AppTheme.statusNotStarted),

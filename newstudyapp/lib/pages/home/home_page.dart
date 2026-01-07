@@ -175,7 +175,10 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTodayReviewCard(bool isDark) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        // 直接跳转到费曼学习页面
+        _homeController.navigateToTodayReviewFeynmanLearning();
+      },
       child: Container(
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
@@ -202,28 +205,50 @@ class _HomePageState extends State<HomePage>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.local_fire_department,
-                          color: Colors.white, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        '今日复习',
-                        style: TextStyle(
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.local_fire_department,
+                              color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            '今日需要复习',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        _showTodayReviewExplanation(context);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.help_outline,
                           color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          size: 16,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -237,46 +262,53 @@ class _HomePageState extends State<HomePage>
               ],
             ),
             const SizedBox(height: 24),
-            const Row(
-              children: [
-                Text(
-                  '8',
-                  style: TextStyle(
-                    fontSize: 56,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    height: 1,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '个词条',
-                        style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w400),
+            Obx(() => Row(
+                  children: [
+                    Text(
+                      '${_homeController.todayReviewCount.value}',
+                      style: const TextStyle(
+                        fontSize: 56,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1,
                       ),
-                      Text(
-                        '等待复习',
-                        style: TextStyle(fontSize: 14, color: Colors.white70),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '个词条',
+                            style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w400),
+                          ),
+                          Text(
+                            '需要复习',
+                            style:
+                                TextStyle(fontSize: 14, color: Colors.white70),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+                    ),
+                  ],
+                )),
             const SizedBox(height: 20),
-            Row(
-              children: [
-                _buildQuickStat('困难', '3', Colors.orange),
-                const SizedBox(width: 12),
-                _buildQuickStat('需改进', '5', Colors.yellow),
-              ],
-            ),
+            Obx(() => Row(
+                  children: [
+                    _buildQuickStat(
+                        '需巩固',
+                        '${_homeController.needsReviewCount.value}',
+                        AppTheme.statusNeedsReview),
+                    const SizedBox(width: 12),
+                    _buildQuickStat(
+                        '需改进',
+                        '${_homeController.needsImproveCount.value}',
+                        AppTheme.statusNeedsImprove),
+                  ],
+                )),
           ],
         ),
       ),
@@ -300,12 +332,155 @@ class _HomePageState extends State<HomePage>
           ),
           const SizedBox(width: 6),
           Text(
-            '$value $label',
+            '$label $value',
             style: const TextStyle(
-                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
           ),
         ],
       ),
+    );
+  }
+
+  /// 显示今日复习说明（与学习中心保持一致）
+  void _showTodayReviewExplanation(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final cardColor = isDark ? Colors.grey[900] : Colors.white;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.statusNeedsReview.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.local_fire_department,
+                      color: AppTheme.statusNeedsReview,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '今日需要复习',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: textColor),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '根据复习计划，今天应该复习的词条。',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: textColor,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '包含状态：',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildStatusItem(
+                        '需巩固', '上次学习评分70-89分', AppTheme.statusNeedsReview),
+                    const SizedBox(height: 6),
+                    _buildStatusItem(
+                        '需改进', '上次学习评分50-69分', AppTheme.statusNeedsImprove),
+                    const SizedBox(height: 6),
+                    _buildStatusItem(
+                        '未掌握', '上次学习评分0-49分', AppTheme.statusNotMastered),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.statusNeedsReview,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    '知道了',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusItem(String status, String desc, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '$status：$desc',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -333,7 +508,10 @@ class _HomePageState extends State<HomePage>
         ),
         const SizedBox(height: 16),
         Obx(() {
-          if (_homeController.isLoading.value) {
+          final isLoading = _homeController.isLoading.value;
+          final notes = _homeController.notes.toList();
+
+          if (isLoading) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(20.0),
@@ -342,13 +520,13 @@ class _HomePageState extends State<HomePage>
             );
           }
 
-          if (_homeController.notes.isEmpty) {
+          if (notes.isEmpty) {
             return _buildEmptyNotes(isDark);
           }
 
           return Column(
             children: [
-              ..._homeController.notes.map((note) => Padding(
+              ...notes.map((note) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _buildNoteCard(
                       isDark: isDark,
@@ -449,7 +627,7 @@ class _HomePageState extends State<HomePage>
                         color: textColor),
                   ),
                 ),
-                // 显示优先级最高的状态标签（未掌握 > 需改进 > 待复习）
+                // 显示优先级最高的状态标签（未掌握 > 需改进 > 需巩固）
                 if (note.notMasteredCount > 0)
                   Container(
                     padding:
@@ -491,7 +669,7 @@ class _HomePageState extends State<HomePage>
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${note.needsReviewCount} 待复习',
+                      '${note.needsReviewCount} 需巩固',
                       style: TextStyle(
                           color: AppTheme.statusNeedsReview,
                           fontSize: 11,

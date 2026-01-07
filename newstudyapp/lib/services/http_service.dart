@@ -314,6 +314,118 @@ class HttpService {
     }
   }
 
+  // ==================== 学习中心相关接口 ====================
+
+  /// 获取学习中心统计数据
+  Future<StudyCenterStatistics> getStudyCenterStatistics() async {
+    try {
+      final response = await _dio.get(ApiConfig.studyCenterStatistics);
+      return StudyCenterStatistics.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取今日复习词条列表
+  Future<FlashCardListResponse> getTodayReviewCards({
+    int skip = 0,
+    int limit = 100,
+  }) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.todayReviewCards,
+        queryParameters: {
+          'skip': skip,
+          'limit': limit,
+        },
+      );
+      return FlashCardListResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取薄弱词条列表（需巩固、需改进、未掌握）
+  Future<FlashCardListResponse> getWeakCards({
+    int skip = 0,
+    int limit = 100,
+    String? status, // 'NEEDS_REVIEW'（需巩固）, 'NEEDS_IMPROVE', 'NOT_MASTERED'
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{
+        'skip': skip,
+        'limit': limit,
+      };
+      if (status != null) {
+        queryParams['status'] = status;
+      }
+      final response = await _dio.get(
+        ApiConfig.weakCards,
+        queryParameters: queryParams,
+      );
+      return FlashCardListResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取已掌握词条列表
+  Future<FlashCardListResponse> getMasteredCards({
+    int skip = 0,
+    int limit = 100,
+  }) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.masteredCards,
+        queryParameters: {
+          'skip': skip,
+          'limit': limit,
+        },
+      );
+      return FlashCardListResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取全部词条列表
+  Future<FlashCardListResponse> getAllCards({
+    int skip = 0,
+    int limit = 100,
+  }) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.allCards,
+        queryParameters: {
+          'skip': skip,
+          'limit': limit,
+        },
+      );
+      return FlashCardListResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 按笔记分类获取词条列表
+  Future<CardsByNoteResponse> getCardsByNote({
+    int skip = 0,
+    int limit = 100,
+  }) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.cardsByNote,
+        queryParameters: {
+          'skip': skip,
+          'limit': limit,
+        },
+      );
+      return CardsByNoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // ==================== 通用请求方法 ====================
 
   /// 通用 GET 请求

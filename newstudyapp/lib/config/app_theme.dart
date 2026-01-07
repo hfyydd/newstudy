@@ -31,7 +31,7 @@ class AppTheme {
   /// 已掌握 - 绿色
   static const Color statusMastered = Color(0xFF4ECDC4);
 
-  /// 待复习 - 天蓝色
+  /// 需巩固 - 天蓝色（70-89分）
   static const Color statusNeedsReview = Color(0xFF87CEEB);
 
   /// 需改进 - 金黄色
