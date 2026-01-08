@@ -18,7 +18,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
     final cardColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
+    final borderColor =
+        isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
 
     // 如果是自动学习模式，完全不渲染页面（包括AppBar），实现完全无感
     // 使用 Obx 监听 _autoStartLearning 的变化，返回时自动重新构建
@@ -28,7 +29,6 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       }
 
       return Scaffold(
-
         backgroundColor: bgColor,
         appBar: AppBar(
           backgroundColor: bgColor,
@@ -57,15 +57,15 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             },
           ),
           title: Obx(() => Text(
-            controller.state.noteTitle,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          )),
+                controller.state.noteTitle,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )),
           actions: [
             IconButton(
               icon: Icon(Icons.more_horiz, color: textColor),
@@ -89,7 +89,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 闪词学习区域（放在顶部）
-                      _buildFlashCardSection(isDark, textColor, secondaryColor, cardColor, borderColor),
+                      _buildFlashCardSection(isDark, textColor, secondaryColor,
+                          cardColor, borderColor),
                       const SizedBox(height: 24),
 
                       // 分割线
@@ -114,7 +115,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   }
 
   /// 构建加载状态
-  Widget _buildLoadingState(bool isDark, Color textColor, Color? secondaryColor) {
+  Widget _buildLoadingState(
+      bool isDark, Color textColor, Color? secondaryColor) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -132,22 +134,23 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 height: 40,
                 child: CircularProgressIndicator(
                   strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.darkPrimary),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AppTheme.darkPrimary),
                 ),
               ),
             ),
           ),
           const SizedBox(height: 24),
           Obx(() => Text(
-            controller.state.generatingStatus.value.isNotEmpty
-                ? controller.state.generatingStatus.value
-                : 'AI 正在生成笔记...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-          )),
+                controller.state.generatingStatus.value.isNotEmpty
+                    ? controller.state.generatingStatus.value
+                    : 'AI 正在生成笔记...',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                ),
+              )),
           const SizedBox(height: 8),
           Text(
             '正在分析内容并提取核心概念',
@@ -188,11 +191,12 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   }
 
   /// 构建笔记内容（Markdown渲染）
-  Widget _buildNoteContent(bool isDark, Color textColor, Color? secondaryColor) {
+  Widget _buildNoteContent(
+      bool isDark, Color textColor, Color? secondaryColor) {
     return Obx(() {
       final markdownContent = controller.state.markdownContent;
       final content = controller.state.noteContent;
-      
+
       // 优先使用Markdown内容
       if (markdownContent.isNotEmpty) {
         return MarkdownBody(
@@ -201,7 +205,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           styleSheet: _buildMarkdownStyleSheet(isDark, textColor),
         );
       }
-      
+
       // 回退到普通文本
       if (content.isEmpty) {
         return Center(
@@ -225,40 +229,74 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 构建Markdown样式表
   MarkdownStyleSheet _buildMarkdownStyleSheet(bool isDark, Color textColor) {
-    final codeBackground = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5);
-    final blockquoteColor = isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE8E8E8);
+    final codeBackground =
+        isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5);
+    final blockquoteColor =
+        isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE8E8E8);
     // 标题使用主题紫色
     const headingColor = Color(0xFF667EEA);
     // 二级标题使用稍浅的紫色
     final h2Color = isDark ? const Color(0xFF8B9EF0) : const Color(0xFF5A6FD1);
     // 三级标题使用青色
     const h3Color = Color(0xFF4ECDC4);
-    
+
     return MarkdownStyleSheet(
       p: TextStyle(fontSize: 15, color: textColor, height: 1.8),
-      h1: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: headingColor, height: 1.5),
-      h2: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: h2Color, height: 1.5),
-      h3: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: h3Color, height: 1.5),
-      h4: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor, height: 1.5),
+      h1: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: headingColor,
+          height: 1.5),
+      h2: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: h2Color,
+          height: 1.5),
+      h3: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: h3Color,
+          height: 1.5),
+      h4: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+          height: 1.5),
       listBullet: TextStyle(fontSize: 15, color: textColor),
-      code: TextStyle(fontSize: 14, color: AppTheme.darkPrimary, backgroundColor: codeBackground),
-      codeblockDecoration: BoxDecoration(color: codeBackground, borderRadius: BorderRadius.circular(8)),
+      code: TextStyle(
+          fontSize: 14,
+          color: AppTheme.darkPrimary,
+          backgroundColor: codeBackground),
+      codeblockDecoration: BoxDecoration(
+          color: codeBackground, borderRadius: BorderRadius.circular(8)),
       codeblockPadding: const EdgeInsets.all(12),
-      blockquote: TextStyle(fontSize: 15, color: isDark ? Colors.grey[400] : Colors.grey[700], fontStyle: FontStyle.italic, height: 1.6),
+      blockquote: TextStyle(
+          fontSize: 15,
+          color: isDark ? Colors.grey[400] : Colors.grey[700],
+          fontStyle: FontStyle.italic,
+          height: 1.6),
       blockquoteDecoration: BoxDecoration(
         border: Border(left: BorderSide(color: AppTheme.darkPrimary, width: 3)),
         color: blockquoteColor,
       ),
       blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      tableHead: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
+      tableHead: TextStyle(
+          fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
       tableBody: TextStyle(fontSize: 14, color: textColor),
-      tableBorder: TableBorder.all(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5), width: 1),
+      tableBorder: TableBorder.all(
+          color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+          width: 1),
       tableCellsPadding: const EdgeInsets.all(8),
       strong: TextStyle(fontWeight: FontWeight.bold, color: textColor),
       em: TextStyle(fontStyle: FontStyle.italic, color: textColor),
-      a: TextStyle(color: AppTheme.darkPrimary, decoration: TextDecoration.underline),
+      a: TextStyle(
+          color: AppTheme.darkPrimary, decoration: TextDecoration.underline),
       horizontalRuleDecoration: BoxDecoration(
-        border: Border(top: BorderSide(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5), width: 1)),
+        border: Border(
+            top: BorderSide(
+                color:
+                    isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+                width: 1)),
       ),
     );
   }
@@ -281,10 +319,12 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       }
 
       if (!hasFlashCards) {
-        return _buildNoFlashCardsCard(isDark, textColor, secondaryColor, cardColor, borderColor);
+        return _buildNoFlashCardsCard(
+            isDark, textColor, secondaryColor, cardColor, borderColor);
       }
 
-      return _buildProgressCard(isDark, textColor, secondaryColor, cardColor, borderColor, progress!);
+      return _buildProgressCard(
+          isDark, textColor, secondaryColor, cardColor, borderColor, progress!);
     });
   }
 
@@ -514,41 +554,6 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          // 次要操作按钮
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: controller.regenerateFlashCards,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white.withOpacity(0.5)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('重新生成'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: controller.viewLearningRecords,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white.withOpacity(0.5)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('学习记录'),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -630,55 +635,69 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   ) {
     return Row(
       children: [
-        _buildStatItem('已掌握', progress.mastered, AppTheme.statusMastered),
-        _buildStatItem('需巩固', progress.needsReview, AppTheme.statusNeedsReview),
-        _buildStatItem('需改进', progress.needsImprove, AppTheme.statusNeedsImprove),
-        _buildStatItem('未掌握', progress.notMastered, AppTheme.statusNotMastered),
-        _buildStatItem('未学习', progress.notStarted, AppTheme.statusNotStarted),
+        _buildStatItem(
+            '已掌握', progress.mastered, AppTheme.statusMastered, 'MASTERED'),
+        _buildStatItem('需巩固', progress.needsReview, AppTheme.statusNeedsReview,
+            'NEEDS_REVIEW'),
+        _buildStatItem('需改进', progress.needsImprove,
+            AppTheme.statusNeedsImprove, 'NEEDS_IMPROVE'),
+        _buildStatItem('未掌握', progress.notMastered, AppTheme.statusNotMastered,
+            'NOT_MASTERED'),
+        _buildStatItem('未学习', progress.notStarted, AppTheme.statusNotStarted,
+            'NOT_STARTED'),
       ],
     );
   }
 
   /// 构建统计项
-  Widget _buildStatItem(String label, int count, Color color) {
+  Widget _buildStatItem(String label, int count, Color color, String status) {
+    // 如果数量为0，不添加点击事件
+    final isClickable = count > 0;
+
     return Expanded(
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+      child: GestureDetector(
+        onTap:
+            isClickable ? () => controller.startLearningByStatus(status) : null,
+        child: Opacity(
+          opacity: isClickable ? 1.0 : 0.5,
+          child: Column(
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$count',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 4),
+              const SizedBox(height: 4),
               Text(
-                '$count',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.7),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.7),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
-
 
   /// 显示更多选项
   void _showMoreOptions(BuildContext context, bool isDark) {
@@ -710,15 +729,18 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               }),
               _buildOptionItem(Icons.edit_outlined, '编辑笔记', isDark, () {
                 Get.back();
-                Get.snackbar('提示', '编辑功能开发中', snackPosition: SnackPosition.BOTTOM);
+                Get.snackbar('提示', '编辑功能开发中',
+                    snackPosition: SnackPosition.BOTTOM);
               }),
               _buildOptionItem(Icons.share_outlined, '分享笔记', isDark, () {
                 Get.back();
-                Get.snackbar('提示', '分享功能开发中', snackPosition: SnackPosition.BOTTOM);
+                Get.snackbar('提示', '分享功能开发中',
+                    snackPosition: SnackPosition.BOTTOM);
               }),
               _buildOptionItem(Icons.delete_outline, '删除笔记', isDark, () {
                 Get.back();
-                Get.snackbar('提示', '删除功能开发中', snackPosition: SnackPosition.BOTTOM);
+                Get.snackbar('提示', '删除功能开发中',
+                    snackPosition: SnackPosition.BOTTOM);
               }, isDestructive: true),
               const SizedBox(height: 8),
             ],

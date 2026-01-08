@@ -412,6 +412,61 @@ class NoteDetailController extends GetxController {
     continueLearning();
   }
 
+  /// 根据状态开始学习（点击统计项时调用）
+  void startLearningByStatus(String status) {
+    if (_flashCardsData.isEmpty) {
+      Get.snackbar(
+        '提示',
+        '暂无闪词可学习',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    // 根据状态筛选词条
+    final filteredCards = _flashCardsData.where((card) {
+      final cardStatus = card['status'] as String?;
+      return cardStatus == status;
+    }).toList();
+
+    if (filteredCards.isEmpty) {
+      Get.snackbar(
+        '提示',
+        '该状态下暂无词条可学习',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    // 获取笔记ID
+    int? noteId;
+    final noteIdStr = state.note.value?.id;
+    if (noteIdStr != null) {
+      noteId = int.tryParse(noteIdStr);
+    }
+
+    // 状态名称映射
+    final statusNames = {
+      'MASTERED': '已掌握',
+      'NEEDS_REVIEW': '需巩固',
+      'NEEDS_IMPROVE': '需改进',
+      'NOT_MASTERED': '未掌握',
+      'NOT_STARTED': '未学习',
+    };
+    final statusName = statusNames[status] ?? status;
+
+    // 跳转到费曼学习页面，传递筛选后的词条
+    Get.toNamed(
+      AppRoutes.feynmanLearning,
+      arguments: {
+        'flashCards': filteredCards,
+        'noteId': noteId,
+        'topic': '${state.note.value?.title ?? "我的笔记"} - $statusName',
+        'defaultRole': state.defaultRole.value,
+      },
+    );
+  }
+
   /// 检查是否是自动开始学习模式（用于页面显示判断）
   /// 返回可观察变量，供 Obx 使用
   RxBool get autoStartLearning => _autoStartLearning;
