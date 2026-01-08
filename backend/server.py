@@ -1,6 +1,7 @@
 import logging
 import sys
 from typing import List
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Query, Request, Depends
 from fastapi import File, UploadFile
@@ -574,7 +575,7 @@ class SetNoteDefaultRoleRequest(BaseModel):
     role_id: str = Field(..., min_length=1, description="角色ID")
 
 
-# ==================== 学习中心相关模型 ====================
+# ==================== 学习中心 / 首页统计模型 ====================
 
 class StudyCenterStatisticsResponse(BaseModel):
     """学习中心统计数据响应"""
@@ -584,6 +585,28 @@ class StudyCenterStatisticsResponse(BaseModel):
     needs_improve_count: int = Field(default=0, description="需改进数量")
     not_mastered_count: int = Field(default=0, description="未掌握数量")
     total_cards_count: int = Field(default=0, description="全部词条数量")
+
+
+class DailyStudyCount(BaseModel):
+    """按天统计的学习次数"""
+    date: str = Field(..., description="日期，格式YYYY-MM-DD")
+    count: int = Field(default=0, description="当天学习次数")
+
+
+class HomeStatisticsResponse(BaseModel):
+    """首页学习统计数据响应"""
+    today_review_count: int = Field(default=0, description="今日复习数量")
+    mastered_count: int = Field(default=0, description="已掌握数量")
+    needs_review_count: int = Field(default=0, description="需巩固数量（70-89分）")
+    needs_improve_count: int = Field(default=0, description="需改进数量")
+    not_mastered_count: int = Field(default=0, description="未掌握数量")
+    total_cards_count: int = Field(default=0, description="全部词条数量")
+
+    streak_days: int = Field(default=0, description="连续学习天数（从今天向前连续有学习记录）")
+    active_days_7d: int = Field(default=0, description="近7天活跃天数（有学习记录的天数）")
+    week_completed: int = Field(default=0, description="本周完成的学习次数（学习记录数）")
+    week_target: int = Field(default=30, description="本周学习目标次数")
+    trend_7d: List[DailyStudyCount] = Field(default_factory=list, description="近7天学习趋势")
 
 
 class FlashCardListItem(BaseModel):
@@ -1092,6 +1115,139 @@ def get_study_center_statistics(
         
     except Exception as exc:
         logger.error(f"❌ 获取学习中心统计数据失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/home/statistics", response_model=HomeStatisticsResponse)
+def get_home_statistics(
+    cur = Depends(get_db_cursor)
+) -> HomeStatisticsResponse:
+    """
+    获取首页学习统计数据：
+    - 基础状态分布（沿用学习中心统计）
+    - 连续学习天数
+    - 近7天活跃天数
+    - 本周完成次数 + 目标
+    - 近7天趋势
+    """
+    try:
+        user_id = get_default_user_id()
+
+        # 基础状态统计
+        stats_sql = """
+            SELECT 
+                COUNT(CASE WHEN fc.status = 'MASTERED' THEN 1 END) as mastered_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_REVIEW' THEN 1 END) as needs_review_count,
+                COUNT(CASE WHEN fc.status = 'NEEDS_IMPROVE' THEN 1 END) as needs_improve_count,
+                COUNT(CASE WHEN fc.status = 'NOT_MASTERED' THEN 1 END) as not_mastered_count,
+                COUNT(fc.id) as total_cards_count,
+                COUNT(CASE 
+                    WHEN (
+                        (fc.status = 'NOT_MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '4 hours' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'NEEDS_IMPROVE' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '3 days' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'NEEDS_REVIEW' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '1 day' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR 
+                            fc.last_reviewed_at + INTERVAL '7 days' <= NOW()
+                        ))
+                    )
+                    THEN 1 
+                END) as today_review_count
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            WHERE n.user_id = %s
+        """
+        cur.execute(stats_sql, (user_id,))
+        stats = cur.fetchone()
+
+        mastered_count = stats['mastered_count'] or 0
+        needs_review_count = stats['needs_review_count'] or 0
+        needs_improve_count = stats['needs_improve_count'] or 0
+        not_mastered_count = stats['not_mastered_count'] or 0
+        total_cards_count = stats['total_cards_count'] or 0
+        today_review_count = stats['today_review_count'] or 0
+
+        # 近30天的学习记录（用于 streak / active / trend / 周进度）
+        learning_sql = """
+            SELECT 
+                DATE(lr.attempted_at) AS day,
+                COUNT(*) AS cnt
+            FROM learning_records lr
+            INNER JOIN notes n ON lr.note_id = n.id
+            WHERE n.user_id = %s
+                AND lr.attempted_at >= NOW() - INTERVAL '30 days'
+            GROUP BY DATE(lr.attempted_at)
+        """
+        cur.execute(learning_sql, (user_id,))
+        learning_rows = cur.fetchall()
+        day_count_map = {row['day'].strftime("%Y-%m-%d"): row['cnt'] for row in learning_rows}
+
+        # 近7天趋势（包含当天，补0）
+        trend_7d = []
+        for i in range(6, -1, -1):
+            day = (datetime.utcnow().date() - timedelta(days=i))
+            day_str = day.strftime("%Y-%m-%d")
+            trend_7d.append(DailyStudyCount(date=day_str, count=day_count_map.get(day_str, 0)))
+
+        # 近7天活跃天数
+        active_days_7d = sum(1 for item in trend_7d if item.count > 0)
+
+        # 连续学习天数（streak）：从今天起向前连续有学习记录的天数
+        streak = 0
+        current_day = datetime.utcnow().date()
+        for i in range(0, 30):
+            day = (current_day - timedelta(days=i)).strftime("%Y-%m-%d")
+            if day_count_map.get(day, 0) > 0:
+                streak += 1
+            else:
+                break
+
+        # 本周进度：本周起始（周一）到现在的学习次数
+        # week_start 使用 Monday 作为一周开始
+        today = datetime.utcnow().date()
+        week_start = today - timedelta(days=today.weekday())
+        week_sql = """
+            SELECT COUNT(*) AS cnt
+            FROM learning_records lr
+            INNER JOIN notes n ON lr.note_id = n.id
+            WHERE n.user_id = %s
+              AND lr.attempted_at >= %s
+        """
+        cur.execute(week_sql, (user_id, week_start))
+        week_cnt_row = cur.fetchone()
+        week_completed = week_cnt_row['cnt'] if week_cnt_row and week_cnt_row['cnt'] else 0
+
+        # 周目标（简单固定值，可后续做用户配置）
+        week_target = 30
+
+        return HomeStatisticsResponse(
+            today_review_count=today_review_count,
+            mastered_count=mastered_count,
+            needs_review_count=needs_review_count,
+            needs_improve_count=needs_improve_count,
+            not_mastered_count=not_mastered_count,
+            total_cards_count=total_cards_count,
+            streak_days=streak,
+            active_days_7d=active_days_7d,
+            week_completed=week_completed,
+            week_target=week_target,
+            trend_7d=trend_7d,
+        )
+
+    except Exception as exc:
+        logger.error(f"❌ 获取首页统计数据失败: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

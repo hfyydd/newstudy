@@ -519,6 +519,73 @@ class FlashCardListResponse {
   final int total;
 }
 
+/// 首页学习统计 - 趋势点
+class DailyStudyCount {
+  const DailyStudyCount({
+    required this.date,
+    required this.count,
+  });
+
+  factory DailyStudyCount.fromJson(Map<String, dynamic> json) {
+    return DailyStudyCount(
+      date: json['date'] as String,
+      count: json['count'] as int? ?? 0,
+    );
+  }
+
+  final String date;
+  final int count;
+}
+
+/// 首页学习统计
+class HomeStatisticsResponse {
+  const HomeStatisticsResponse({
+    required this.todayReviewCount,
+    required this.masteredCount,
+    required this.needsReviewCount,
+    required this.needsImproveCount,
+    required this.notMasteredCount,
+    required this.totalCardsCount,
+    required this.streakDays,
+    required this.activeDays7d,
+    required this.weekCompleted,
+    required this.weekTarget,
+    required this.trend7d,
+  });
+
+  factory HomeStatisticsResponse.fromJson(Map<String, dynamic> json) {
+    final trendRaw = json['trend_7d'] as List? ?? [];
+    return HomeStatisticsResponse(
+      todayReviewCount: json['today_review_count'] as int? ?? 0,
+      masteredCount: json['mastered_count'] as int? ?? 0,
+      needsReviewCount: json['needs_review_count'] as int? ?? 0,
+      needsImproveCount: json['needs_improve_count'] as int? ?? 0,
+      notMasteredCount: json['not_mastered_count'] as int? ?? 0,
+      totalCardsCount: json['total_cards_count'] as int? ?? 0,
+      streakDays: json['streak_days'] as int? ?? 0,
+      activeDays7d: json['active_days_7d'] as int? ?? 0,
+      weekCompleted: json['week_completed'] as int? ?? 0,
+      weekTarget: json['week_target'] as int? ?? 0,
+      trend7d: trendRaw
+          .whereType<Map<String, dynamic>>()
+          .map(DailyStudyCount.fromJson)
+          .toList(growable: false),
+    );
+  }
+
+  final int todayReviewCount;
+  final int masteredCount;
+  final int needsReviewCount;
+  final int needsImproveCount;
+  final int notMasteredCount;
+  final int totalCardsCount;
+  final int streakDays;
+  final int activeDays7d;
+  final int weekCompleted;
+  final int weekTarget;
+  final List<DailyStudyCount> trend7d;
+}
+
 /// 按笔记分类的词条统计模型
 class CardsByNoteItem {
   const CardsByNoteItem({

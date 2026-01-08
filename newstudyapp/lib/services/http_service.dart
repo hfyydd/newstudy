@@ -426,6 +426,18 @@ class HttpService {
     }
   }
 
+  /// 获取首页学习统计
+  Future<HomeStatisticsResponse> getHomeStatistics() async {
+    try {
+      final response = await _dio.get(ApiConfig.homeStatistics);
+      return HomeStatisticsResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // ==================== 通用请求方法 ====================
 
   /// 通用 GET 请求

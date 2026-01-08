@@ -17,12 +17,20 @@ class HomeController extends GetxController {
   final RxInt todayReviewCount = 0.obs;
   final RxInt needsReviewCount = 0.obs;
   final RxInt needsImproveCount = 0.obs;
+  final RxInt masteredCount = 0.obs;
+  final RxInt notMasteredCount = 0.obs;
+  final RxInt totalCardsCount = 0.obs;
+  final RxInt streakDays = 0.obs;
+  final RxInt activeDays7d = 0.obs;
+  final RxInt weekCompleted = 0.obs;
+  final RxInt weekTarget = 30.obs;
+  final RxList<DailyStudyCount> trend7d = <DailyStudyCount>[].obs;
 
   @override
   void onInit() {
     super.onInit();
     loadNotes();
-    loadReviewSummary();
+    loadHomeStatistics();
   }
 
   @override
@@ -53,18 +61,34 @@ class HomeController extends GetxController {
     }
   }
 
-  /// 加载今日复习概要
-  Future<void> loadReviewSummary() async {
+  /// 加载首页学习统计
+  Future<void> loadHomeStatistics() async {
     try {
-      final statistics = await _httpService.getStudyCenterStatistics();
+      final statistics = await _httpService.getHomeStatistics();
       todayReviewCount.value = statistics.todayReviewCount;
       needsReviewCount.value = statistics.needsReviewCount;
       needsImproveCount.value = statistics.needsImproveCount;
+      masteredCount.value = statistics.masteredCount;
+      notMasteredCount.value = statistics.notMasteredCount;
+      totalCardsCount.value = statistics.totalCardsCount;
+      streakDays.value = statistics.streakDays;
+      activeDays7d.value = statistics.activeDays7d;
+      weekCompleted.value = statistics.weekCompleted;
+      weekTarget.value = statistics.weekTarget;
+      trend7d.value = statistics.trend7d;
     } catch (e) {
       // 如果API调用失败，使用假数据作为降级方案
       todayReviewCount.value = 0;
       needsReviewCount.value = 0;
       needsImproveCount.value = 0;
+      masteredCount.value = 0;
+      notMasteredCount.value = 0;
+      totalCardsCount.value = 0;
+      streakDays.value = 0;
+      activeDays7d.value = 0;
+      weekCompleted.value = 0;
+      weekTarget.value = 30;
+      trend7d.value = [];
       debugPrint('加载今日复习概要失败: $e');
     }
   }

@@ -78,6 +78,11 @@ class ApiConfig {
   /// 按笔记分类获取词条列表
   static const String cardsByNote = '/study-center/cards-by-note';
 
+  // ==================== 首页学习统计 ====================
+
+  /// 获取首页学习统计数据（含趋势、streak、周进度）
+  static const String homeStatistics = '/home/statistics';
+
   // ==================== 辅助方法 ====================
 
   /// 构建完整的 API URL

@@ -5,6 +5,7 @@ import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
+import 'package:newstudyapp/models/note_models.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -63,16 +64,12 @@ class _HomePageState extends State<HomePage>
                 _buildTodayReviewCard(isDark),
                 const SizedBox(height: 24),
 
-                // 我的笔记区域
-                _buildNotesSection(isDark),
-                const SizedBox(height: 24),
-
                 // 学习统计
                 _buildStatsSection(isDark),
                 const SizedBox(height: 24),
 
-                // 测试按钮
-                _buildTestButton(isDark),
+                // 我的笔记区域（放在学习统计之后，降低权重）
+                _buildNotesSection(isDark),
                 const SizedBox(height: 100),
               ],
             ),
@@ -533,8 +530,6 @@ class _HomePageState extends State<HomePage>
                       note: note,
                     ),
                   )),
-              const SizedBox(height: 12),
-              _buildAddNoteButton(isDark),
             ],
           );
         }),
@@ -578,8 +573,6 @@ class _HomePageState extends State<HomePage>
               color: secondaryColor,
             ),
           ),
-          const SizedBox(height: 24),
-          _buildAddNoteButton(isDark),
         ],
       ),
     );
@@ -749,166 +742,333 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildAddNoteButton(bool isDark) {
-    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
-    final iconColor = isDark ? Colors.grey[600] : Colors.grey[500];
-
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: borderColor!, width: 1, style: BorderStyle.solid),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add_circle_outline, color: iconColor, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              '创建新笔记',
-              style: TextStyle(
-                  color: iconColor, fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildStatsSection(bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '学习统计',
-          style: TextStyle(
-              fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-                child: _buildStatCard(
-                    isDark,
-                    Icons.local_fire_department_rounded,
-                    '7',
-                    '连续天数',
-                    const Color(0xFFFF6B6B))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _buildStatCard(isDark, Icons.psychology_rounded, '25',
-                    '已掌握', AppTheme.statusMastered)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-                child: _buildStatCard(isDark, Icons.timer_outlined, '2.5h',
-                    '累计时长', const Color(0xFFFFD93D))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _buildStatCard(isDark, Icons.library_books_outlined,
-                    '50', '累计学习', const Color(0xFF95E1D3))),
-          ],
-        ),
-      ],
-    );
+    return Obx(() {
+      final streak = _homeController.streakDays.value;
+      final active7d = _homeController.activeDays7d.value;
+      final trend = _homeController.trend7d.toList();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '学习统计',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 只保留节奏相关指标，拆分为两个卡片：连续学习 & 近7天活跃
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  isDark: isDark,
+                  icon: Icons.local_fire_department_rounded,
+                  title: '连续学习',
+                  value: '${streak}天',
+                  subtitle: '保持学习习惯',
+                  color: const Color(0xFFFF6B6B),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricCard(
+                  isDark: isDark,
+                  icon: Icons.event_available_outlined,
+                  title: '近7天活跃',
+                  value: '$active7d天',
+                  subtitle: '最近一周学习天数',
+                  color: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildTrendCard(isDark: isDark, trend: trend),
+        ],
+      );
+    });
   }
 
-  Widget _buildStatCard(
-      bool isDark, IconData icon, String value, String label, Color color) {
+  Widget _buildMetricCard({
+    required bool isDark,
+    required IconData icon,
+    required String title,
+    required String value,
+    required String subtitle,
+    required Color color,
+    double? progress,
+  }) {
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor!, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const Spacer(),
+              if (progress != null)
+                Text(
+                  '${(progress * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    color: secondaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-                height: 1),
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+              height: 1,
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: secondaryColor)),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: TextStyle(fontSize: 13, color: secondaryColor),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 12, color: secondaryColor),
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 8),
+            _buildProgressBar(isDark: isDark, progress: progress, color: color),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildTestButton(bool isDark) {
+  Widget _buildProgressMetricCard({
+    required bool isDark,
+    required IconData icon,
+    required String title,
+    required String value,
+    required String subtitle,
+    required Color color,
+    required double progress,
+  }) {
+    return _buildMetricCard(
+      isDark: isDark,
+      icon: icon,
+      title: title,
+      value: value,
+      subtitle: subtitle,
+      color: color,
+      progress: progress,
+    );
+  }
+
+  Widget _buildProgressBar({
+    required bool isDark,
+    required double progress,
+    required Color color,
+  }) {
+    final bgColor = isDark ? Colors.grey[800] : Colors.grey[200];
+    return Container(
+      height: 8,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: FractionallySizedBox(
+        alignment: Alignment.centerLeft,
+        widthFactor: progress.clamp(0.0, 1.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrendCard({
+    required bool isDark,
+    required List<DailyStudyCount> trend,
+  }) {
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
-    final iconColor = isDark ? Colors.grey[500] : Colors.grey[600];
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
+    final maxCount = trend.isNotEmpty
+        ? trend.map((e) => e.count).reduce((a, b) => a > b ? a : b)
+        : 0;
+    final safeMax = maxCount == 0 ? 1 : maxCount;
+    const double chartHeight = 96;
+    const double barMaxHeight = 60;
+
+    // 计算纵轴刻度值（显示3-4个刻度点）
+    List<int> yAxisTicks = [];
+    if (safeMax > 0) {
+      // 向上取整到合适的值
+      int roundedMax = safeMax;
+      if (safeMax <= 5) {
+        roundedMax = 5;
+        yAxisTicks = [0, 2, 4, 5];
+      } else if (safeMax <= 10) {
+        roundedMax = 10;
+        yAxisTicks = [0, 5, 10];
+      } else if (safeMax <= 20) {
+        roundedMax = 20;
+        yAxisTicks = [0, 10, 20];
+      } else if (safeMax <= 50) {
+        roundedMax = ((safeMax / 10).ceil() * 10);
+        int step = roundedMax ~/ 4;
+        yAxisTicks = [0, step, step * 2, step * 3, roundedMax];
+      } else {
+        roundedMax = ((safeMax / 20).ceil() * 20);
+        int step = roundedMax ~/ 4;
+        yAxisTicks = [0, step, step * 2, step * 3, roundedMax];
+      }
+    } else {
+      yAxisTicks = [0, 1];
+    }
+
+    // 获取用于计算柱状图高度的最大值（使用纵轴刻度的最大值）
+    final chartMax =
+        yAxisTicks.isNotEmpty ? yAxisTicks.last.toDouble() : safeMax;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor!, width: 1),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.science_outlined, color: iconColor, size: 20),
-              const SizedBox(width: 8),
               Text(
-                '测试功能',
+                '近7天学习趋势',
                 style: TextStyle(
-                    fontSize: 14,
-                    color: iconColor,
-                    fontWeight: FontWeight.w600),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '学习次数',
+                style: TextStyle(fontSize: 12, color: secondaryColor),
               ),
             ],
           ),
           const SizedBox(height: 12),
           SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Get.toNamed(AppRoutes.feynmanLearning);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.darkPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
-              ),
-              child: const Text(
-                '跳转到闪词学习页面',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
+            height: chartHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 纵轴刻度标签
+                SizedBox(
+                  width: 30,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: yAxisTicks.reversed.map((tick) {
+                      return Text(
+                        '$tick',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: secondaryColor,
+                          height: 1.0,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 图表区域（带参考线）
+                Expanded(
+                  child: Stack(
+                    children: [
+                      // 参考线
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: yAxisTicks.reversed.map((tick) {
+                          return Container(
+                            height: 1,
+                            color: (secondaryColor ?? Colors.grey)
+                                .withOpacity(0.2),
+                          );
+                        }).toList(),
+                      ),
+                      // 柱状图
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: trend.map((item) {
+                          final barHeight =
+                              (item.count / chartMax) * barMaxHeight;
+                          return Expanded(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    height: barHeight.clamp(0, barMaxHeight),
+                                    decoration: BoxDecoration(
+                                      color: (isDark
+                                              ? AppTheme.darkPrimary
+                                              : AppTheme.lightPrimary)
+                                          .withOpacity(0.9),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    item.date.substring(5),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: secondaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
