@@ -1,19 +1,25 @@
 # NewStudy 项目
 
-一个集成了 AI 智能学习助手的前后端分离应用。
+一个集成了 AI 智能学习助手的前后端分离应用，支持Docker部署和PostgreSQL数据库。
 
 ## 项目结构
 
 ```
 .
 ├── backend/          # Python FastAPI 后端服务
+│   ├── Dockerfile          # Docker镜像构建文件
+│   ├── docker-compose.yml   # Docker Compose配置
+│   ├── init.sql           # PostgreSQL初始化脚本
+│   └── database_async.py   # PostgreSQL异步数据库实现
 └── newstudyapp/      # Flutter 前端应用
 ```
 
 ## 技术栈
 
-- **后端**: FastAPI + Python 3.13+ + LangChain
+- **后端**: FastAPI + Python 3.13+ + LangChain + PostgreSQL
 - **前端**: Flutter 3.4.0+
+- **数据库**: PostgreSQL 16
+- **容器化**: Docker + Docker Compose
 - **包管理**:
   - 后端: `uv`
   - 前端: `flutter pub`
@@ -37,58 +43,78 @@ git clone <repository-url>
 cd newstudy
 ```
 
-### 2. 后端部署
+### 2. Docker部署（推荐）
 
-#### 2.1 安装依赖
+#### 2.1 环境配置
+
+复制环境变量模板文件：
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+编辑 `backend/.env` 文件：
+
+```env
+# AI配置
+BASE_URL=https://api.moonshot.cn/v1
+API_KEY=your-api-key-here
+MODEL=kimi-k2-turbo-preview
+
+# 数据库配置
+DATABASE_URL=postgresql+asyncpg://newstudy_user:newstudy_password@localhost:5432/newstudy
+```
+
+#### 2.2 启动Docker服务
+
+```bash
+cd backend
+docker-compose up -d
+```
+
+这将启动：
+- PostgreSQL数据库（端口5432）
+- FastAPI后端（端口8000）
+- Redis缓存（端口6379）
+
+#### 2.3 验证服务
+
+```bash
+# 查看服务状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f
+
+# 测试API
+curl http://localhost:8000/docs
+```
+
+### 3. 本地开发部署
+
+#### 3.1 后端部署
+
+安装依赖：
 
 ```bash
 cd backend
 uv sync
 ```
 
-#### 2.2 配置环境变量
+配置环境变量（同Docker部署）
 
-复制环境变量模板文件：
-
-```bash
-cp .env.example .env
-```
-
-编辑 `.env` 文件，配置你的 API key：
-
-```env
-BASE_URL=https://api.moonshot.cn/v1
-API_KEY=your-api-key-here
-MODEL=kimi-k2-turbo-preview
-```
-
-**注意**: `.env` 文件不会被提交到 Git，请妥善保管你的 API key。
-
-#### 2.3 启动后端服务
+启动后端服务：
 
 ```bash
 # 使用 uv 运行
 uv run uvicorn server:app --reload --host 0.0.0.0 --port 8000
-
-# 或者先激活虚拟环境
-uv venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate    # Windows
-uvicorn server:app --reload --host 0.0.0.0 --port 8000
 ```
 
-后端服务将运行在 `http://localhost:8000`
-
-#### 2.4 验证后端服务
+#### 3.2 验证后端服务
 
 访问 API 文档：
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
-
-测试 API 健康状态：
-```bash
-curl http://localhost:8000/docs
-```
 
 ### 3. 前端部署
 
@@ -229,19 +255,59 @@ flutter upgrade
 
 ## 生产部署
 
-### 后端生产部署
+### Docker生产部署（推荐）
 
-建议使用以下方式部署：
+#### 1. 创建生产配置
 
 ```bash
-# 使用 gunicorn 作为 WSGI 服务器（需额外安装）
+# 复制生产环境配置
+cp backend/docker-compose.yml backend/docker-compose.prod.yml
+```
+
+#### 2. 配置生产环境变量
+
+创建 `.env.prod` 文件：
+
+```env
+API_KEY=your-production-api-key
+DB_USER=your_db_user
+DB_PASSWORD=your_secure_password
+BASE_URL=https://api.moonshot.cn/v1
+MODEL=kimi-k2-turbo-preview
+```
+
+#### 3. 启动生产服务
+
+```bash
+cd backend
+docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
+### 传统部署
+
+```bash
+# 使用 gunicorn 作为 WSGI 服务器
 pip install gunicorn
 gunicorn server:app -w 4 -k uvicorn.workers.UvicornWorker
+```
 
-# 或使用 Docker
-# (需要创建 Dockerfile)
-docker build -t backend .
-docker run -p 8000:8000 --env-file .env backend
+### 数据库迁移
+
+从SQLite迁移到PostgreSQL：
+
+```bash
+cd backend
+uv run python migrate_to_postgresql.py
+```
+
+数据备份和恢复：
+
+```bash
+# 备份数据库
+uv run python backup_restore.py backup
+
+# 恢复数据库
+uv run python backup_restore.py restore
 ```
 
 ### 前端生产构建

@@ -33,6 +33,16 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health_check():
+    """健康检查接口"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(),
+        "database": "sqlite",
+    }
+
+
 class AgentRequest(BaseModel):
     text: str = Field(..., min_length=1, description="用户输入文本")
 

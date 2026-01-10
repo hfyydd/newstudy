@@ -7,9 +7,16 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
+# AI配置
 base_url = os.getenv("BASE_URL", "https://api.moonshot.cn/v1")
 api_key = os.getenv("API_KEY", "")
 model = os.getenv("MODEL", "kimi-k2-turbo-preview")
+
+# 数据库配置
+database_url = os.getenv(
+    "DATABASE_URL", 
+    "postgresql+asyncpg://newstudy_user:newstudy_password@localhost:5432/newstudy"
+)
 
 # 注意：
 # 这里不要在 import 阶段直接抛错，否则服务无法启动（即使只想用不依赖 LLM 的功能）。

@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库服务
+  postgres:
+    image: postgres:16-alpine
+    container_name: newstudy_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: newstudy
+      POSTGRES_USER: newstudy_user
+      POSTGRES_PASSWORD: newstudy_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newstudy_user -d newstudy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI后端服务
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: newstudy_backend
+    restart: unless-stopped
+    environment:
+      # 数据库配置
+      DATABASE_URL: postgresql+asyncpg://newstudy_user:newstudy_password@postgres:5432/newstudy
+      # AI配置
+      BASE_URL: https://api.moonshot.cn/v1
+      API_KEY: ${API_KEY}
+      MODEL: kimi-k2-turbo-preview
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis缓存服务（可选）
+  redis:
+    image: redis:7-alpine
+    container_name: newstudy_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: newstudy_network
