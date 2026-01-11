@@ -12,7 +12,7 @@ class ApiConfig {
   /// Windows: ipconfig
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.1.105:8000',
+    defaultValue: 'http://192.168.101.26:8000',
   );
 
   // ==================== Agent 相关接口 ====================
@@ -65,6 +65,10 @@ class ApiConfig {
   /// 更新闪词卡片状态
   static String updateFlashCardStatus(String noteId) =>
       '/notes/$noteId/flash-cards/status';
+
+  /// 添加困惑词到闪词卡片
+  static String addConfusedTerms(String noteId) =>
+      '/notes/$noteId/flash-cards/add-terms';
 
   /// 获取学习统计
   static const String getStatistics = '/statistics';

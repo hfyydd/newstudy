@@ -10,7 +10,7 @@ class FeynmanLearningController extends GetxController {
   // 使用 HttpService 单例
   final httpService = HttpService();
   late final FeynmanLearningState state;
-  
+
   // 语音识别事件订阅
   StreamSubscription<SpeechRecognizerEvent>? _speechEventSubscription;
 
@@ -20,7 +20,7 @@ class FeynmanLearningController extends GetxController {
     state = FeynmanLearningState();
     _initializeSpeech();
     _setupSpeechEventListeners();
-    
+
     // 从路由参数获取主题信息
     final arguments = Get.arguments as Map<String, dynamic>?;
     if (arguments != null) {
@@ -47,10 +47,12 @@ class FeynmanLearningController extends GetxController {
 
       state.topicName.value = arguments['topic'] as String?;
       // 优先使用 noteId，如果没有则使用 topicId
-      state.topicId.value = arguments['noteId'] as String? ?? arguments['topicId'] as String?;
-      
+      state.topicId.value =
+          arguments['noteId'] as String? ?? arguments['topicId'] as String?;
+
       // 使用 topicId 作为 category 加载词汇
-      final category = state.topicId.value ?? FeynmanLearningState.defaultCategory;
+      final category =
+          state.topicId.value ?? FeynmanLearningState.defaultCategory;
       state.activeCategory.value = category;
       loadTerms(category: category);
     } else {
@@ -153,7 +155,7 @@ class FeynmanLearningController extends GetxController {
   Future<void> _updateCardStatusOnSuccess() async {
     final noteId = state.topicId.value;
     final currentTerm = state.currentExplainingTerm.value;
-    
+
     if (noteId == null || currentTerm == null) {
       debugPrint('[FeynmanLearningController] 无法自动更新状态：noteId或term为空');
       return;
@@ -163,7 +165,7 @@ class FeynmanLearningController extends GetxController {
       // 学习成功，设置为已掌握
       await httpService.updateFlashCardStatus(noteId, currentTerm, 'mastered');
       debugPrint('[FeynmanLearningController] 学习成功，已自动标记为掌握: $currentTerm');
-      
+
       // 添加到已掌握集合（用于UI显示）
       state.masteredTerms.add(currentTerm);
     } catch (e) {
@@ -176,7 +178,7 @@ class FeynmanLearningController extends GetxController {
   Future<void> _updateCardStatusOnFailure() async {
     final noteId = state.topicId.value;
     final currentTerm = state.currentExplainingTerm.value;
-    
+
     if (noteId == null || currentTerm == null) {
       debugPrint('[FeynmanLearningController] 无法自动更新状态：noteId或term为空');
       return;
@@ -188,7 +190,8 @@ class FeynmanLearningController extends GetxController {
       // 如果词条当前状态是needsImprove，升级为needsReview（更困难）
       // 如果词条当前状态是mastered，降级为needsReview（复习时又困难了）
       // 如果词条当前状态是needsReview，保持needsReview
-      await httpService.updateFlashCardStatus(noteId, currentTerm, 'needsReview');
+      await httpService.updateFlashCardStatus(
+          noteId, currentTerm, 'needsReview');
       debugPrint('[FeynmanLearningController] 学习失败，已自动标记为需要复习: $currentTerm');
     } catch (e) {
       debugPrint('[FeynmanLearningController] 自动更新状态失败: $e');
@@ -216,10 +219,10 @@ class FeynmanLearningController extends GetxController {
     try {
       // 调用后端API更新状态
       await httpService.updateFlashCardStatus(noteId, term, 'mastered');
-      
+
       // 添加到已掌握集合（用于UI显示）
       state.masteredTerms.add(term);
-      
+
       Get.snackbar(
         '成功',
         '已标记为掌握',
@@ -228,10 +231,10 @@ class FeynmanLearningController extends GetxController {
         colorText: Colors.white,
         icon: const Icon(Icons.check_circle, color: Colors.white),
       );
-      
+
       // 不删除词条，保留在列表中但标记为已掌握
       // 这样用户翻回来时还能看到，但会显示为已掌握状态
-      
+
       // 继续下一张卡片
       nextCard();
     } catch (e) {
@@ -265,11 +268,33 @@ class FeynmanLearningController extends GetxController {
     state.currentExplainingTerm.value = term;
     state.learningPhase.value = LearningPhase.explaining;
     state.explanationHistory.add(term);
-    
+
     // 切换到解释视图状态
     state.isExplanationViewVisible.value = true;
     state.inputMode.value = InputMode.voice;
     state.textInputController.clear();
+  }
+
+  /// 保存困惑词到闪词卡片
+  Future<void> _saveConfusedTermsToFlashCards(List<String> terms) async {
+    final noteId = state.topicId.value;
+    if (noteId == null || noteId.isEmpty) {
+      debugPrint('[FeynmanLearningController] 无法保存困惑词: noteId为空');
+      return;
+    }
+
+    try {
+      debugPrint('[FeynmanLearningController] 保存困惑词到闪卡: $terms');
+      await httpService.addConfusedTerms(
+        noteId,
+        terms,
+        status: 'needsReview',
+      );
+      debugPrint('[FeynmanLearningController] 困惑词保存成功');
+    } catch (e) {
+      debugPrint('[FeynmanLearningController] 保存困惑词失败: $e');
+      // 失败不阻断流程，只打印日志
+    }
   }
 
   void restoreCardView() {
@@ -278,11 +303,11 @@ class FeynmanLearningController extends GetxController {
     state.currentExplainingTerm.value = null;
     state.confusedWords.clear();
     state.explanationHistory.clear();
-    
+
     // 先更新状态
     state.isExplanationViewVisible.value = false;
     state.isExplanationViewVisible.refresh(); // 强制刷新
-    
+
     try {
       state.inputMode.value = InputMode.voice;
       state.textInputController.clear();
@@ -299,10 +324,10 @@ class FeynmanLearningController extends GetxController {
     }
 
     state.isSubmittingSuggestion.value = true;
-    
+
     // 保存用户输入的解释内容，用于页面显示
     state.userExplanation.value = trimmed;
-    
+
     // 保存到解释历史记录中（词汇 -> 解释内容）
     final currentTerm = state.currentExplainingTerm.value;
     if (currentTerm != null) {
@@ -326,7 +351,7 @@ class FeynmanLearningController extends GetxController {
           state.learningPhase.value = LearningPhase.success;
           state.confusedWords.clear();
           state.textInputController.clear();
-          
+
           // 自动更新词条状态为已掌握
           await _updateCardStatusOnSuccess();
         } else {
@@ -344,10 +369,12 @@ class FeynmanLearningController extends GetxController {
       state.confusedWords.value = List.of(extracted);
       state.learningPhase.value = LearningPhase.reviewing;
       state.textInputController.clear();
-      
+
       // 自动更新词条状态为需要复习
       await _updateCardStatusOnFailure();
-      
+
+      // 保存困惑词到闪词卡片
+      await _saveConfusedTermsToFlashCards(extracted);
     } catch (error) {
       Get.snackbar(
         '错误',
@@ -457,7 +484,7 @@ class FeynmanLearningController extends GetxController {
     if (state.topicName.value != null) {
       return state.topicName.value!;
     }
-    
+
     // 否则根据 category 返回显示名称
     switch (state.activeCategory.value) {
       case 'economics':
@@ -535,15 +562,15 @@ class FeynmanLearningController extends GetxController {
       state.isAppending.value = false;
     }
   }
-  
+
   // ========== 学习流程方法 ==========
-  
+
   /// 选择一个不清楚的词汇继续解释
   void selectConfusedWord(String word) {
     // 清除上一轮的解释内容
     state.userExplanation.value = null;
     state.confusedWords.clear();
-    
+
     // 设置新的解释词汇
     state.currentExplainingTerm.value = word;
     state.explanationHistory.add(word);
@@ -551,23 +578,25 @@ class FeynmanLearningController extends GetxController {
     state.inputMode.value = InputMode.voice;
     state.textInputController.clear();
   }
-  
+
   /// 获取词汇的辅助解释（可选功能）
   Future<void> getWordExplanation(String word) async {
     // 如果已经缓存了，直接返回
     if (state.wordExplanations.containsKey(word)) {
       return;
     }
-    
+
     state.isLoadingExplanation.value = true;
-    
+
     try {
       // 构造请求：包含词汇和上下文
-      final requestText = '{"words": ["<$word>"], "original_context": "${state.currentExplainingTerm.value ?? word}"}';
+      final requestText =
+          '{"words": ["<$word>"], "original_context": "${state.currentExplainingTerm.value ?? word}"}';
       final response = await httpService.runSimpleExplainer(requestText);
-      
-      debugPrint('[FeynmanLearningController] Explanation reply: ${response.reply}');
-      
+
+      debugPrint(
+          '[FeynmanLearningController] Explanation reply: ${response.reply}');
+
       // 解析响应
       final explanation = _parseExplanation(response.reply, word);
       if (explanation != null) {
@@ -584,13 +613,13 @@ class FeynmanLearningController extends GetxController {
       state.isLoadingExplanation.value = false;
     }
   }
-  
+
   /// 解析辅助解释响应
   WordExplanation? _parseExplanation(String reply, String word) {
     try {
       final jsonBlock = _extractJsonBlock(reply);
       if (jsonBlock == null) return null;
-      
+
       final decoded = jsonDecode(jsonBlock);
       if (decoded is Map<String, dynamic>) {
         final explanations = decoded['explanations'];
@@ -609,22 +638,22 @@ class FeynmanLearningController extends GetxController {
     }
     return null;
   }
-  
+
   /// 完成学习，返回卡片选择界面
   void finishLearning() {
     // 注意：不再从列表中移除词条，因为状态已经更新到数据库
     // 词条会保留在列表中，但会显示为已掌握状态
-    
+
     // 重置学习状态
     state.resetLearningState();
     state.isExplanationViewVisible.value = false;
     state.inputMode.value = InputMode.voice;
     state.textInputController.clear();
-    
+
     // 如果列表为空，补充新词汇
     maybeReplenishDeck();
   }
-  
+
   /// 中途退出学习
   void cancelLearning() {
     state.resetLearningState();
@@ -645,13 +674,14 @@ class FeynmanLearningController extends GetxController {
         debugPrint('[SpeechRecognizer] Already available');
         return;
       }
-      
+
       // 如果不可用，尝试初始化
       final available = await SpeechRecognizerService.initialize();
       state.speechAvailable.value = available;
       if (!available) {
         // 初始化失败，但不阻止使用（可能是权限问题，稍后可以重试）
-        debugPrint('[SpeechRecognizer] Initialize returned false, but will allow retry');
+        debugPrint(
+            '[SpeechRecognizer] Initialize returned false, but will allow retry');
         // 仍然设置为 true，允许用户尝试使用
         state.speechAvailable.value = true;
       } else {
@@ -741,4 +771,3 @@ class _ExtractionResult {
   static _ExtractionResult empty() =>
       const _ExtractionResult(terms: <String>[], isClear: false);
 }
-

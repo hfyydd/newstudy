@@ -6,12 +6,12 @@ import 'package:newstudyapp/models/note_models.dart';
 import 'package:newstudyapp/pages/note_detail/note_detail_state.dart';
 
 /// HTTP 网络请求服务（单例模式）
-/// 
+///
 /// 单例模式实现原理：
 /// 1. 私有构造函数 `_internal()` - 防止外部直接创建实例
 /// 2. 静态私有实例 `_instance` - 保存唯一的实例对象
 /// 3. 工厂构造函数 `factory HttpService()` - 对外暴露的唯一入口，总是返回同一实例
-/// 
+///
 /// 优势：
 /// - 全局唯一：整个应用中只有一个 HttpService 实例
 /// - 线程安全：Dart 保证静态变量初始化的线程安全性
@@ -22,13 +22,13 @@ class HttpService {
   // 每次调用 HttpService() 都会返回 _instance，不会创建新对象
   // 使用方式：final http = HttpService();
   factory HttpService() => _instance;
-  
+
   // 静态私有实例：全局唯一的 HttpService 对象
   // static - 属于类本身，不属于任何实例
   // final - 一旦赋值不可修改
   // 这行代码只会执行一次，在类首次使用时初始化
   static final HttpService _instance = HttpService._internal();
-  
+
   // Dio 实例：用于发送 HTTP 请求
   late final Dio _dio;
 
@@ -124,7 +124,8 @@ class HttpService {
           'max_terms': maxTerms,
         },
       );
-      return NoteExtractResponse.fromJson(response.data as Map<String, dynamic>);
+      return NoteExtractResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -149,7 +150,8 @@ class HttpService {
         data: formData,
         // 注意：不要手动设置 Content-Type，Dio 会自动设置正确的 multipart/form-data 头（包括 boundary）
       );
-      return NoteExtractResponse.fromJson(response.data as Map<String, dynamic>);
+      return NoteExtractResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -239,15 +241,15 @@ class HttpService {
     try {
       debugPrint('[HttpService] 准备删除笔记，noteId: $noteId');
       debugPrint('[HttpService] 删除接口URL: ${ApiConfig.deleteNote(noteId)}');
-      
+
       final response = await _dio.delete(
         ApiConfig.deleteNote(noteId),
       );
-      
+
       // 打印响应以便调试
       debugPrint('[HttpService] 删除笔记响应状态码: ${response.statusCode}');
       debugPrint('[HttpService] 删除笔记响应数据: ${response.data}');
-      
+
       // 验证响应
       if (response.statusCode != 200 && response.statusCode != 204) {
         throw Exception('删除失败：状态码 ${response.statusCode}');
@@ -276,7 +278,8 @@ class HttpService {
           'max_terms': maxTerms,
         },
       );
-      return FlashCardGenerateResponse.fromJson(response.data as Map<String, dynamic>);
+      return FlashCardGenerateResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -288,7 +291,8 @@ class HttpService {
       final response = await _dio.get(
         ApiConfig.getFlashCards(noteId),
       );
-      return FlashCardListResponse.fromJson(response.data as Map<String, dynamic>);
+      return FlashCardListResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -325,6 +329,29 @@ class HttpService {
     }
   }
 
+  /// 添加困惑词到闪词卡片
+  Future<void> addConfusedTerms(
+    String noteId,
+    List<String> terms, {
+    String status = 'needsReview',
+  }) async {
+    try {
+      debugPrint(
+          '[HttpService] 添加困惑词: noteId=$noteId, terms=$terms, status=$status');
+      await _dio.post(
+        ApiConfig.addConfusedTerms(noteId),
+        data: {
+          'terms': terms,
+          'status': status,
+        },
+      );
+      debugPrint('[HttpService] 困惑词添加成功');
+    } on DioException catch (e) {
+      debugPrint('[HttpService] 添加困惑词失败: $e');
+      throw _handleError(e);
+    }
+  }
+
   // ==================== 学习统计接口 ====================
 
   /// 获取学习统计
@@ -332,8 +359,10 @@ class HttpService {
     try {
       debugPrint('[HttpService] 获取学习统计: ${ApiConfig.getStatistics}');
       final response = await _dio.get(ApiConfig.getStatistics);
-      debugPrint('[HttpService] 获取学习统计响应: ${response.statusCode} ${response.data}');
-      return LearningStatisticsResponse.fromJson(response.data as Map<String, dynamic>);
+      debugPrint(
+          '[HttpService] 获取学习统计响应: ${response.statusCode} ${response.data}');
+      return LearningStatisticsResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       debugPrint('[HttpService] 获取学习统计失败: $e');
       throw _handleError(e);
@@ -343,10 +372,13 @@ class HttpService {
   /// 获取今日复习统计
   Future<TodayReviewStatisticsResponse> getTodayReviewStatistics() async {
     try {
-      debugPrint('[HttpService] 获取今日复习统计: ${ApiConfig.getTodayReviewStatistics}');
+      debugPrint(
+          '[HttpService] 获取今日复习统计: ${ApiConfig.getTodayReviewStatistics}');
       final response = await _dio.get(ApiConfig.getTodayReviewStatistics);
-      debugPrint('[HttpService] 获取今日复习统计响应: ${response.statusCode} ${response.data}');
-      return TodayReviewStatisticsResponse.fromJson(response.data as Map<String, dynamic>);
+      debugPrint(
+          '[HttpService] 获取今日复习统计响应: ${response.statusCode} ${response.data}');
+      return TodayReviewStatisticsResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       debugPrint('[HttpService] 获取今日复习统计失败: $e');
       throw _handleError(e);
@@ -354,15 +386,18 @@ class HttpService {
   }
 
   /// 获取需要复习的闪词卡片列表
-  Future<ReviewFlashCardsResponse> getReviewFlashCards({bool includeAll = false}) async {
+  Future<ReviewFlashCardsResponse> getReviewFlashCards(
+      {bool includeAll = false}) async {
     try {
-      final url = includeAll 
+      final url = includeAll
           ? '${ApiConfig.getReviewFlashCards}?include_all=true'
           : ApiConfig.getReviewFlashCards;
       debugPrint('[HttpService] 获取复习卡片列表: $url');
       final response = await _dio.get(url);
-      debugPrint('[HttpService] 获取复习卡片列表响应: ${response.statusCode} ${response.data}');
-      return ReviewFlashCardsResponse.fromJson(response.data as Map<String, dynamic>);
+      debugPrint(
+          '[HttpService] 获取复习卡片列表响应: ${response.statusCode} ${response.data}');
+      return ReviewFlashCardsResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       debugPrint('[HttpService] 获取复习卡片列表失败: $e');
       throw _handleError(e);

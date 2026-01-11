@@ -530,76 +530,66 @@ def generate_flash_cards(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@app.get("/notes/{note_id}/flash-cards", response_model=FlashCardListResponse)
-def get_flash_cards(note_id: str) -> FlashCardListResponse:
-    """
-    获取笔记的闪词卡片列表
+class AddTermsRequest(BaseModel):
+    terms: List[str] = Field(..., min_length=1, description="要添加的困惑词列表")
+    status: str = Field(default="needsReview", description="学习状态")
+
+
+@app.post("/notes/{note_id}/flash-cards/add-terms", response_model=FlashCardGenerateResponse)
+def add_confused_terms(
+    note_id: str,
+    request: AddTermsRequest,
+) -> FlashCardGenerateResponse:
+    """将困惑词添加到闪词卡片
     
-    返回笔记的所有闪词卡片词条列表。
+    当用户解释一个词但AI判断仍有困惑时，将这些困惑词添加到闪卡中。
+    这些词会在用户继续学习时成为复习重点。
     """
     # 检查笔记是否存在
     note = db.get_note(note_id)
     if not note:
         raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
-
-    try:
-        cards = db.get_flash_cards(note_id)
-        terms = [card.term for card in cards]
-        return FlashCardListResponse(
-            note_id=note_id,
-            terms=terms,
-            total=len(terms),
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-class FlashCardStatusUpdateRequest(BaseModel):
-    """更新闪词卡片状态请求模型"""
-    term: str = Field(..., description="词条")
-    status: str = Field(..., description="学习状态：notStarted, needsReview, needsImprove, mastered")
-
-
-@app.put("/notes/{note_id}/flash-cards/status", response_model=dict)
-def update_flash_card_status(
-    note_id: str,
-    payload: FlashCardStatusUpdateRequest,
-) -> dict:
-    """
-    更新闪词卡片的学习状态
     
-    用于标记卡片为已掌握、待复习等状态。
-    """
-    note = db.get_note(note_id)
-    if not note:
-        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
-
-    # 验证状态值
-    valid_statuses = ["notStarted", "needsReview", "needsImprove", "mastered"]
-    if payload.status not in valid_statuses:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效的状态值。允许的值: {', '.join(valid_statuses)}"
-        )
-
     try:
-        success = db.update_flash_card_status(
-            note_id=note_id,
-            term=payload.term,
-            status=payload.status,
-        )
-        
-        if not success:
+        # 验证状态值
+        valid_statuses = ["notStarted", "needsReview", "needsImprove", "mastered"]
+        if request.status not in valid_statuses:
             raise HTTPException(
-                status_code=404,
-                detail=f"未找到词条 '{payload.term}' 的闪词卡片"
+                status_code=400,
+                detail=f"无效的状态值。允许的值: {', '.join(valid_statuses)}"
             )
         
-        return {
-            "success": True,
-            "message": f"已更新词条 '{payload.term}' 的状态为 '{payload.status}'"
-        }
-    except Exception as exc:
+        # 清理词汇（移除尖括号等）
+        cleaned_terms = []
+        for term in request.terms:
+            # 移除尖括号和空格
+            cleaned = term.replace("<", "").replace(">", "").strip()
+            if cleaned and cleaned not in cleaned_terms:
+                cleaned_terms.append(cleaned)
+        
+        if not cleaned_terms:
+            raise HTTPException(status_code=400, detail="没有有效的词条可以添加")
+        
+        # 创建闪词卡片
+        new_cards = db.create_flash_cards(note_id, cleaned_terms)
+        
+        # 更新状态（使用 note_id 和 term）
+        for card in new_cards:
+            if request.status != "notStarted":
+                db.update_flash_card_status(note_id, card.term, request.status)
+        
+        # 获取所有词条
+        all_cards = db.get_flash_cards(note_id)
+        all_terms = [card.term for card in all_cards]
+        
+        return FlashCardGenerateResponse(
+            note_id=note_id,
+            terms=all_terms,
+            total=len(all_terms),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
