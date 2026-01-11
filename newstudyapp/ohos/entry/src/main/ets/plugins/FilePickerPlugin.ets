@@ -132,23 +132,38 @@ export class FilePickerPlugin {
             
             documentSelectResult.forEach((uri: string) => {
               try {
-                // 从 URI 获取文件信息
-                const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
-                const stat = fs.statSync(file.fd);
+                hilog.info(0x0000, TAG, "Processing URI: %{public}s", uri);
                 
-                // 拷贝到缓存目录，以便 Flutter 访问
-                const cachedPath = FilePickerPlugin.copyFileToCache(uri);
+                // 确保URI有正确的格式
+                let correctUri = uri;
+                if (!uri.startsWith('file://') && !uri.startsWith('/')) {
+                  // 如果没有 file:// 前缀，尝试直接访问
+                  correctUri = uri;
+                }
+                
+                // 打开文件获取信息
+                const file = fs.openSync(correctUri, fs.OpenMode.READ_ONLY);
+                const stat = fs.statSync(file.fd);
+                hilog.info(0x0000, TAG, "File opened successfully, size: %{public}d", stat.size);
+                
+                // 拷贝到缓存目录
+                const cachedPath = FilePickerPlugin.copyFileToCache(correctUri);
+                hilog.info(0x0000, TAG, "Cached path: %{public}s", cachedPath);
                 
                 // 从 URI 中提取文件名
-                let fileName = uri.split('/').pop() || 'unknown';
+                let fileName = correctUri.split('/').pop() || 'unknown';
                 if (fileName.includes('?')) {
                   fileName = fileName.split('?')[0];
                 }
+                // URL解码
+                try {
+                  fileName = decodeURIComponent(fileName);
+                } catch (e) {}
                 
                 const fileInfoObj: FileInfo = {
                   name: fileName,
                   path: cachedPath,
-                  uri: uri,
+                  uri: correctUri,
                   size: stat.size
                 };
                 fileResults.push(fileInfoObj);
@@ -156,6 +171,7 @@ export class FilePickerPlugin {
                 fs.closeSync(file);
               } catch (fileError) {
                 hilog.error(0x0000, TAG, "Error processing file: %{public}s", (fileError as Error)?.message || "Unknown");
+                hilog.error(0x0000, TAG, "Error details: %{public}s", JSON.stringify(fileError));
               }
             });
             
@@ -184,21 +200,33 @@ export class FilePickerPlugin {
             
             documentSelectResult.forEach((uri: string) => {
               try {
-                const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+                hilog.info(0x0000, TAG, "Processing URI: %{public}s", uri);
+                
+                let correctUri = uri;
+                if (!uri.startsWith('file://') && !uri.startsWith('/')) {
+                  correctUri = uri;
+                }
+                
+                const file = fs.openSync(correctUri, fs.OpenMode.READ_ONLY);
                 const stat = fs.statSync(file.fd);
+                hilog.info(0x0000, TAG, "File opened, size: %{public}d", stat.size);
                 
                 // 拷贝到缓存目录
-                const cachedPath = FilePickerPlugin.copyFileToCache(uri);
+                const cachedPath = FilePickerPlugin.copyFileToCache(correctUri);
+                hilog.info(0x0000, TAG, "Cached path: %{public}s", cachedPath);
                 
                 let fileName = uri.split('/').pop() || 'unknown';
                 if (fileName.includes('?')) {
                   fileName = fileName.split('?')[0];
                 }
+                try {
+                  fileName = decodeURIComponent(fileName);
+                } catch (e) {}
                 
                 const fileInfoObj: FileInfo = {
                   name: fileName,
                   path: cachedPath,
-                  uri: uri,
+                  uri: correctUri,
                   size: stat.size
                 };
                 fileResults.push(fileInfoObj);
@@ -206,6 +234,7 @@ export class FilePickerPlugin {
                 fs.closeSync(file);
               } catch (fileError) {
                 hilog.error(0x0000, TAG, "Error processing file: %{public}s", (fileError as Error)?.message || "Unknown");
+                hilog.error(0x0000, TAG, "Error details: %{public}s", JSON.stringify(fileError));
               }
             });
             
@@ -250,27 +279,40 @@ export class FilePickerPlugin {
           
           photoSelectResult.photoUris.forEach((uri: string) => {
             try {
-              const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+              hilog.info(0x0000, TAG, "Processing image URI: %{public}s", uri);
+              
+              let correctUri = uri;
+              if (!uri.startsWith('file://') && !uri.startsWith('/')) {
+                correctUri = uri;
+              }
+              
+              const file = fs.openSync(correctUri, fs.OpenMode.READ_ONLY);
               const stat = fs.statSync(file.fd);
+              hilog.info(0x0000, TAG, "Image file opened, size: %{public}d", stat.size);
               
               // 拷贝到缓存目录
-              const cachedPath = FilePickerPlugin.copyFileToCache(uri);
+              const cachedPath = FilePickerPlugin.copyFileToCache(correctUri);
+              hilog.info(0x0000, TAG, "Cached path: %{public}s", cachedPath);
               
               let fileName = uri.split('/').pop() || 'image.jpg';
               if (fileName.includes('?')) {
                 fileName = fileName.split('?')[0];
               }
+              try {
+                fileName = decodeURIComponent(fileName);
+              } catch (e) {}
 
               const fileInfoObj: FileInfo = {
                 name: fileName,
                 path: cachedPath,
-                uri: uri,
+                uri: correctUri,
                 size: stat.size
               };
               fileResults.push(fileInfoObj);
               fs.closeSync(file);
             } catch (fileError) {
               hilog.error(0x0000, TAG, "Error processing image: %{public}s", (fileError as Error)?.message || "Unknown");
+              hilog.error(0x0000, TAG, "Error details: %{public}s", JSON.stringify(fileError));
             }
           });
           
@@ -314,22 +356,34 @@ export class FilePickerPlugin {
             
             if (pickerResult && pickerResult.resultCode === 0 && pickerResult.resultUri) {
               const uri = pickerResult.resultUri;
+              hilog.info(0x0000, TAG, "Camera photo URI: %{public}s", uri);
+              
               try {
-                const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+                let correctUri = uri;
+                if (!uri.startsWith('file://') && !uri.startsWith('/')) {
+                  correctUri = uri;
+                }
+                
+                const file = fs.openSync(correctUri, fs.OpenMode.READ_ONLY);
                 const stat = fs.statSync(file.fd);
+                hilog.info(0x0000, TAG, "Photo file opened, size: %{public}d", stat.size);
                 
                 // 拷贝到缓存目录
-                const cachedPath = FilePickerPlugin.copyFileToCache(uri);
+                const cachedPath = FilePickerPlugin.copyFileToCache(correctUri);
+                hilog.info(0x0000, TAG, "Cached path: %{public}s", cachedPath);
                 
                 let fileName = uri.split('/').pop() || 'photo.jpg';
                 if (fileName.includes('?')) {
                   fileName = fileName.split('?')[0];
                 }
+                try {
+                  fileName = decodeURIComponent(fileName);
+                } catch (e) {}
 
                 const fileInfoObj: FileInfo = {
                   name: fileName,
                   path: cachedPath,
-                  uri: uri,
+                  uri: correctUri,
                   size: stat.size
                 };
                 
@@ -337,6 +391,7 @@ export class FilePickerPlugin {
                 result.success([fileInfoObj]);
               } catch (fileError) {
                 hilog.error(0x0000, TAG, "Error processing photo from cameraPicker: %{public}s", (fileError as Error)?.message || "Unknown");
+                hilog.error(0x0000, TAG, "Error details: %{public}s", JSON.stringify(fileError));
                 result.error("FILE_ERROR", (fileError as Error)?.message || "Failed to process captured photo", null);
               }
             } else {
@@ -370,32 +425,51 @@ export class FilePickerPlugin {
     }
 
     try {
+      // 获取缓存目录
       const cacheDir = FilePickerPlugin.context.cacheDir;
-      const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+      hilog.info(0x0000, TAG, "Cache directory: %{public}s", cacheDir);
       
+      // 打开原始文件
+      const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+      hilog.info(0x0000, TAG, "Opened source file: %{public}s", uri);
+      
+      // 从URI中提取文件名（处理URL编码）
       let fileName = uri.split('/').pop() || `file_${Date.now()}`;
       if (fileName.includes('?')) {
         fileName = fileName.split('?')[0];
       }
+      // URL解码文件名
+      try {
+        fileName = decodeURIComponent(fileName);
+      } catch (e) {
+        hilog.warn(0x0000, TAG, "Failed to decode filename: %{public}s", fileName);
+      }
       
+      // 构建目标路径
       const destPath = `${cacheDir}/${fileName}`;
+      hilog.info(0x0000, TAG, "Destination path: %{public}s", destPath);
       
       // 如果目标文件已存在，先删除
       try {
         if (fs.accessSync(destPath)) {
+          hilog.info(0x0000, TAG, "Destination file exists, deleting...");
           fs.unlinkSync(destPath);
         }
       } catch (e) {
         // 忽略 access 或 unlink 错误
+        hilog.info(0x0000, TAG, "Destination file does not exist or delete failed, continue...");
       }
       
+      // 拷贝文件
       fs.copyFileSync(file.fd, destPath);
       fs.closeSync(file);
       
       hilog.info(0x0000, TAG, "File successfully cached to: %{public}s", destPath);
       return destPath;
     } catch (e) {
-      hilog.error(0x0000, TAG, "Failed to copy file to cache: %{public}s", (e as Error).message);
+      hilog.error(0x0000, TAG, "Failed to copy file to cache: %{public}s", (e as Error)?.message || "Unknown");
+      hilog.error(0x0000, TAG, "Error details: %{public}s", JSON.stringify(e));
+      // 如果拷贝失败，尝试返回原始URI
       return uri;
     }
   }
