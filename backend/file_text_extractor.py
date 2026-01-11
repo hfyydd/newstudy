@@ -91,47 +91,42 @@ def extract_text_from_upload(filename: Optional[str], raw: bytes) -> str:
 
     if ext == "pdf":
         try:
-            from pypdf import PdfReader
+            import fitz
         except Exception as exc:  # noqa: BLE001
-            raise ValueError("缺少 PDF 解析依赖 pypdf") from exc
+            raise ValueError("缺少 PDF 解析依赖 PyMuPDF，请运行: pip install PyMuPDF") from exc
 
-        reader = PdfReader(io.BytesIO(raw))
-        parts: list[str] = []
-        has_text = False
-        
-        for i, page in enumerate(reader.pages):
-            try:
-                text = page.extract_text() or ""
+        try:
+            doc = fitz.open(stream=raw, filetype="pdf")
+            parts = []
+            has_text = False
+            
+            for page_num, page in enumerate(doc):
+                text = page.get_text() or ""
                 if text.strip():
                     has_text = True
                     parts.append(text)
-            except Exception:
-                text = ""
-            
-            # 如果这一页没有文本，尝试用OCR（如果有图片）
-            if not text.strip():
-                try:
-                    # 尝试提取页面中的图片并OCR
-                    page_text = _ocr_pdf_page(page, i)
+                else:
+                    page_text = _ocr_pdf_page(page, page_num)
                     if page_text.strip():
                         has_text = True
                         parts.append(page_text)
-                except Exception:
-                    pass
-        
-        result_text = "\n\n".join(parts).strip()
-        
-        # 如果完全没有提取到任何文本
-        if not result_text:
-            raise ValueError(
-                "无法从PDF中提取到文本内容。"
-                "这可能是因为："
-                "1. PDF是扫描件（没有文本层），"
-                "2. PDF使用了特殊的编码方式。"
-                "建议：将PDF转为图片后重新上传，或使用文字版PDF。"
-            )
-        
-        return result_text
+            
+            doc.close()
+            result_text = "\n\n".join(parts).strip()
+            
+            if not result_text:
+                raise ValueError(
+                    "无法从PDF中提取到文本内容。这可能是因为："
+                    "1. PDF是扫描件（没有文本层），"
+                    "2. PDF使用了特殊的编码方式。"
+                    "建议：将PDF转为图片后重新上传，或使用文字版PDF。"
+                )
+            
+            return result_text
+        except Exception as exc:
+            if isinstance(exc, ValueError):
+                raise
+            raise ValueError(f"PDF解析失败: {exc}") from exc
 
     if ext == "docx":
         try:
