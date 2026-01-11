@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:newstudyapp/config/api_config.dart';
@@ -131,29 +133,50 @@ class HttpService {
     }
   }
 
-  /// 从笔记文件中抽取待学习词语（PDF/DOCX/TXT）
+  /// 从笔记文件中抽取待学习词语（PDF/DOCX/TXT/图片）
   Future<NoteExtractResponse> extractTermsFromNoteFile({
     required String filePath,
     required String filename,
     int maxTerms = 30,
   }) async {
     try {
+      // 读取文件内容
+      Uint8List fileBytes;
+
+      // 处理HarmonyOS的file:// URI格式
+      String actualPath = filePath;
+      if (filePath.startsWith('file://')) {
+        actualPath = filePath.substring(7); // 移除 'file://' 前缀
+      }
+
+      try {
+        final file = File(actualPath);
+        fileBytes = await file.readAsBytes();
+      } catch (e) {
+        // 如果直接读取失败，尝试使用HarmonyOS原生方式
+        debugPrint('[HttpService] 直接读取文件失败: $e');
+        throw Exception('无法读取文件: $e');
+      }
+
       final formData = FormData.fromMap({
         'max_terms': maxTerms,
-        'file': await MultipartFile.fromFile(
-          filePath,
+        'file': MultipartFile.fromBytes(
+          fileBytes,
           filename: filename,
         ),
       });
+
       final response = await _dio.post(
         ApiConfig.extractNoteTermsFile,
         data: formData,
-        // 注意：不要手动设置 Content-Type，Dio 会自动设置正确的 multipart/form-data 头（包括 boundary）
       );
       return NoteExtractResponse.fromJson(
           response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
+    } catch (e) {
+      debugPrint('[HttpService] 提取文件词语失败: $e');
+      throw Exception('解析文件失败：$e');
     }
   }
 
