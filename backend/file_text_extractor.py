@@ -35,10 +35,49 @@ def _get_easyocr_reader():
     global _easyocr_reader
     if _easyocr_reader is None:
         import easyocr
-        # 初始化 easyocr (支持中英文)
-        # gpu=False 使用CPU，第一次运行会自动下载模型
         _easyocr_reader = easyocr.Reader(['ch_sim', 'en'], gpu=False)
     return _easyocr_reader
+
+
+def _ocr_pdf_page(page, page_num: int = 0) -> str:
+    """从PDF页面提取图片并进行OCR"""
+    try:
+        import numpy as np
+        import cv2
+        
+        # 尝试提取页面中的图片
+        images = page.images
+        if not images:
+            return ""
+        
+        reader = _get_easyocr_reader()
+        all_text: list[str] = []
+        
+        for i, image in enumerate(images):
+            try:
+                # image 可能是PIL Image或bytes
+                if hasattr(image, 'tobytes'):
+                    # PIL Image
+                    img_bytes = image.tobytes()
+                elif isinstance(image, bytes):
+                    img_bytes = image
+                else:
+                    continue
+                
+                nparr = np.frombuffer(img_bytes, np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                
+                if img is not None:
+                    results = reader.readtext(img, detail=0)
+                    page_text = "\n".join([str(r) for r in results if str(r).strip()])
+                    if page_text:
+                        all_text.append(page_text)
+            except Exception as e:
+                continue
+        
+        return "\n".join(all_text)
+    except Exception:
+        return ""
 
 
 def extract_text_from_upload(filename: Optional[str], raw: bytes) -> str:
@@ -58,14 +97,41 @@ def extract_text_from_upload(filename: Optional[str], raw: bytes) -> str:
 
         reader = PdfReader(io.BytesIO(raw))
         parts: list[str] = []
-        for page in reader.pages:
+        has_text = False
+        
+        for i, page in enumerate(reader.pages):
             try:
                 text = page.extract_text() or ""
+                if text.strip():
+                    has_text = True
+                    parts.append(text)
             except Exception:
                 text = ""
-            if text.strip():
-                parts.append(text)
-        return "\n\n".join(parts).strip()
+            
+            # 如果这一页没有文本，尝试用OCR（如果有图片）
+            if not text.strip():
+                try:
+                    # 尝试提取页面中的图片并OCR
+                    page_text = _ocr_pdf_page(page, i)
+                    if page_text.strip():
+                        has_text = True
+                        parts.append(page_text)
+                except Exception:
+                    pass
+        
+        result_text = "\n\n".join(parts).strip()
+        
+        # 如果完全没有提取到任何文本
+        if not result_text:
+            raise ValueError(
+                "无法从PDF中提取到文本内容。"
+                "这可能是因为："
+                "1. PDF是扫描件（没有文本层），"
+                "2. PDF使用了特殊的编码方式。"
+                "建议：将PDF转为图片后重新上传，或使用文字版PDF。"
+            )
+        
+        return result_text
 
     if ext == "docx":
         try:
