@@ -3,17 +3,21 @@ import 'package:newstudyapp/pages/note_detail/note_detail_state.dart';
 class NoteExtractResponse {
   const NoteExtractResponse({
     required this.title,
+    required this.text,
     required this.terms,
     required this.totalChars,
   });
 
   factory NoteExtractResponse.fromJson(Map<String, dynamic> json) {
     final titleRaw = json['title'];
+    final textRaw = json['text'];
     final termsRaw = json['terms'];
     final totalCharsRaw = json['total_chars'];
 
     final String? title =
         titleRaw is String && titleRaw.trim().isNotEmpty ? titleRaw : null;
+
+    final String text = textRaw is String ? textRaw : '';
 
     if (termsRaw is! List) {
       throw const FormatException('缺少 terms 字段');
@@ -29,10 +33,11 @@ class NoteExtractResponse {
     }
 
     return NoteExtractResponse(
-        title: title, terms: terms, totalChars: totalCharsRaw);
+        title: title, text: text, terms: terms, totalChars: totalCharsRaw);
   }
 
   final String? title;
+  final String text;
   final List<String> terms;
   final int totalChars;
 }
@@ -43,6 +48,7 @@ class NoteResponse {
     required this.id,
     required this.title,
     required this.content,
+    this.summary,
     required this.createdAt,
     required this.updatedAt,
     required this.termCount,
@@ -52,6 +58,7 @@ class NoteResponse {
     final idRaw = json['id'];
     final titleRaw = json['title'];
     final contentRaw = json['content'];
+    final summaryRaw = json['summary'];
     final createdAtRaw = json['createdAt'];
     final updatedAtRaw = json['updatedAt'];
     final termCountRaw = json['termCount'];
@@ -72,10 +79,15 @@ class NoteResponse {
     final String? title =
         titleRaw is String && titleRaw.trim().isNotEmpty ? titleRaw : null;
 
+    final String? summary = summaryRaw is String && summaryRaw.trim().isNotEmpty
+        ? summaryRaw
+        : null;
+
     return NoteResponse(
       id: idRaw,
       title: title,
       content: contentRaw,
+      summary: summary,
       createdAt: DateTime.parse(createdAtRaw),
       updatedAt: DateTime.parse(updatedAtRaw),
       termCount: termCountRaw is int ? termCountRaw : 0,
@@ -85,6 +97,7 @@ class NoteResponse {
   final String id;
   final String? title;
   final String content;
+  final String? summary;
   final DateTime createdAt;
   final DateTime updatedAt;
   final int termCount;
@@ -95,6 +108,7 @@ class NoteResponse {
       id: id,
       title: title ?? '',
       content: content,
+      summary: summary,
       createdAt: createdAt,
       updatedAt: updatedAt,
       termCount: termCount,
@@ -182,6 +196,81 @@ class FlashCardListResponse {
   final String noteId;
   final List<String> terms;
   final int total;
+}
+
+/// 闪词卡片详情模型（含状态）
+class FlashCardDetail {
+  const FlashCardDetail({
+    required this.term,
+    required this.status,
+  });
+
+  factory FlashCardDetail.fromJson(Map<String, dynamic> json) {
+    final termRaw = json['term'];
+    final statusRaw = json['status'];
+
+    if (termRaw is! String || termRaw.trim().isEmpty) {
+      throw const FormatException('缺少 term 字段');
+    }
+    if (statusRaw is! String) {
+      throw const FormatException('缺少 status 字段');
+    }
+
+    return FlashCardDetail(
+      term: termRaw.trim(),
+      status: statusRaw,
+    );
+  }
+
+  final String term;
+  final String status; // notStarted, needsReview, needsImprove, mastered
+}
+
+/// 闪词卡片列表响应模型（含状态）
+class FlashCardListWithStatusResponse {
+  const FlashCardListWithStatusResponse({
+    required this.noteId,
+    required this.cards,
+    required this.total,
+    required this.masteredCount,
+  });
+
+  factory FlashCardListWithStatusResponse.fromJson(Map<String, dynamic> json) {
+    final noteIdRaw = json['note_id'];
+    final cardsRaw = json['cards'];
+    final totalRaw = json['total'];
+    final masteredCountRaw = json['mastered_count'];
+
+    if (noteIdRaw is! String || noteIdRaw.isEmpty) {
+      throw const FormatException('缺少 note_id 字段');
+    }
+    if (cardsRaw is! List) {
+      throw const FormatException('缺少 cards 字段');
+    }
+    if (totalRaw is! int) {
+      throw const FormatException('缺少 total 字段');
+    }
+    if (masteredCountRaw is! int) {
+      throw const FormatException('缺少 mastered_count 字段');
+    }
+
+    final cards = cardsRaw
+        .whereType<Map<String, dynamic>>()
+        .map((e) => FlashCardDetail.fromJson(e))
+        .toList(growable: false);
+
+    return FlashCardListWithStatusResponse(
+      noteId: noteIdRaw,
+      cards: cards,
+      total: totalRaw,
+      masteredCount: masteredCountRaw,
+    );
+  }
+
+  final String noteId;
+  final List<FlashCardDetail> cards;
+  final int total;
+  final int masteredCount;
 }
 
 /// 笔记列表项响应模型

@@ -58,6 +58,10 @@ class ApiConfig {
   /// 获取闪词卡片列表
   static String getFlashCards(String noteId) => '/notes/$noteId/flash-cards';
 
+  /// 获取闪词卡片列表（含状态）
+  static String getFlashCardsWithStatus(String noteId) =>
+      '/notes/$noteId/flash-cards/detail';
+
   /// 获取闪词学习进度
   static String getFlashCardProgress(String noteId) =>
       '/notes/$noteId/flash-cards/progress';

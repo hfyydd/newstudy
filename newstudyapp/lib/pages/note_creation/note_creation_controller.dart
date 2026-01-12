@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io' show Platform;
 import 'package:newstudyapp/pages/note_creation/note_creation_state.dart';
+import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 import 'package:newstudyapp/services/http_service.dart';
 import 'package:newstudyapp/services/harmonyos_file_picker_service.dart';
@@ -102,7 +103,7 @@ class NoteCreationController extends GetxController {
           final files = await HarmonyOSFilePickerService.pickFiles(
             allowedExtensions: const ['pdf', 'docx', 'txt', 'md'],
           );
-          
+
           if (files.isEmpty) {
             return; // 用户取消选择
           }
@@ -110,7 +111,8 @@ class NoteCreationController extends GetxController {
           final file = files.first;
           state.selectedFileName.value = file['name'] as String? ?? '未知文件';
           // 优先使用 path，如果没有则使用 uri
-          state.selectedFilePath.value = file['path'] as String? ?? file['uri'] as String? ?? '';
+          state.selectedFilePath.value =
+              file['path'] as String? ?? file['uri'] as String? ?? '';
         } catch (e) {
           // 如果原生实现失败，回退到 file_picker（如果支持）
           Get.snackbar(
@@ -142,9 +144,9 @@ class NoteCreationController extends GetxController {
           maxHeight: 1080,
           imageQuality: 85,
         );
-        
+
         if (image == null) return;
-        
+
         state.selectedFileName.value = image.name;
         state.selectedFilePath.value = image.path;
       } else {
@@ -156,7 +158,8 @@ class NoteCreationController extends GetxController {
 
           final photo = photos.first;
           state.selectedFileName.value = photo['name'] as String? ?? '未知照片';
-          state.selectedFilePath.value = photo['path'] as String? ?? photo['uri'] as String? ?? '';
+          state.selectedFilePath.value =
+              photo['path'] as String? ?? photo['uri'] as String? ?? '';
         } else {
           // 使用相册选择
           final images = await HarmonyOSFilePickerService.pickImages();
@@ -164,10 +167,11 @@ class NoteCreationController extends GetxController {
 
           final image = images.first;
           state.selectedFileName.value = image['name'] as String? ?? '未知图片';
-          state.selectedFilePath.value = image['path'] as String? ?? image['uri'] as String? ?? '';
+          state.selectedFilePath.value =
+              image['path'] as String? ?? image['uri'] as String? ?? '';
         }
       }
-      
+
       // 跳转到文件上传流程
       Get.toNamed(AppRoutes.noteCreation);
     } catch (e) {
@@ -178,7 +182,6 @@ class NoteCreationController extends GetxController {
       );
     }
   }
-
 
   Future<void> extractTermsFromSelectedFile() async {
     final path = state.selectedFilePath.value;
@@ -204,6 +207,9 @@ class NoteCreationController extends GetxController {
       if (state.titleController.text.trim().isEmpty && resp.title != null) {
         state.titleController.text = resp.title!;
       }
+      // 保存提取的文本内容（用于保存笔记）
+      state.extractedText.value = resp.text;
+      state.noteTextController.text = resp.text;
       state.terms.value = List.of(resp.terms);
       state.isEditingTerms.value = true;
 
@@ -247,7 +253,7 @@ class NoteCreationController extends GetxController {
     state.terms.removeAt(index);
   }
 
-  void startLearning() {
+  void startLearning() async {
     if (state.terms.isEmpty) {
       Get.snackbar(
         '提示',
@@ -259,14 +265,43 @@ class NoteCreationController extends GetxController {
     }
 
     final title = state.titleController.text.trim();
+
+    // 如果有提取的文本内容，先保存笔记到数据库
+    final extractedText = state.noteTextController.text.trim();
+    String? savedNoteId;
+
+    if (extractedText.isNotEmpty) {
+      state.isSaving.value = true;
+      try {
+        final noteResponse = await httpService.createNote(
+          title: title.isEmpty ? 'PDF笔记' : title,
+          content: extractedText,
+        );
+        savedNoteId = noteResponse.id;
+        debugPrint('[NoteCreationController] 笔记创建成功: $savedNoteId');
+
+        // 通知 HomeController 刷新列表
+        if (Get.isRegistered<HomeController>()) {
+          final homeController = Get.find<HomeController>();
+          await homeController.loadNotes();
+          debugPrint('[NoteCreationController] 已刷新笔记列表');
+        }
+      } catch (e) {
+        debugPrint('[NoteCreationController] 笔记创建失败: $e');
+        // 即使保存失败也继续学习，只是不会有笔记ID
+      } finally {
+        state.isSaving.value = false;
+      }
+    }
+
+    // 跳转到学习页面，传递笔记ID以便标记已掌握
     Get.toNamed(
       AppRoutes.feynmanLearning,
       arguments: {
         'topic': title.isEmpty ? '我的笔记' : title,
         'terms': state.terms.toList(growable: false),
+        'noteId': savedNoteId,
       },
     );
   }
 }
-
-

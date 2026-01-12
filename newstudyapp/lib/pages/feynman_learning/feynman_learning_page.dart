@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.dart';
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_state.dart';
 import 'package:newstudyapp/config/app_theme.dart';
+import 'package:newstudyapp/routes/app_routes.dart';
 
 class FeynmanLearningPage extends StatelessWidget {
   const FeynmanLearningPage({super.key});
@@ -72,9 +73,23 @@ class FeynmanLearningPage extends StatelessWidget {
       backgroundColor: Theme.of(Get.context!).scaffoldBackgroundColor,
       elevation: 0,
       leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: iconColor),
-        onPressed: () => Get.back(),
+        icon: Icon(Icons.close, color: iconColor),
+        onPressed: () => Get.offAllNamed(AppRoutes.main),
       ),
+      actions: [
+        // 返回首页按钮
+        TextButton(
+          onPressed: () => Get.offAllNamed(AppRoutes.main),
+          child: Text(
+            '返回首页',
+            style: TextStyle(
+              color: iconColor,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
       title: Obx(
         () => Text(
           controller.getCategoryDisplayName(),
@@ -293,7 +308,8 @@ class FeynmanLearningPage extends StatelessWidget {
                       ),
                       // 已掌握标记
                       Obx(() {
-                        final isMastered = controller.state.masteredTerms.contains(term);
+                        final isMastered =
+                            controller.state.masteredTerms.contains(term);
                         if (isMastered) {
                           return Container(
                             margin: const EdgeInsets.only(left: 12, top: 8),
@@ -613,134 +629,138 @@ class FeynmanLearningPage extends StatelessWidget {
                     ),
                   )
                 : explanation == null
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      '获取解释失败，请稍后重试',
-                      style: TextStyle(fontSize: 14, color: secondaryColor),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // 类比
-                        if (explanation.analogy.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFF59E0B).withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.compare_arrows,
-                                  size: 20,
-                                  color: const Color(0xFFF59E0B),
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Text(
+                          '获取解释失败，请稍后重试',
+                          style: TextStyle(fontSize: 14, color: secondaryColor),
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 类比
+                            if (explanation.analogy.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFFF59E0B).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFF59E0B)
+                                        .withOpacity(0.3),
+                                  ),
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '就像：${explanation.analogy}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.compare_arrows,
+                                      size: 20,
                                       color: const Color(0xFFF59E0B),
                                     ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // 详细解释
-                        if (explanation.simpleExplanation.isNotEmpty) ...[
-                          Text(
-                            '详细解释',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: secondaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: cardColor,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              explanation.simpleExplanation,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: textColor,
-                                height: 1.6,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // 关键点
-                        if (explanation.keyPoint.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF10B981).withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.check_circle_outline,
-                                  size: 20,
-                                  color: const Color(0xFF10B981),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '关键点',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: const Color(0xFF10B981),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        explanation.keyPoint,
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '就像：${explanation.analogy}',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: textColor,
-                                          height: 1.4,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFFF59E0B),
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
+                            // 详细解释
+                            if (explanation.simpleExplanation.isNotEmpty) ...[
+                              Text(
+                                '详细解释',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: secondaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: cardColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  explanation.simpleExplanation,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: textColor,
+                                    height: 1.6,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
+                            // 关键点
+                            if (explanation.keyPoint.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF10B981).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFF10B981)
+                                        .withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline,
+                                      size: 20,
+                                      color: const Color(0xFF10B981),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '关键点',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: const Color(0xFF10B981),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            explanation.keyPoint,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: textColor,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
           ),
           actions: [
             TextButton(

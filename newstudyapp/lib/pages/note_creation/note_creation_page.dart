@@ -29,7 +29,8 @@ class NoteCreationPage extends StatelessWidget {
     );
   }
 
-  Widget _buildNoteInput(BuildContext context, NoteCreationController controller, bool isDark) {
+  Widget _buildNoteInput(
+      BuildContext context, NoteCreationController controller, bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
     final cardColor = isDark ? Colors.grey[900]! : Colors.white;
@@ -65,7 +66,8 @@ class NoteCreationPage extends StatelessWidget {
               controller: controller.state.titleController,
               decoration: InputDecoration(
                 labelText: '标题（可选）',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               style: TextStyle(color: textColor),
             ),
@@ -110,8 +112,14 @@ class NoteCreationPage extends StatelessWidget {
             // 照片预览（如果选中的是图片）
             Obx(() {
               final path = controller.state.selectedFilePath.value;
-              final name = controller.state.selectedFileName.value?.toLowerCase() ?? '';
-              if (path != null && (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.heic'))) {
+              final name =
+                  controller.state.selectedFileName.value?.toLowerCase() ?? '';
+              if (path != null &&
+                  (name.endsWith('.jpg') ||
+                      name.endsWith('.jpeg') ||
+                      name.endsWith('.png') ||
+                      name.endsWith('.webp') ||
+                      name.endsWith('.heic'))) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   width: double.infinity,
@@ -135,7 +143,9 @@ class NoteCreationPage extends StatelessWidget {
                 final loading = controller.state.isLoading.value;
                 final hasFile = controller.state.selectedFilePath.value != null;
                 return ElevatedButton(
-                  onPressed: (!hasFile || loading) ? null : controller.extractTermsFromSelectedFile,
+                  onPressed: (!hasFile || loading)
+                      ? null
+                      : controller.extractTermsFromSelectedFile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.darkPrimary,
                     foregroundColor: Colors.white,
@@ -151,12 +161,14 @@ class NoteCreationPage extends StatelessWidget {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       : const Text(
                           '上传文件并解析',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                 );
               }),
@@ -173,7 +185,8 @@ class NoteCreationPage extends StatelessWidget {
                   labelText: '笔记内容',
                   alignLabelWithHint: true,
                   hintText: '把你的笔记粘贴到这里（支持中英混合）…',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.all(16),
                 ),
               ),
@@ -200,12 +213,14 @@ class NoteCreationPage extends StatelessWidget {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       : const Text(
                           '解析并抽取词语',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                 );
               }),
@@ -217,7 +232,8 @@ class NoteCreationPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTermsEditor(BuildContext context, NoteCreationController controller, bool isDark) {
+  Widget _buildTermsEditor(
+      BuildContext context, NoteCreationController controller, bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
     final cardColor = isDark ? Colors.grey[900]! : Colors.white;
@@ -249,7 +265,11 @@ class NoteCreationPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            _AddTermRow(controller: controller, isDark: isDark, textColor: textColor, borderColor: borderColor),
+            _AddTermRow(
+                controller: controller,
+                isDark: isDark,
+                textColor: textColor,
+                borderColor: borderColor),
             const SizedBox(height: 16),
             Obx(() {
               final terms = controller.state.terms;
@@ -271,10 +291,12 @@ class NoteCreationPage extends StatelessWidget {
                     final index = entry.key;
                     final term = entry.value;
                     return Padding(
-                      padding: EdgeInsets.only(bottom: index < terms.length - 1 ? 12 : 12),
+                      padding: EdgeInsets.only(
+                          bottom: index < terms.length - 1 ? 12 : 12),
                       child: _EditableTermTile(
                         initialValue: term,
-                        onChanged: (value) => controller.updateTerm(index, value),
+                        onChanged: (value) =>
+                            controller.updateTerm(index, value),
                         onRemove: () => controller.removeTerm(index),
                         isDark: isDark,
                         cardColor: cardColor,
@@ -289,23 +311,37 @@ class NoteCreationPage extends StatelessWidget {
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: controller.startLearning,
-                icon: const Icon(Icons.rocket_launch),
-                label: const Text(
-                  '开始学习',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.darkPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Obx(() {
+                final isSaving = controller.state.isSaving.value;
+                return ElevatedButton.icon(
+                  onPressed: isSaving ? null : controller.startLearning,
+                  icon: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.rocket_launch),
+                  label: Text(
+                    isSaving ? '保存中...' : '开始学习',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
                   ),
-                  elevation: 0,
-                ),
-              ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.darkPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                );
+              }),
             ),
             const SizedBox(height: 40),
           ],
@@ -436,8 +472,10 @@ class _AddTermRowState extends State<_AddTermRow> {
             style: TextStyle(color: widget.textColor),
             decoration: InputDecoration(
               hintText: '手动添加词语…',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
             onSubmitted: (_) => _submit(),
           ),
@@ -454,11 +492,10 @@ class _AddTermRowState extends State<_AddTermRow> {
             ),
             elevation: 0,
           ),
-          child: const Text('添加', style: TextStyle(fontWeight: FontWeight.w600)),
+          child:
+              const Text('添加', style: TextStyle(fontWeight: FontWeight.w600)),
         ),
       ],
     );
   }
 }
-
-

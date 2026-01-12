@@ -15,7 +15,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
-    final borderColor = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
+    final borderColor =
+        isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -27,15 +28,15 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           onPressed: () => Get.back(),
         ),
         title: Obx(() => Text(
-          controller.state.noteTitle,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        )),
+              controller.state.noteTitle,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            )),
         actions: [
           IconButton(
             icon: Icon(Icons.more_horiz, color: textColor),
@@ -59,7 +60,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                   children: [
                     // 闪词学习区域（突出显示，使用渐变背景）
                     _buildFlashCardSection(isDark, textColor, secondaryColor),
-                    
+
                     // 笔记内容区域
                     Padding(
                       padding: const EdgeInsets.all(20),
@@ -69,7 +70,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                           // 笔记内容标题
                           Row(
                             children: [
-                              Icon(Icons.article_outlined, size: 18, color: secondaryColor),
+                              Icon(Icons.article_outlined,
+                                  size: 18, color: secondaryColor),
                               const SizedBox(width: 8),
                               Text(
                                 '笔记内容',
@@ -117,11 +119,12 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     });
   }
 
-  /// 构建笔记内容（Markdown 渲染）
-  Widget _buildNoteContent(bool isDark, Color textColor, Color? secondaryColor) {
+  /// 构建笔记内容（显示摘要）
+  Widget _buildNoteContent(
+      bool isDark, Color textColor, Color? secondaryColor) {
     return Obx(() {
-      final content = controller.state.noteContent;
-      if (content.isEmpty) {
+      final summary = controller.state.noteSummary;
+      if (summary.isEmpty) {
         return Center(
           child: Padding(
             padding: const EdgeInsets.all(40),
@@ -133,93 +136,20 @@ class NoteDetailPage extends GetView<NoteDetailController> {
         );
       }
 
-      return MarkdownBody(
-        data: content,
-        selectable: true,
-        styleSheet: MarkdownStyleSheet(
-          p: TextStyle(
+      // 显示摘要（不是完整内容）
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[900] : Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          summary,
+          style: TextStyle(
             fontSize: 15,
             color: textColor,
             height: 1.8,
-          ),
-          h1: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: textColor,
-            height: 2,
-          ),
-          h2: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: textColor,
-            height: 1.8,
-          ),
-          h3: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: textColor,
-            height: 1.8,
-          ),
-          h4: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: textColor,
-            height: 1.6,
-          ),
-          strong: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-          em: TextStyle(
-            fontStyle: FontStyle.italic,
-            color: textColor,
-          ),
-          code: TextStyle(
-            fontSize: 14,
-            color: isDark ? const Color(0xFF4ECDC4) : const Color(0xFF007ACC),
-            backgroundColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5),
-          ),
-          codeblockDecoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF8F8F8),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
-            ),
-          ),
-          blockquote: TextStyle(
-            fontSize: 15,
-            color: secondaryColor,
-            fontStyle: FontStyle.italic,
-            height: 1.6,
-          ),
-          blockquoteDecoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: AppTheme.darkPrimary.withOpacity(0.5),
-                width: 4,
-              ),
-            ),
-          ),
-          listBullet: TextStyle(
-            fontSize: 15,
-            color: textColor,
-          ),
-          tableHead: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-          tableBody: TextStyle(
-            color: textColor,
-          ),
-          tableBorder: TableBorder.all(
-            color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
-          ),
-          horizontalRuleDecoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
-              ),
-            ),
           ),
         ),
       );
@@ -303,7 +233,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.statusNeedsReview.withOpacity(isDark ? 0.12 : 0.08),
+                      AppTheme.statusNeedsReview
+                          .withOpacity(isDark ? 0.12 : 0.08),
                       Colors.transparent,
                     ],
                   ),
@@ -330,12 +261,12 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         // 使用半透明背景，与渐变背景融合
-        color: isDark 
+        color: isDark
             ? Colors.white.withOpacity(0.05)
             : Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark 
+          color: isDark
               ? Colors.white.withOpacity(0.1)
               : AppTheme.darkPrimary.withOpacity(0.15),
           width: 1,
@@ -405,12 +336,12 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         // 使用半透明背景，与渐变背景融合
-        color: isDark 
+        color: isDark
             ? Colors.white.withOpacity(0.05)
             : Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark 
+          color: isDark
               ? Colors.white.withOpacity(0.1)
               : AppTheme.darkPrimary.withOpacity(0.15),
           width: 1,
@@ -505,17 +436,17 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     FlashCardProgress progress,
   ) {
     final total = progress.total;
-    
+
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 24, 20, 28),
       decoration: BoxDecoration(
         // 使用半透明背景，与渐变背景融合
-        color: isDark 
+        color: isDark
             ? Colors.white.withOpacity(0.06)
             : Colors.white.withOpacity(0.75),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark 
+          color: isDark
               ? Colors.white.withOpacity(0.1)
               : AppTheme.statusMastered.withOpacity(0.2),
           width: 1,
@@ -573,7 +504,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 ),
                 // 掌握百分比
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.statusMastered.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -603,10 +535,14 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                _buildStatCard('已掌握', progress.mastered, AppTheme.statusMastered, isDark),
-                _buildStatCard('待复习', progress.needsReview, AppTheme.statusNeedsReview, isDark),
-                _buildStatCard('需改进', progress.needsImprove, AppTheme.statusNeedsImprove, isDark),
-                _buildStatCard('未学习', progress.notStarted, AppTheme.statusNotStarted, isDark),
+                _buildStatCard(
+                    '已掌握', progress.mastered, AppTheme.statusMastered, isDark),
+                _buildStatCard('待复习', progress.needsReview,
+                    AppTheme.statusNeedsReview, isDark),
+                _buildStatCard('需改进', progress.needsImprove,
+                    AppTheme.statusNeedsImprove, isDark),
+                _buildStatCard('未学习', progress.notStarted,
+                    AppTheme.statusNotStarted, isDark),
               ],
             ),
           ),
@@ -643,7 +579,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 Container(
                   width: 1,
                   height: 24,
-                  color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5),
+                  color: isDark
+                      ? const Color(0xFF2C2C2E)
+                      : const Color(0xFFE5E5E5),
                 ),
                 Expanded(
                   child: TextButton.icon(
@@ -704,7 +642,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               Expanded(
                 flex: progress.notStarted,
                 child: Container(
-                  color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5E5),
+                  color: isDark
+                      ? const Color(0xFF3A3A3C)
+                      : const Color(0xFFE5E5E5),
                 ),
               ),
           ],
@@ -764,7 +704,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       if (!hasFlashCards) return const SizedBox.shrink();
 
       return Container(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.of(Get.context!).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+            20, 16, 20, 16 + MediaQuery.of(Get.context!).padding.bottom),
         decoration: BoxDecoration(
           color: bgColor,
           border: Border(top: BorderSide(color: borderColor)),
@@ -824,7 +765,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               }),
               _buildOptionItem(Icons.share_outlined, '分享笔记', isDark, () {
                 Get.back();
-                Get.snackbar('提示', '分享功能开发中', snackPosition: SnackPosition.BOTTOM);
+                Get.snackbar('提示', '分享功能开发中',
+                    snackPosition: SnackPosition.BOTTOM);
               }),
               _buildOptionItem(Icons.delete_outline, '删除笔记', isDark, () {
                 Get.back();

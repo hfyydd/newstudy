@@ -321,6 +321,20 @@ class HttpService {
     }
   }
 
+  /// 获取闪词卡片列表（含状态）
+  Future<FlashCardListWithStatusResponse> getFlashCardsWithStatus(
+      String noteId) async {
+    try {
+      final response = await _dio.get(
+        ApiConfig.getFlashCardsWithStatus(noteId),
+      );
+      return FlashCardListWithStatusResponse.fromJson(
+          response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// 获取闪词学习进度
   Future<FlashCardProgress> getFlashCardProgress(String noteId) async {
     try {

@@ -64,6 +64,7 @@ class NoteExtractRequest(BaseModel):
 
 class NoteExtractResponse(BaseModel):
     title: str | None = Field(default=None, description="笔记标题（回显）")
+    text: str = Field(default="", description="提取的文本内容")
     terms: List[str] = Field(..., description="抽取出的词语列表（可编辑）")
     total_chars: int = Field(..., ge=0, description="笔记字符数")
 
@@ -74,18 +75,21 @@ class NoteExtractResponse(BaseModel):
 class NoteCreateRequest(BaseModel):
     title: Optional[str] = Field(default=None, description="笔记标题（可选）")
     content: str = Field(..., min_length=1, description="笔记内容（文本）")
+    summary: Optional[str] = Field(default=None, description="笔记摘要（可选）")
 
 
 class NoteUpdateRequest(BaseModel):
     """更新笔记请求模型"""
     title: Optional[str] = Field(default=None, description="笔记标题（可选）")
     content: Optional[str] = Field(default=None, min_length=1, description="笔记内容（可选）")
+    summary: Optional[str] = Field(default=None, description="笔记摘要（可选）")
 
 
 class NoteResponse(BaseModel):
     id: str = Field(..., description="笔记ID")
     title: Optional[str] = Field(default=None, description="笔记标题")
-    content: str = Field(..., description="笔记内容")
+    content: str = Field(default="", description="笔记内容")
+    summary: Optional[str] = Field(default=None, description="笔记摘要")
     createdAt: datetime = Field(..., description="创建时间")
     updatedAt: datetime = Field(..., description="更新时间")
     termCount: int = Field(default=0, description="词条数量")
@@ -114,6 +118,27 @@ class FlashCardListResponse(BaseModel):
     note_id: str = Field(..., description="笔记ID")
     terms: List[str] = Field(..., description="词条列表")
     total: int = Field(..., description="总词条数")
+
+
+class FlashCardDetailResponse(BaseModel):
+    """闪词卡片详情响应模型（含状态）"""
+    term: str = Field(..., description="词条")
+    status: str = Field(..., description="学习状态")
+
+
+class FlashCardListWithStatusResponse(BaseModel):
+    """闪词卡片列表响应模型（含状态）"""
+    note_id: str = Field(..., description="笔记ID")
+    cards: List[FlashCardDetailResponse] = Field(..., description="卡片详情列表")
+    total: int = Field(..., description="总词条数")
+    mastered_count: int = Field(..., description="已掌握数量")
+
+
+class FlashCardStatusUpdateRequest(BaseModel):
+    """闪词卡片状态更新请求模型"""
+    term: str = Field(..., description="词条")
+    status: str = Field(..., description="学习状态",
+                   pattern="^(notStarted|needsReview|needsImprove|mastered)$")
 
 
 TERMS_LIBRARY = {
@@ -269,7 +294,7 @@ def extract_terms(payload: NoteExtractRequest) -> NoteExtractResponse:
     """
     提交笔记文本，解析并抽取待学习词语。
 
-    - 优先 LLM 抽取（更贴近“重点概念”）
+    - 优先 LLM 抽取（更贴近"重点概念"）
     - LLM 不可用时使用规则兜底抽取
     """
     try:
@@ -280,6 +305,7 @@ def extract_terms(payload: NoteExtractRequest) -> NoteExtractResponse:
     # 允许为空：如果笔记太短或不含有效词语
     return NoteExtractResponse(
         title=payload.title,
+        text=payload.text,
         terms=terms,
         total_chars=len(payload.text),
     )
@@ -302,6 +328,7 @@ async def extract_terms_from_file(
 
     return NoteExtractResponse(
         title=file.filename,
+        text=text,
         terms=terms,
         total_chars=len(text),
     )
@@ -366,13 +393,20 @@ def create_note(payload: NoteCreateRequest) -> NoteResponse:
     创建笔记
     
     保存用户的笔记内容（文本），返回创建的笔记信息。
+    如果没有提供 summary，会自动从 content 截取前200字符作为摘要。
     """
+    # 生成摘要：如果没有提供，从内容截取
+    summary = payload.summary
+    if summary is None:
+        summary = payload.content[:200] + "..." if len(payload.content) > 200 else payload.content
+    
     try:
         note = db.create_note(title=payload.title, content=payload.content)
         return NoteResponse(
             id=note.id,
             title=note.title,
             content=note.content,
+            summary=summary,
             createdAt=note.created_at,  # type: ignore
             updatedAt=note.updated_at,  # type: ignore
             termCount=0,  # type: ignore
@@ -387,6 +421,7 @@ def get_note(note_id: str) -> NoteResponse:
     获取笔记详情
     
     根据笔记ID返回笔记的完整信息。
+    如果笔记没有摘要，会自动从内容截取前200字符。
     """
     note = db.get_note(note_id)
     if not note:
@@ -396,10 +431,14 @@ def get_note(note_id: str) -> NoteResponse:
     cards = db.get_flash_cards(note_id)
     term_count = len(cards)
 
+    # 生成摘要（从内容截取）
+    summary = note.content[:200] + "..." if len(note.content) > 200 else note.content
+
     return NoteResponse(
         id=note.id,
         title=note.title,
         content=note.content,
+        summary=summary,
         createdAt=note.created_at,  # type: ignore
         updatedAt=note.updated_at,  # type: ignore
         termCount=term_count,  # type: ignore
@@ -614,6 +653,84 @@ def get_flash_card_progress(note_id: str) -> FlashCardProgressResponse:
             needsImprove=progress["needsImprove"],
             notStarted=progress["notStarted"],
         )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/notes/{note_id}/flash-cards", response_model=FlashCardListResponse)
+def get_flash_cards(note_id: str) -> FlashCardListResponse:
+    """获取闪词卡片列表"""
+    # 检查笔记是否存在
+    note = db.get_note(note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+    try:
+        cards = db.get_flash_cards(note_id)
+        return FlashCardListResponse(
+            note_id=note_id,
+            terms=[card.term for card in cards],
+            total=len(cards),
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/notes/{note_id}/flash-cards/detail", response_model=FlashCardListWithStatusResponse)
+def get_flash_cards_with_status(note_id: str) -> FlashCardListWithStatusResponse:
+    """获取闪词卡片列表（含状态详情）"""
+    # 检查笔记是否存在
+    note = db.get_note(note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+    try:
+        cards = db.get_flash_cards(note_id)
+        card_details = [
+            FlashCardDetailResponse(term=card.term, status=card.status)
+            for card in cards
+        ]
+        mastered_count = sum(1 for card in cards if card.status == "mastered")
+        return FlashCardListWithStatusResponse(
+            note_id=note_id,
+            cards=card_details,
+            total=len(cards),
+            mastered_count=mastered_count,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.put("/notes/{note_id}/flash-cards/status")
+def update_flash_card_status(
+    note_id: str,
+    request: FlashCardStatusUpdateRequest,
+) -> Dict[str, str]:
+    """更新闪词卡片状态"""
+    # 检查笔记是否存在
+    note = db.get_note(note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail=f"笔记 {note_id} 不存在")
+
+    try:
+        cards = db.get_flash_cards(note_id)
+        target_card = None
+        
+        for card in cards:
+            if card.term == request.term:
+                target_card = card
+                break
+        
+        if not target_card:
+            raise HTTPException(status_code=404, detail="闪词卡片不存在")
+        
+        success = db.update_flash_card_status(note_id, request.term, request.status)
+        if not success:
+            raise HTTPException(status_code=500, detail="更新失败")
+        
+        return {"message": "状态更新成功"}
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

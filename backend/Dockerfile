@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
+    # Tesseract OCR 依赖（可选，用于更快的OCR处理）
+    tesseract-ocr \
+    tesseract-ocr-chi-sim \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制uv配置文件

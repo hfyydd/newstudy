@@ -2,11 +2,11 @@ import 'package:get/get.dart';
 
 /// 闪词卡片状态枚举
 enum CardStatus {
-  notStarted,   // 未学习
-  needsReview,  // 待复习（良好）
+  notStarted, // 未学习
+  needsReview, // 待复习（良好）
   needsImprove, // 需改进
-  notMastered,  // 未掌握
-  mastered,     // 已掌握
+  notMastered, // 未掌握
+  mastered, // 已掌握
 }
 
 /// 笔记模型
@@ -14,6 +14,7 @@ class NoteModel {
   final String id;
   final String title;
   final String content;
+  final String? summary; // 笔记摘要
   final DateTime createdAt;
   final DateTime updatedAt;
   final int termCount;
@@ -22,6 +23,7 @@ class NoteModel {
     required this.id,
     required this.title,
     required this.content,
+    this.summary,
     required this.createdAt,
     required this.updatedAt,
     this.termCount = 0,
@@ -29,6 +31,9 @@ class NoteModel {
 
   /// 是否已生成闪词
   bool get hasFlashCards => termCount > 0;
+
+  /// 获取要显示的内容（优先使用摘要）
+  String get displayContent => summary ?? content;
 }
 
 /// 闪词学习进度
@@ -51,7 +56,8 @@ class FlashCardProgress {
   double get masteredPercent => total > 0 ? mastered / total : 0;
 
   /// 学习进度百分比（已掌握 + 待复习）
-  double get progressPercent => total > 0 ? (mastered + needsReview) / total : 0;
+  double get progressPercent =>
+      total > 0 ? (mastered + needsReview) / total : 0;
 }
 
 /// 笔记详情页状态
@@ -74,7 +80,9 @@ class NoteDetailState {
   /// 笔记标题
   String get noteTitle => note.value?.title ?? '';
 
-  /// 笔记内容
+  /// 笔记内容（完整内容）
   String get noteContent => note.value?.content ?? '';
-}
 
+  /// 笔记摘要（用于显示）
+  String get noteSummary => note.value?.displayContent ?? '';
+}

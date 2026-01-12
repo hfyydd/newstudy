@@ -10,6 +10,10 @@
 说明：
 - 传统 .doc 属于二进制格式，默认不支持（需要额外系统依赖/转换工具）。
 - 图片OCR使用EasyOCR，支持中英文识别
+- 可配置使用Tesseract（需安装系统依赖），速度更快
+
+环境变量：
+- OCR_BACKEND: "easyocr" (默认) 或 "tesseract"
 """
 
 from __future__ import annotations
@@ -22,12 +26,37 @@ from typing import Optional
 # 缓存EasyOCR Reader实例，避免重复初始化
 _easyocr_reader = None
 
+# Tesseract可用性检查
+_tesseract_available = None
+
 
 def _get_extension(filename: Optional[str]) -> str:
     if not filename:
         return ""
     _, ext = os.path.splitext(filename)
     return ext.lower().strip(".")
+
+
+def _get_ocr_backend() -> str:
+    """获取配置的OCR后端"""
+    return os.environ.get("OCR_BACKEND", "easyocr").lower()
+
+
+def _is_tesseract_available() -> bool:
+    """检查Tesseract是否可用"""
+    global _tesseract_available
+    if _tesseract_available is not None:
+        return _tesseract_available
+    
+    try:
+        import pytesseract
+        # 检查tesseract命令是否可用
+        pytesseract.get_tesseract_version()
+        _tesseract_available = True
+        return True
+    except Exception:
+        _tesseract_available = False
+        return False
 
 
 def _get_easyocr_reader():
@@ -37,6 +66,75 @@ def _get_easyocr_reader():
         import easyocr
         _easyocr_reader = easyocr.Reader(['ch_sim', 'en'], gpu=False)
     return _easyocr_reader
+
+
+def _preprocess_image_for_ocr(img):
+    """预处理图片以提高OCR准确率"""
+    try:
+        import numpy as np
+        import cv2
+        
+        # 转换为灰度图
+        if len(img.shape) == 3:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = img.copy()
+        
+        # 应用CLAHE增强对比度
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+        
+        # 轻度去噪
+        denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
+        
+        return denoised
+    except Exception:
+        return img
+
+
+def _ocr_with_tesseract(img) -> str:
+    """使用Tesseract进行OCR"""
+    try:
+        import pytesseract
+        from PIL import Image
+        
+        # 预处理图片
+        processed = _preprocess_image_for_ocr(img)
+        
+        # 转换为PIL Image
+        pil_image = Image.fromarray(processed)
+        
+        # 使用Tesseract进行OCR（中英文混合）
+        text = pytesseract.image_to_string(
+            pil_image,
+            lang='eng+chi_sim',
+            config='--oem 3 --psm 6'
+        )
+        
+        return text.strip()
+    except Exception as e:
+        raise ValueError(f"Tesseract OCR失败: {e}")
+
+
+def _ocr_with_easyocr(img) -> str:
+    """使用EasyOCR进行OCR"""
+    reader = _get_easyocr_reader()
+    results = reader.readtext(img, detail=0)
+    text_list = [str(r) for r in results if str(r).strip()]
+    return "\n".join(text_list)
+
+
+def _ocr_image(img) -> str:
+    """根据配置选择OCR后端"""
+    backend = _get_ocr_backend()
+    
+    if backend == "tesseract":
+        if not _is_tesseract_available():
+            # 回退到EasyOCR
+            return _ocr_with_easyocr(img)
+        return _ocr_with_tesseract(img)
+    else:
+        return _ocr_with_easyocr(img)
 
 
 def _ocr_pdf_page(page, page_num: int = 0) -> str:
@@ -50,7 +148,6 @@ def _ocr_pdf_page(page, page_num: int = 0) -> str:
         if not images:
             return ""
         
-        reader = _get_easyocr_reader()
         all_text: list[str] = []
         
         for i, image in enumerate(images):
@@ -68,11 +165,11 @@ def _ocr_pdf_page(page, page_num: int = 0) -> str:
                 img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 
                 if img is not None:
-                    results = reader.readtext(img, detail=0)
-                    page_text = "\n".join([str(r) for r in results if str(r).strip()])
-                    if page_text:
+                    # 使用配置的OCR后端
+                    page_text = _ocr_image(img)
+                    if page_text.strip():
                         all_text.append(page_text)
-            except Exception as e:
+            except Exception:
                 continue
         
         return "\n".join(all_text)
@@ -154,14 +251,9 @@ def extract_text_from_upload(filename: Optional[str], raw: bytes) -> str:
         if img is None:
             raise ValueError("无法解析图片文件")
 
-        # 使用缓存的 reader
-        reader = _get_easyocr_reader()
-        raw_results = reader.readtext(img, detail=0)
-        # 显式转换为字符串列表
-        text_list: list[str] = [str(item) for item in raw_results]
-        # 过滤空行
-        filtered = [line for line in text_list if line.strip()]
-        return "\n".join(filtered)
+        # 使用配置的OCR后端
+        text = _ocr_image(img)
+        return text
 
     raise ValueError(f"不支持的文件类型: .{ext}")
 

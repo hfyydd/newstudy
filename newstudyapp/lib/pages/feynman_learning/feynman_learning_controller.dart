@@ -41,6 +41,9 @@ class FeynmanLearningController extends GetxController {
           state.terms.value = List.of(terms);
           state.isLoading.value = false;
           state.errorMessage.value = null;
+
+          // 加载卡片状态以显示已掌握的标记
+          _loadCardStatuses(state.topicId.value);
           return;
         }
       }
@@ -55,6 +58,9 @@ class FeynmanLearningController extends GetxController {
           state.topicId.value ?? FeynmanLearningState.defaultCategory;
       state.activeCategory.value = category;
       loadTerms(category: category);
+
+      // 如果有 noteId（说明是从笔记进入的），加载卡片状态
+      _loadCardStatuses(arguments['noteId'] as String?);
     } else {
       // 如果没有参数，使用默认 category
       loadTerms();
@@ -141,6 +147,28 @@ class FeynmanLearningController extends GetxController {
     } catch (error) {
       state.errorMessage.value = '获取术语失败：$error';
       state.isLoading.value = false;
+    }
+  }
+
+  /// 加载卡片状态以显示已掌握的标记
+  Future<void> _loadCardStatuses(String? noteId) async {
+    if (noteId == null || noteId.isEmpty) {
+      return;
+    }
+
+    try {
+      final response = await httpService.getFlashCardsWithStatus(noteId);
+      // 从API响应中提取已掌握的词条
+      for (final card in response.cards) {
+        if (card.status == 'mastered') {
+          state.masteredTerms.add(card.term);
+        }
+      }
+      debugPrint(
+          '[FeynmanLearningController] 加载到 ${response.masteredCount} 个已掌握的词条');
+    } catch (e) {
+      debugPrint('[FeynmanLearningController] 加载卡片状态失败: $e');
+      // 不显示错误提示，不影响正常使用
     }
   }
 

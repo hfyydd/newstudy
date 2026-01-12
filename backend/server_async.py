@@ -1,7 +1,11 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Awaitable
+from enum import Enum
+import asyncio
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi import File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -56,6 +60,7 @@ class NoteExtractRequest(BaseModel):
 
 class NoteExtractResponse(BaseModel):
     title: str | None = Field(default=None, description="笔记标题（回显）")
+    text: str = Field(default="", description="提取的文本内容")
     terms: List[str] = Field(..., description="抽取出的词语列表（可编辑）")
     total_chars: int = Field(..., ge=0, description="笔记字符数")
 
@@ -106,6 +111,20 @@ class FlashCardListResponse(BaseModel):
     note_id: str = Field(..., description="笔记ID")
     terms: List[str] = Field(..., description="词条列表")
     total: int = Field(..., description="总词条数")
+
+
+class FlashCardDetailResponse(BaseModel):
+    """闪词卡片详情响应模型（含状态）"""
+    term: str = Field(..., description="词条")
+    status: str = Field(..., description="学习状态")
+
+
+class FlashCardListWithStatusResponse(BaseModel):
+    """闪词卡片列表响应模型（含状态）"""
+    note_id: str = Field(..., description="笔记ID")
+    cards: List[FlashCardDetailResponse] = Field(..., description="卡片详情列表")
+    total: int = Field(..., description="总词条数")
+    mastered_count: int = Field(..., description="已掌握数量")
 
 
 class FlashCardStatusUpdateRequest(BaseModel):
@@ -227,6 +246,7 @@ async def extract_note_terms(request: NoteExtractRequest):
         terms = await extract_terms_from_note(request.text, request.max_terms)
         return NoteExtractResponse(
             title=request.title,
+            text=request.text,
             terms=terms,
             total_chars=len(request.text),
         )
@@ -242,10 +262,12 @@ async def extract_note_terms_file(
 ):
     """从笔记文件中抽取待学习词语（multipart/form-data）"""
     try:
-        text = await extract_text_from_upload(file)
+        raw = await file.read()
+        text = extract_text_from_upload(file.filename, raw)
         terms = await extract_terms_from_note(text, max_terms)
         return NoteExtractResponse(
             title=title,
+            text=text,
             terms=terms,
             total_chars=len(text),
         )
@@ -399,6 +421,26 @@ async def get_flash_cards(note_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/notes/{note_id}/flash-cards/detail", response_model=FlashCardListWithStatusResponse)
+async def get_flash_cards_with_status(note_id: str):
+    """获取闪词卡片列表（含状态详情）"""
+    try:
+        cards = await db.get_flash_cards(note_id)
+        card_details = [
+            FlashCardDetailResponse(term=card.term, status=card.status)
+            for card in cards
+        ]
+        mastered_count = sum(1 for card in cards if card.status == "mastered")
+        return FlashCardListWithStatusResponse(
+            note_id=note_id,
+            cards=card_details,
+            total=len(cards),
+            mastered_count=mastered_count,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get(
     "/notes/{note_id}/flash-cards/progress",
     response_model=FlashCardProgressResponse,
@@ -511,5 +553,173 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
-    
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# ==================== 异步文档处理 ====================
+
+# 异步任务状态枚举
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+# 异步任务存储（内存中，生产环境建议用Redis）
+_task_store: Dict[str, dict] = {}
+
+# 线程池用于CPU密集型任务
+_ocr_executor = ThreadPoolExecutor(max_workers=4)
+
+# 配置
+ASYNC_FILE_SIZE_THRESHOLD = 5 * 1024 * 1024  # 5MB
+ASYNC_PAGE_COUNT_THRESHOLD = 10  # 10页
+
+
+class AsyncTaskResponse(BaseModel):
+    """异步任务响应"""
+    task_id: str
+    status: TaskStatus
+    message: str
+
+
+class AsyncTaskResult(BaseModel):
+    """异步任务结果"""
+    task_id: str
+    status: TaskStatus
+    text: Optional[str] = None
+    terms: Optional[List[str]] = None
+    error: Optional[str] = None
+
+
+def _create_task(task_id: str, message: str) -> dict:
+    """创建异步任务"""
+    task = {
+        "task_id": task_id,
+        "status": TaskStatus.PENDING,
+        "message": message,
+        "text": None,
+        "terms": None,
+        "error": None,
+        "created_at": datetime.now().isoformat(),
+        "completed_at": None,
+    }
+    _task_store[task_id] = task
+    return task
+
+
+def _update_task(task_id: str, status: TaskStatus, **kwargs):
+    """更新异步任务"""
+    if task_id in _task_store:
+        _task_store[task_id].update({
+            "status": status,
+            **kwargs,
+        })
+        if status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            _task_store[task_id]["completed_at"] = datetime.now().isoformat()
+
+
+async def _process_file_async(task_id: str, filename: str, raw: bytes, max_terms: int):
+    """后台处理文件提取（异步任务）"""
+    try:
+        _update_task(task_id, TaskStatus.PROCESSING, message="正在提取文本...")
+        
+        # 在线程池中运行CPU密集型OCR操作
+        loop = asyncio.get_event_loop()
+        text = await loop.run_in_executor(
+            _ocr_executor,
+            lambda: extract_text_from_upload(filename or "unknown", raw)
+        )
+        
+        _update_task(task_id, TaskStatus.PROCESSING, message="正在提取术语...")
+        
+        # 提取术语
+        terms = await extract_terms_from_note(text, max_terms)
+        
+        _task_store[task_id].update({
+            "status": TaskStatus.COMPLETED,
+            "message": "处理完成",
+            "text": text,
+            "terms": terms,
+        })
+    except Exception as e:
+        _update_task(task_id, TaskStatus.FAILED, error=str(e), message="处理失败")
+
+
+@app.post("/notes/extract-terms/file/async", response_model=AsyncTaskResponse)
+async def extract_note_terms_file_async(
+    title: Optional[str] = None,
+    max_terms: int = 30,
+    file: UploadFile = File(...),
+):
+    """
+    异步从笔记文件中抽取待学习词语
+    
+    适用于大文件（>5MB或>10页），立即返回任务ID，可通过API查询进度
+    """
+    task_id = str(uuid.uuid4())[:8]
+    raw = await file.read()
+    file_size = len(raw)
+    
+    # 创建任务
+    _create_task(
+        task_id,
+        f"文件 {file.filename} ({file_size/1024:.1f}KB) 已加入队列"
+    )
+    
+    # 启动后台任务
+    asyncio.create_task(
+        _process_file_async(task_id, file.filename, raw, max_terms)
+    )
+    
+    return AsyncTaskResponse(
+        task_id=task_id,
+        status=TaskStatus.PENDING,
+        message=_task_store[task_id]["message"]
+    )
+
+
+@app.get("/notes/extract-terms/async/{task_id}", response_model=AsyncTaskResult)
+async def get_async_task_result(task_id: str):
+    """获取异步任务结果"""
+    task = _task_store.get(task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    
+    return AsyncTaskResult(
+        task_id=task_id,
+        status=task["status"],
+        text=task.get("text"),
+        terms=task.get("terms"),
+        error=task.get("error"),
+    )
+
+
+@app.get("/notes/extract-terms/async", response_model=Dict[str, AsyncTaskResult])
+async def list_async_tasks() -> Dict[str, AsyncTaskResult]:
+    """列出所有异步任务"""
+    return {
+        task_id: AsyncTaskResult(
+            task_id=task_id,
+            status=task["status"],
+            text=task.get("text"),
+            terms=task.get("terms"),
+            error=task.get("error"),
+        )
+        for task_id, task in _task_store.items()
+    }
+
+
+@app.delete("/notes/extract-terms/async/{task_id}")
+async def delete_async_task(task_id: str):
+    """删除已完成的任务"""
+    if task_id not in _task_store:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    
+    if _task_store[task_id]["status"] == TaskStatus.PROCESSING:
+        raise HTTPException(status_code=400, detail="无法删除正在进行的任务")
+    
+    del _task_store[task_id]
+    return {"message": "任务已删除"}
