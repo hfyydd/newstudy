@@ -112,6 +112,20 @@ class Database:
                 )
             """)
 
+            # 创建学习历史表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS learning_history (
+                    id TEXT PRIMARY KEY,
+                    card_id TEXT NOT NULL,
+                    note_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    duration_seconds INTEGER DEFAULT 0,
+                    studied_at TEXT NOT NULL,
+                    FOREIGN KEY (card_id) REFERENCES flash_cards(id) ON DELETE CASCADE,
+                    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+                )
+            """)
+
             # 创建索引以提高查询性能
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_flash_cards_note_id 
@@ -128,6 +142,14 @@ class Database:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_review_schedule_card_id 
                 ON review_schedule(card_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_learning_history_card_id 
+                ON learning_history(card_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_learning_history_studied_at 
+                ON learning_history(studied_at)
             """)
 
             conn.commit()
@@ -424,6 +446,14 @@ class Database:
                     review_count = review_count + 1
             """, (str(uuid4()), card_id, next_review_str, next_review_str))
             
+            # 记录学习历史（默认每次学习耗时60秒）
+            history_id = str(uuid4())
+            cursor.execute("""
+                INSERT INTO learning_history 
+                (id, card_id, note_id, status, duration_seconds, studied_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (history_id, card_id, note_id, status, 60, now_str))
+            
             conn.commit()
             return True
         finally:
@@ -460,6 +490,33 @@ class Database:
         finally:
             conn.close()
 
+    def record_learning_history(
+        self, card_id: str, note_id: str, status: str, duration_seconds: int = 0
+    ) -> None:
+        """记录学习历史
+        
+        Args:
+            card_id: 闪词卡片ID
+            note_id: 笔记ID
+            status: 学习后的状态
+            duration_seconds: 学习时长（秒），默认为0
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            history_id = str(uuid4())
+            studied_at = datetime.now().isoformat()
+            
+            cursor.execute("""
+                INSERT INTO learning_history 
+                (id, card_id, note_id, status, duration_seconds, studied_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (history_id, card_id, note_id, status, duration_seconds, studied_at))
+            
+            conn.commit()
+        finally:
+            conn.close()
+
     def get_learning_statistics(self) -> Dict[str, int]:
         """获取学习统计信息（全局统计）"""
         conn = self._get_connection()
@@ -478,13 +535,16 @@ class Database:
             """)
             total_terms = cursor.fetchone()["count"]
 
-            # 计算连续天数（基于最后复习时间）
-            # 注意：这是一个简化实现，实际应用中需要学习历史表来准确计算连续天数
-            # 这里暂时返回0，因为需要更复杂的逻辑来计算连续天数
-            consecutive_days = 0
+            # 计算连续学习天数
+            consecutive_days = self._calculate_consecutive_days(cursor)
             
-            # 累计时长（分钟）- 暂时返回0，实际需要学习历史表来记录学习时长
-            total_minutes = 0
+            # 计算累计学习时长（分钟）
+            cursor.execute("""
+                SELECT COALESCE(SUM(duration_seconds), 0) as total_seconds 
+                FROM learning_history
+            """)
+            total_seconds = cursor.fetchone()["total_seconds"]
+            total_minutes = int(total_seconds / 60)
 
             return {
                 "mastered": mastered,
@@ -494,6 +554,61 @@ class Database:
             }
         finally:
             conn.close()
+
+    def _calculate_consecutive_days(self, cursor) -> int:
+        """计算连续学习天数
+        
+        逻辑：从今天往前数，统计连续有学习记录的天数
+        如果某一天没有学习记录，则中断
+        """
+        # 获取所有学习时间（SQLite不支持DATE函数，需要在Python中处理）
+        cursor.execute("""
+            SELECT studied_at
+            FROM learning_history
+            ORDER BY studied_at DESC
+        """)
+        
+        rows = cursor.fetchall()
+        
+        if not rows:
+            return 0
+        
+        # 提取所有学习日期（去重）
+        study_dates_set = set()
+        for row in rows:
+            study_datetime = datetime.fromisoformat(row["studied_at"])
+            study_date = study_datetime.date()
+            study_dates_set.add(study_date)
+        
+        # 转换为排序列表
+        study_dates = sorted(study_dates_set, reverse=True)
+        
+        # 计算连续天数
+        today = datetime.now().date()
+        consecutive_days = 0
+        
+        # 检查最近的学习日期
+        if not study_dates:
+            return 0
+        
+        latest_date = study_dates[0]
+        
+        # 如果最后一次学习不是今天或昨天，则连续天数为0
+        days_since_last_study = (today - latest_date).days
+        if days_since_last_study > 1:
+            return 0
+        
+        # 从最近的学习日期开始，往前统计连续天数
+        check_date = latest_date
+        for study_date in study_dates:
+            if study_date == check_date:
+                consecutive_days += 1
+                check_date -= timedelta(days=1)
+            elif study_date < check_date:
+                # 有间隔，中断连续
+                break
+        
+        return consecutive_days
 
     def get_today_review_statistics(self) -> Dict[str, int]:
         """获取今日复习统计信息（基于复习时间间隔）"""
