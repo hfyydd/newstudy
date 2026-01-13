@@ -90,10 +90,10 @@ class HomePage extends GetView<HomeController> {
 
   Widget _buildTodayReviewCard(bool isDark) {
     return Obx(() => _HomePageHelper.buildTodayReviewCard(
-      isDark,
-      statistics: controller.state.todayReviewStatistics.value,
-      onTap: controller.navigateToReview,
-    ));
+          isDark,
+          statistics: controller.state.todayReviewStatistics.value,
+          onTap: controller.navigateToReview,
+        ));
   }
 
   Widget _buildNotesSection(bool isDark) {
@@ -149,12 +149,14 @@ class HomePage extends GetView<HomeController> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           controller.state.errorMessage.value ?? '未知错误',
-                          style: const TextStyle(color: Colors.red, fontSize: 14),
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 14),
                         ),
                       ),
                     ],
@@ -179,7 +181,8 @@ class HomePage extends GetView<HomeController> {
           }
 
           if (controller.state.notes.isEmpty) {
-            return _HomePageHelper.buildAddNoteButton(isDark, _showCreateNoteSheet);
+            return _HomePageHelper.buildAddNoteButton(
+                isDark, _showCreateNoteSheet);
           }
 
           // 显示笔记列表（最多显示前3个）
@@ -196,7 +199,8 @@ class HomePage extends GetView<HomeController> {
                 final index = entry.key;
                 final note = entry.value;
                 return Padding(
-                  padding: EdgeInsets.only(bottom: index < displayNotes.length - 1 ? 12 : 12),
+                  padding: EdgeInsets.only(
+                      bottom: index < displayNotes.length - 1 ? 12 : 12),
                   child: _buildNoteCard(
                     isDark: isDark,
                     noteId: note.id,
@@ -351,9 +355,9 @@ class HomePage extends GetView<HomeController> {
 
   Widget _buildStatsSection(bool isDark) {
     return Obx(() => _HomePageHelper.buildStatsSection(
-      isDark,
-      statistics: controller.state.statistics.value,
-    ));
+          isDark,
+          statistics: controller.state.statistics.value,
+        ));
   }
 
   void _showCreateNoteSheet(BuildContext context, bool isDark) {
@@ -513,7 +517,8 @@ class _HomePageHelper {
     );
   }
 
-  static Widget buildAddNoteButton(bool isDark, Function(BuildContext, bool) showCreateNoteSheet) {
+  static Widget buildAddNoteButton(
+      bool isDark, Function(BuildContext, bool) showCreateNoteSheet) {
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final iconColor = isDark ? Colors.grey[600] : Colors.grey[500];
 
@@ -550,21 +555,120 @@ class _HomePageHelper {
 
   static Widget buildStatsSection(
     bool isDark, {
-    LearningStatisticsResponse? statistics,
+    TodayReviewStatisticsResponse? todayReviewStats,
+    LearningStatisticsResponse? learningStats,
   }) {
     final textColor = isDark ? Colors.white : Colors.black;
+    
+    // 今日复习统计部分
+    final totalToday = todayReviewStats?.total ?? 0;
+    final needsReviewToday = todayReviewStats?.needsReview ?? 0;
+    final needsImproveToday = todayReviewStats?.needsImprove ?? 0;
 
-    // 使用统计数据，如果没有则显示默认值
-    final consecutiveDays = statistics?.consecutiveDays ?? 0;
-    final mastered = statistics?.mastered ?? 0;
-    final totalMinutes = statistics?.totalMinutes ?? 0;
-    final totalTerms = statistics?.totalTerms ?? 0;
+    // 全局学习统计部分
+    final consecutiveDays = learningStats?.consecutiveDays ?? 0;
+    final mastered = learningStats?.mastered ?? 0;
+    final totalMinutes = learningStats?.totalMinutes ?? 0;
+    final totalTerms = learningStats?.totalTerms ?? 0;
 
     // 格式化累计时长：分钟转换为小时
     String formatDuration(int minutes) {
       if (minutes < 60) {
         return '${minutes}分钟';
       }
+      final hours = minutes ~/ 60;
+      final mins = minutes % 60;
+      if (mins == 0) {
+        return '${hours}h';
+      }
+      return '${hours}.${(mins / 60 * 10).toInt()}h';
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 全局学习统计
+        Text(
+          '全局统计',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textColor.withOpacity(0.8),
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // 全局学习统计
+        Text(
+          '全局统计',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textColor.withOpacity(0.8),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                  isDark, Icons.local_fire_department_rounded,
+                  '$consecutiveDays',
+                  '连续天数',
+                  const Color(0xFFFF6B6B))),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(isDark, Icons.psychology_rounded,
+                  '$mastered', '已掌握', const Color(0xFF4ECDC4))),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(isDark, Icons.timer_outlined,
+                  formatDuration(totalMinutes), '累计时长', const Color(0xFFFFD93D))),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(isDark, Icons.library_books_outlined,
+                  '$totalTerms', '累计学习', const Color(0xFF95E1D3))),
+          ],
+        ),
+        
+        // 今日复习统计
+        if (totalToday > 0) ... [
+          const SizedBox(height: 32),
+          Text(
+            '今日复习',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: textColor.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                  child: _buildStatCard(isDark, Icons.notification_important_outlined,
+                      '$needsReviewToday', '需复习', const Color(0xFFFF9C27B0))),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _buildStatCard(isDark, Icons.build_circle_outlined,
+                      '$needsImproveToday', '需改进', const Color(0xFFE67E22))),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+      final hours = minutes ~/ 60;
+      final mins = minutes % 60;
+      if (mins == 0) {
+        return '${hours}h';
+      }
+      return '${hours}.${(mins / 60 * 10).toInt()}h';
+    }
       final hours = minutes ~/ 60;
       final mins = minutes % 60;
       if (mins == 0) {
@@ -593,8 +697,8 @@ class _HomePageHelper {
                     const Color(0xFFFF6B6B))),
             const SizedBox(width: 12),
             Expanded(
-                child: _buildStatCard(isDark, Icons.psychology_rounded, '$mastered',
-                    '已掌握', const Color(0xFF4ECDC4))),
+                child: _buildStatCard(isDark, Icons.psychology_rounded,
+                    '$mastered', '已掌握', const Color(0xFF4ECDC4))),
           ],
         ),
         const SizedBox(height: 12),
@@ -657,7 +761,6 @@ class _HomePageHelper {
       ),
     );
   }
-
 }
 
 // 创建笔记底部选择器
@@ -843,7 +946,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
     return GestureDetector(
       onTap: () async {
         final label = item.label;
-        
+
         // 1. 自定义文本 (BottomSheet)
         if (label == '自定义文本') {
           Get.put(CreateNoteController());
@@ -861,7 +964,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
         if (['PDF文档', 'Word文档', '其他文档', '上传图片', '拍照'].contains(label)) {
           final creationController = Get.put(NoteCreationController());
           Get.back(); // 关闭当前源选择弹窗
-          
+
           if (label == '上传图片') {
             creationController.pickImage(ImageSource.gallery);
           } else if (label == '拍照') {
