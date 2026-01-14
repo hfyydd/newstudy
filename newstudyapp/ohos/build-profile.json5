@@ -1,7 +1,20 @@
-
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/hanfeng/.ohos/config/default_ohos_tzVSKxgV6_dYD8iUA6HF2jM0oAoEHN2lSAvnHHS7N4I=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BEEE182BECFB74D7A2C554D4BB1AFA2A613E7F19222489061CA41254DCC08776BF4FB026AEB1F9F",
+          "profile": "/Users/hanfeng/.ohos/config/default_ohos_tzVSKxgV6_dYD8iUA6HF2jM0oAoEHN2lSAvnHHS7N4I=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/hanfeng/.ohos/config/default_ohos_tzVSKxgV6_dYD8iUA6HF2jM0oAoEHN2lSAvnHHS7N4I=.p12",
+          "storePassword": "0000001B49556654CB20C352E253026F956B24E67B9A297A61B7274A3E350DBAD05A71786D02C1A304953C"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
