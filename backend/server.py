@@ -25,7 +25,7 @@ try:
     from .note_terms_extractor import extract_terms_from_note
     from .file_text_extractor import extract_text_from_upload
     from .smart_note_generator import generate_smart_note
-    from .db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
+    from .db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id, get_learning_statistics, get_today_review_statistics, record_learning_history
     from .get_default_user import get_default_user_id
     from .feynman_evaluator import evaluate_explanation, get_available_roles
 except ImportError:  # pragma: no cover
@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover
     from note_terms_extractor import extract_terms_from_note
     from file_text_extractor import extract_text_from_upload
     from smart_note_generator import generate_smart_note
-    from db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
+    from db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id, get_learning_statistics, get_today_review_statistics, record_learning_history
     from get_default_user import get_default_user_id
     from feynman_evaluator import evaluate_explanation, get_available_roles
 
@@ -607,6 +607,20 @@ class HomeStatisticsResponse(BaseModel):
     week_completed: int = Field(default=0, description="本周完成的学习次数（学习记录数）")
     week_target: int = Field(default=30, description="本周学习目标次数")
     trend_7d: List[DailyStudyCount] = Field(default_factory=list, description="近7天学习趋势")
+
+
+class LearningStatisticsResponse(BaseModel):
+    """学习统计响应（全局统计）"""
+    mastered: int = Field(..., description="已掌握词条数")
+    totalTerms: int = Field(..., description="累计学习词条数")
+    consecutiveDays: int = Field(..., description="连续学习天数")
+    totalMinutes: int = Field(..., description="累计学习时长（分钟）")
+
+
+class TodayReviewStatisticsResponse(BaseModel):
+    """今日复习统计响应"""
+    reviewDue: int = Field(..., description="需要复习的词条数")
+    reviewCompleted: int = Field(..., description="已完成复习的词条数")
 
 
 class FlashCardListItem(BaseModel):
@@ -1695,6 +1709,50 @@ def get_cards_by_note(
         
     except Exception as exc:
         logger.error(f"❌ 按笔记分类获取词条列表失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ==================== 学习统计相关接口 ====================
+
+@app.get("/statistics", response_model=LearningStatisticsResponse)
+def get_learning_statistics_api() -> LearningStatisticsResponse:
+    """
+    获取学习统计信息（全局统计）
+
+    返回全局学习统计数据，包括已掌握词条数、累计学习词条数、连续学习天数、累计学习时长等。
+    """
+    try:
+        logger.info("📊 获取学习统计信息")
+        stats = get_learning_statistics()
+        logger.info(f"✅ 学习统计: 已掌握{stats['mastered']}/{stats['totalTerms']}, 连续{stats['consecutiveDays']}天, 累计{stats['totalMinutes']}分钟")
+        return LearningStatisticsResponse(
+            mastered=stats["mastered"],
+            totalTerms=stats["totalTerms"],
+            consecutiveDays=stats["consecutiveDays"],
+            totalMinutes=stats["totalMinutes"],
+        )
+    except Exception as exc:
+        logger.error(f"❌ 获取学习统计失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/review/today", response_model=TodayReviewStatisticsResponse)
+def get_today_review_statistics_api() -> TodayReviewStatisticsResponse:
+    """
+    获取今日复习统计信息
+
+    返回今日需要复习的词条数和已完成复习的词条数。
+    """
+    try:
+        logger.info("📊 获取今日复习统计")
+        stats = get_today_review_statistics()
+        logger.info(f"✅ 今日复习统计: 待复习{stats['reviewDue']}, 已完成{stats['reviewCompleted']}")
+        return TodayReviewStatisticsResponse(
+            reviewDue=stats["reviewDue"],
+            reviewCompleted=stats["reviewCompleted"],
+        )
+    except Exception as exc:
+        logger.error(f"❌ 获取今日复习统计失败: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

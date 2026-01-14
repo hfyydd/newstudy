@@ -185,3 +185,157 @@ def execute_insert_return_id(query: str, params: Optional[tuple] = None) -> int:
             conn.commit()
             return result[0] if result else None
 
+
+# ==================== 学习统计相关函数 ====================
+
+def get_learning_statistics() -> Dict[str, int]:
+    """
+    获取学习统计信息（全局统计）
+    
+    Returns:
+        包含 mastered, totalTerms, consecutiveDays, totalMinutes 的字典
+    """
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # 统计已掌握的词条数
+            cur.execute("""
+                SELECT COUNT(*) as count FROM flash_cards WHERE status = 'mastered'
+            """)
+            mastered = cur.fetchone()['count']
+            
+            # 统计累计学习词条数（所有词条）
+            cur.execute("""
+                SELECT COUNT(*) as count FROM flash_cards
+            """)
+            total_terms = cur.fetchone()['count']
+            
+            # 计算连续学习天数
+            consecutive_days = _calculate_consecutive_days(cur)
+            
+            # 计算累计学习时长（分钟）
+            cur.execute("""
+                SELECT COALESCE(SUM(duration_seconds), 0) as total_seconds 
+                FROM learning_history
+            """)
+            total_seconds = cur.fetchone()['total_seconds']
+            total_minutes = int(total_seconds / 60) if total_seconds else 0
+            
+            return {
+                "mastered": mastered,
+                "totalTerms": total_terms,
+                "consecutiveDays": consecutive_days,
+                "totalMinutes": total_minutes,
+            }
+
+
+def _calculate_consecutive_days(cur) -> int:
+    """
+    计算连续学习天数
+    
+    逻辑：从今天往前数，统计连续有学习记录的天数
+    如果某一天没有学习记录，则中断
+    """
+    from datetime import datetime, timedelta
+    
+    # 获取所有学习时间（PostgreSQL可以直接使用DATE函数）
+    cur.execute("""
+        SELECT DISTINCT DATE(studied_at) as study_date
+        FROM learning_history
+        ORDER BY study_date DESC
+    """)
+    
+    rows = cur.fetchall()
+    
+    if not rows:
+        return 0
+    
+    # 提取所有学习日期
+    study_dates = [row['study_date'] for row in rows]
+    
+    # 计算连续天数
+    today = datetime.now().date()
+    consecutive_days = 0
+    
+    # 检查最近的学习日期
+    if not study_dates:
+        return 0
+    
+    latest_date = study_dates[0]
+    
+    # 如果最后一次学习不是今天或昨天，则连续天数为0
+    days_since_last_study = (today - latest_date).days
+    if days_since_last_study > 1:
+        return 0
+    
+    # 从最近的学习日期开始，往前统计连续天数
+    check_date = latest_date
+    for study_date in study_dates:
+        if study_date == check_date:
+            consecutive_days += 1
+            check_date -= timedelta(days=1)
+        elif study_date < check_date:
+            # 有间隔，中断连续
+            break
+    
+    return consecutive_days
+
+
+def get_today_review_statistics() -> Dict[str, int]:
+    """
+    获取今日复习统计信息（基于复习时间间隔）
+    
+    Returns:
+        包含 reviewDue, reviewCompleted 的字典
+    """
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            from datetime import datetime
+            now = datetime.now()
+            
+            # 统计需要复习的词条总数（基于时间判断）
+            # 这里简化逻辑：需要复习的 = needsReview 状态的卡片
+            cur.execute("""
+                SELECT COUNT(*) as count 
+                FROM flash_cards 
+                WHERE status IN ('needsReview', 'notStarted')
+            """)
+            review_due = cur.fetchone()['count']
+            
+            # 统计今日已完成复习的词条数
+            cur.execute("""
+                SELECT COUNT(DISTINCT card_id) as count 
+                FROM learning_history 
+                WHERE DATE(studied_at) = CURRENT_DATE
+            """)
+            review_completed = cur.fetchone()['count']
+            
+            return {
+                "reviewDue": review_due,
+                "reviewCompleted": review_completed,
+            }
+
+
+def record_learning_history(card_id: str, note_id: str, status: str, duration_seconds: int = 0) -> str:
+    """
+    记录学习历史
+    
+    Args:
+        card_id: 闪词卡片ID
+        note_id: 笔记ID
+        status: 学习状态
+        duration_seconds: 学习时长（秒）
+    
+    Returns:
+        学习历史记录ID
+    """
+    import uuid
+    history_id = str(uuid.uuid4())
+    
+    query = """
+        INSERT INTO learning_history (id, card_id, note_id, status, duration_seconds, studied_at)
+        VALUES (%s, %s, %s, %s, %s, NOW())
+        RETURNING id
+    """
+    
+    return execute_insert_return_id(query, (history_id, card_id, note_id, status, duration_seconds))
+

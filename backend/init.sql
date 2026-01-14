@@ -27,10 +27,24 @@ CREATE TABLE IF NOT EXISTS flash_cards (
     CONSTRAINT unique_note_term UNIQUE(note_id, term)
 );
 
+-- 创建learning_history表（学习历史记录）
+CREATE TABLE IF NOT EXISTS learning_history (
+    id TEXT PRIMARY KEY,
+    card_id TEXT NOT NULL,
+    note_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    duration_seconds INTEGER DEFAULT 0,
+    studied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_card FOREIGN KEY (card_id) REFERENCES flash_cards(id) ON DELETE CASCADE,
+    CONSTRAINT fk_note_history FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+);
+
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_flash_cards_note_id ON flash_cards(note_id);
 CREATE INDEX IF NOT EXISTS idx_flash_cards_status ON flash_cards(status);
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at);
+CREATE INDEX IF NOT EXISTS idx_learning_history_card_id ON learning_history(card_id);
+CREATE INDEX IF NOT EXISTS idx_learning_history_studied_at ON learning_history(studied_at);
 
 -- 创建更新时间触发器函数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
