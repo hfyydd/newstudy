@@ -9,7 +9,7 @@ dependencies = [
     "langchain-openai>=1.0.2",
     "langgraph>=1.0.3",
     "openai>=1.0",
-    "pypdf>=6.0.0",
+    "pymupdf>=1.25.0",  # 替换pypdf，性能更强
     "python-docx>=1.1.2",
     "python-multipart>=0.0.9",
     "python-dotenv>=1.0.0",
@@ -17,7 +17,12 @@ dependencies = [
     "uvicorn>=0.38.0",
     # 数据库相关
     "sqlalchemy>=2.0.0",
-    "psycopg2-binary>=2.9.0",
+    "psycopg2-binary>=2.9.9",
     "pgvector>=0.3.0",
     "alembic>=1.13.0",
+    "asyncpg>=0.29.0",
+    # OCR 相关
+    "easyocr>=1.7.1",
+    "opencv-python-headless>=4.10.0.84",
+    "pytesseract>=0.3.10",
 ]

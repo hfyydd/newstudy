@@ -68,6 +68,9 @@ class FeynmanLearningState {
   final selectedTerm = Rxn<String>();
   final activeCategory = 'economics'.obs;
   
+  /// 已掌握的词条集合（用于标记已掌握的词条，避免重复标记）
+  final masteredTerms = <String>{}.obs;
+  
   // 卡片浏览状态
   final currentCardIndex = 0.obs;
 
@@ -88,6 +91,11 @@ class FeynmanLearningState {
   final textInputController = TextEditingController();
   final inputText = ''.obs; // 用于跟踪输入文本内容
   final isAppending = false.obs;
+
+  // 语音识别相关状态
+  final isListening = false.obs;
+  final speechAvailable = false.obs;
+  final speechError = Rxn<String>();
 
   // ========== 学习流程状态 ==========
   /// 当前学习阶段

@@ -7,12 +7,12 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
+# AI配置
 base_url = os.getenv("BASE_URL", "https://api.moonshot.cn/v1")
 api_key = os.getenv("API_KEY", "")
 model = os.getenv("MODEL", "kimi-k2-turbo-preview")
 
-# 数据库配置（从 .env 文件读取，不提供默认值）
-# 注意：database_url 变量目前未使用，数据库连接统一使用 database.py 中的 DATABASE_URL
+# 数据库配置（从 .env 文件读取）
 database_url = os.getenv("DATABASE_URL")
 
 # 注意：

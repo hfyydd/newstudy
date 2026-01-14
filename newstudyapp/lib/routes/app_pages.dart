@@ -12,6 +12,7 @@ import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
 import 'package:newstudyapp/pages/note_detail/note_detail_page.dart';
 import 'package:newstudyapp/pages/note_detail/note_detail_controller.dart';
+import 'package:newstudyapp/pages/notes/notes_page.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 
 /// GetX 页面路由配置
@@ -68,6 +69,10 @@ class AppPages {
       binding: BindingsBuilder(() {
         Get.lazyPut<NoteDetailController>(() => NoteDetailController());
       }),
+    ),
+    GetPage(
+      name: AppRoutes.notes,
+      page: () => const NotesPage(),
     ),
   ];
 }

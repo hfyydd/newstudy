@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/pages/main/main_controller.dart';
 import 'package:newstudyapp/pages/home/home_page.dart';
+import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/pages/review/review_page.dart';
+import 'package:newstudyapp/pages/review/review_controller.dart';
 import 'package:newstudyapp/pages/notes/notes_page.dart';
 import 'package:newstudyapp/pages/profile/profile_page.dart';
 
@@ -12,6 +14,11 @@ class MainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(MainController());
+    // 注册 HomeController，因为 HomePage 使用 GetView<HomeController>
+    // 使用 lazyPut 确保只在需要时创建，避免重复创建
+    Get.lazyPut<HomeController>(() => HomeController(), fenix: true);
+    // 注册 ReviewController
+    Get.lazyPut<ReviewController>(() => ReviewController(), fenix: true);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

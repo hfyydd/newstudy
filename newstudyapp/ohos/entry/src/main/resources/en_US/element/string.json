@@ -11,6 +11,18 @@
     {
       "name": "EntryAbility_label",
       "value": "newstudyapp"
+    },
+    {
+      "name": "internet_permission_reason",
+      "value": "Need internet permission to connect to backend service"
+    },
+    {
+      "name": "microphone_permission_reason",
+      "value": "Need microphone permission to use speech recognition"
+    },
+    {
+      "name": "camera_permission_reason",
+      "value": "Need camera permission to use camera feature"
     }
   ]
 }
