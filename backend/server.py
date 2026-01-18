@@ -60,6 +60,9 @@ async def log_requests(request: Request, call_next):
     return response
 
 
+
+
+
 class AgentRequest(BaseModel):
     text: str = Field(..., min_length=1, description="用户输入文本")
 
@@ -70,7 +73,7 @@ class AgentResponse(BaseModel):
 
 class TermsResponse(BaseModel):
     category: str = Field(..., min_length=1, description="术语类别标识")
-    terms: List[str] = Field(..., min_items=1, description="术语列表")
+    terms: List[str] = Field(..., min_length=1, description="术语列表")
 
 
 class NoteExtractRequest(BaseModel):
@@ -82,6 +85,7 @@ class NoteExtractRequest(BaseModel):
 class NoteExtractResponse(BaseModel):
     title: str | None = Field(default=None, description="笔记标题（回显）")
     terms: List[str] = Field(..., description="抽取出的词语列表（可编辑）")
+    text: str = Field(..., description="笔记内容（纯文本）")
     total_chars: int = Field(..., ge=0, description="笔记字符数")
 
 
@@ -102,18 +106,28 @@ class CreateNoteRequest(BaseModel):
     """创建笔记请求"""
     user_input: str = Field(..., min_length=1, description="用户输入的学习内容")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+    # 可选字段：如果前端已经提供了这些信息（如文件上传），则直接使用，不走AI生成
+    title: str | None = Field(default=None, description="笔记标题")
+    terms: List[str] | None = Field(default=None, description="预提取的闪词")
+    content: str | None = Field(default=None, description="笔记正文")
+
+
+class UpdateNoteRequest(BaseModel):
+    """更新笔记请求"""
+    title: str | None = Field(default=None, description="笔记标题")
+    content: str | None = Field(default=None, description="笔记内容")
 
 
 class CreateNoteResponse(BaseModel):
     """创建笔记响应"""
-    note_id: int = Field(..., description="笔记ID")
+    note_id: str = Field(..., description="笔记ID")
     title: str = Field(..., description="笔记标题")
     flash_card_count: int = Field(..., ge=0, description="闪词数量")
 
 
 class NoteListItem(BaseModel):
     """笔记列表项"""
-    id: int
+    id: str
     title: str
     created_at: str
     flash_card_count: int = Field(..., description="闪词总数")
@@ -294,6 +308,7 @@ def extract_terms(payload: NoteExtractRequest) -> NoteExtractResponse:
     return NoteExtractResponse(
         title=payload.title,
         terms=terms,
+        text=text,
         total_chars=len(payload.text),
     )
 
@@ -316,6 +331,7 @@ async def extract_terms_from_file(
     return NoteExtractResponse(
         title=file.filename,
         terms=terms,
+        text=text,
         total_chars=len(text),
     )
 
@@ -370,24 +386,30 @@ def create_note(
         # 获取默认用户ID
         user_id = get_default_user_id()
         
-        # 生成智能笔记和闪词
-        note_content, terms = generate_smart_note(
-            payload.user_input,
-            max_terms=payload.max_terms
-        )
-        
-        # 从Markdown内容中提取标题（取第一行，移除#号）
-        title = "智能笔记"
-        for line in note_content.split('\n'):
-            line = line.strip()
-            if line:
-                # 移除Markdown标题符号
-                title = line.replace('#', '').strip()
-                if title:
-                    # 限制标题长度
-                    if len(title) > 50:
-                        title = title[:50] + "..."
-                    break
+        if payload.terms and payload.content and payload.title:
+            logger.info("⏩ 检测到预提取内容，跳过 AI 生成，直接保存")
+            note_content = payload.content
+            terms = payload.terms
+            title = payload.title
+        else:
+            # 生成智能笔记和闪词
+            note_content, terms = generate_smart_note(
+                payload.user_input,
+                max_terms=payload.max_terms
+            )
+            
+            # 从Markdown内容中提取标题（取第一行，移除#号）
+            title = "智能笔记"
+            for line in note_content.split('\n'):
+                line = line.strip()
+                if line:
+                    # 移除Markdown标题符号
+                    title = line.replace('#', '').strip()
+                    if title:
+                        # 限制标题长度
+                        if len(title) > 50:
+                            title = title[:50] + "..."
+                        break
         
         # 使用 SQL INSERT 创建笔记
         insert_note_sql = """
@@ -515,7 +537,7 @@ def list_notes(
 
 class NoteDetailResponse(BaseModel):
     """笔记详情响应"""
-    id: int
+    id: str
     title: str
     content: str | None
     markdown_content: str | None
@@ -541,8 +563,8 @@ class RolesResponse(BaseModel):
 
 class EvaluateRequest(BaseModel):
     """评估请求"""
-    card_id: int = Field(..., description="闪词卡片ID")
-    note_id: int = Field(..., description="笔记ID")
+    card_id: str = Field(..., description="闪词卡片ID")
+    note_id: str = Field(..., description="笔记ID")
     selected_role: str = Field(..., min_length=1, description="选择的角色ID")
     user_explanation: str = Field(..., min_length=1, description="用户的解释")
 
@@ -554,7 +576,7 @@ class EvaluateResponse(BaseModel):
     feedback: str = Field(..., description="AI反馈（简短版）")
     highlights: List[str] = Field(default=[], description="做得好的点")
     suggestions: List[str] = Field(default=[], description="改进建议")
-    learning_record_id: int = Field(..., description="学习记录ID")
+    learning_record_id: str | int = Field(..., description="学习记录ID")
 
 
 class UpdateCardStatusRequest(BaseModel):
@@ -564,7 +586,7 @@ class UpdateCardStatusRequest(BaseModel):
 
 class CardStatusResponse(BaseModel):
     """卡片状态响应"""
-    id: int
+    id: str
     term: str
     status: str
     review_count: int
@@ -625,10 +647,10 @@ class TodayReviewStatisticsResponse(BaseModel):
 
 class FlashCardListItem(BaseModel):
     """闪词卡片列表项"""
-    id: int
+    id: str
     term: str
     status: str
-    note_id: int
+    note_id: str
     note_title: str = Field(default="", description="笔记标题")
     review_count: int = Field(default=0, description="复习次数")
     last_studied_at: str | None = Field(default=None, description="最后学习时间")
@@ -644,7 +666,7 @@ class FlashCardListResponse(BaseModel):
 
 class CardsByNoteItem(BaseModel):
     """按笔记分类的词条统计项"""
-    note_id: int
+    note_id: str
     note_title: str
     total_count: int = Field(default=0, description="总词条数")
     mastered_count: int = Field(default=0, description="已掌握数量")
@@ -661,7 +683,7 @@ class CardsByNoteResponse(BaseModel):
 
 @app.get("/notes/{note_id}", response_model=NoteDetailResponse)
 def get_note_detail(
-    note_id: int,
+    note_id: str,
     cur = Depends(get_db_cursor)
 ) -> NoteDetailResponse:
     """
@@ -733,6 +755,88 @@ def get_note_detail(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@app.put("/notes/{note_id}", response_model=NoteDetailResponse)
+def update_note(
+    note_id: str,
+    payload: UpdateNoteRequest,
+    cur = Depends(get_db_cursor)
+) -> NoteDetailResponse:
+    """
+    更新笔记（纯 SQL 方式）。
+    """
+    logger.info(f"📝 更新笔记，ID: {note_id}, title: {payload.title}")
+    
+    try:
+        user_id = get_default_user_id()
+        
+        # 1. 验证笔记是否存在且属于当前用户
+        check_sql = "SELECT id FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(check_sql, (note_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+            
+        # 2. 构建更新 SQL
+        update_fields = []
+        params = []
+        if payload.title is not None:
+            update_fields.append("title = %s")
+            params.append(payload.title)
+        if payload.content is not None:
+            update_fields.append("content = %s")
+            params.append(payload.content)
+            
+        if not update_fields:
+            # 没有任何更变，直接返回详情
+            return get_note_detail(note_id, cur)
+            
+        update_fields.append("updated_at = NOW()")
+        params.append(note_id)
+        params.append(user_id)
+        
+        sql = f"UPDATE notes SET {', '.join(update_fields)} WHERE id = %s AND user_id = %s"
+        cur.execute(sql, tuple(params))
+        
+        # 3. 返回更新后的详情
+        return get_note_detail(note_id, cur)
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 更新笔记失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.delete("/notes/{note_id}")
+def delete_note(
+    note_id: str,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    删除笔记（纯 SQL 方式）。
+    """
+    logger.info(f"🗑️ 删除笔记，ID: {note_id}")
+    
+    try:
+        user_id = get_default_user_id()
+        
+        # 删除笔记（级联删除闪词卡片和学习记录已由数据库外键处理，但需要确认约束）
+        delete_sql = "DELETE FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(delete_sql, (note_id, user_id))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+            
+        logger.info(f"✅ 笔记已删除: {note_id}")
+        
+        return {"message": "删除成功", "id": note_id}
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 删除笔记失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 # ========== 学习相关 API ==========
 
 @app.get("/learning/roles", response_model=RolesResponse)
@@ -778,7 +882,7 @@ def evaluate_user_explanation(
             raise HTTPException(status_code=404, detail="闪词卡片不存在")
         
         term = card['term']
-        current_review_count = card['review_count'] or 0
+        current_review_count = card.get('review_count') or 0
         
         # 2. 获取角色名称（用于AI评估）
         roles = get_available_roles()
@@ -878,7 +982,7 @@ def evaluate_user_explanation(
 
 @app.patch("/flash-cards/{card_id}/status", response_model=CardStatusResponse)
 def update_card_status(
-    card_id: int,
+    card_id: str,
     payload: UpdateCardStatusRequest,
     cur = Depends(get_db_cursor)
 ) -> CardStatusResponse:
@@ -949,7 +1053,7 @@ def update_card_status(
 
 @app.get("/flash-cards/{card_id}", response_model=dict)
 def get_flash_card_detail(
-    card_id: int,
+    card_id: str,
     cur = Depends(get_db_cursor)
 ) -> dict:
     """
@@ -998,7 +1102,7 @@ def get_flash_card_detail(
             "note_id": card['note_id'],
             "term": card['term'],
             "status": card['status'],
-            "review_count": card['review_count'] or 0,
+            "review_count": card.get('review_count') or 0,
             "created_at": card['created_at'].isoformat() if card['created_at'] else "",
             "updated_at": card['updated_at'].isoformat() if card['updated_at'] else "",
             "learning_history": learning_history,
@@ -1013,7 +1117,7 @@ def get_flash_card_detail(
 
 @app.patch("/notes/{note_id}/default-role")
 def set_note_default_role(
-    note_id: int,
+    note_id: str,
     payload: SetNoteDefaultRoleRequest,
     cur = Depends(get_db_cursor)
 ) -> dict:
@@ -1195,14 +1299,14 @@ def get_home_statistics(
 
         # 近30天的学习记录（用于 streak / active / trend / 周进度）
         learning_sql = """
-            SELECT 
-                DATE(lr.attempted_at) AS day,
+            SELECT
+                DATE(lr.studied_at) AS day,
                 COUNT(*) AS cnt
             FROM learning_records lr
             INNER JOIN notes n ON lr.note_id = n.id
             WHERE n.user_id = %s
-                AND lr.attempted_at >= NOW() - INTERVAL '30 days'
-            GROUP BY DATE(lr.attempted_at)
+                AND lr.studied_at >= NOW() - INTERVAL '30 days'
+            GROUP BY DATE(lr.studied_at)
         """
         cur.execute(learning_sql, (user_id,))
         learning_rows = cur.fetchall()
@@ -1237,7 +1341,7 @@ def get_home_statistics(
             FROM learning_records lr
             INNER JOIN notes n ON lr.note_id = n.id
             WHERE n.user_id = %s
-              AND lr.attempted_at >= %s
+              AND lr.studied_at >= %s
         """
         cur.execute(week_sql, (user_id, week_start))
         week_cnt_row = cur.fetchone()
@@ -1284,16 +1388,16 @@ def get_today_review_cards(
         # - NEEDS_REVIEW（需巩固）: 1天后（即 last_reviewed_at + 1天 <= NOW()）
         # - MASTERED: 7天后（即 last_reviewed_at + 7天 <= NOW()）
         query_sql = """
-            SELECT 
+            SELECT
                 fc.id,
                 fc.term,
                 fc.status,
                 fc.note_id,
                 n.title as note_title,
-                fc.review_count,
-                MAX(lr.attempted_at) as last_studied_at,
-                MAX(lr.score) as best_score,
+                COUNT(lr.id) as review_count,
+                MAX(lr.studied_at) as last_studied_at,
                 COUNT(lr.id) as attempt_count,
+                MAX(lr.score) as best_score,
                 fc.last_reviewed_at
             FROM flash_cards fc
             INNER JOIN notes n ON fc.note_id = n.id
@@ -1302,29 +1406,29 @@ def get_today_review_cards(
                 AND (
                     -- 未掌握：4小时后需要复习
                     (fc.status = 'NOT_MASTERED' AND (
-                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at IS NULL OR
                         fc.last_reviewed_at + INTERVAL '4 hours' <= NOW()
                     ))
                     OR
                     -- 需改进：3天后需要复习
                     (fc.status = 'NEEDS_IMPROVE' AND (
-                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at IS NULL OR
                         fc.last_reviewed_at + INTERVAL '3 days' <= NOW()
                     ))
                     OR
                     -- 需巩固：1天后需要复习
                     (fc.status = 'NEEDS_REVIEW' AND (
-                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at IS NULL OR
                         fc.last_reviewed_at + INTERVAL '1 day' <= NOW()
                     ))
                     OR
                     -- 已掌握：7天后需要复习（长期巩固）
                     (fc.status = 'MASTERED' AND (
-                        fc.last_reviewed_at IS NULL OR 
+                        fc.last_reviewed_at IS NULL OR
                         fc.last_reviewed_at + INTERVAL '7 days' <= NOW()
                     ))
                 )
-            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count, fc.last_reviewed_at
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.last_reviewed_at
             ORDER BY 
                 CASE fc.status
                     WHEN 'NOT_MASTERED' THEN 1  -- 未掌握优先
@@ -1389,10 +1493,10 @@ def get_today_review_cards(
                 status=card['status'],
                 note_id=card['note_id'],
                 note_title=card['note_title'] or '',
-                review_count=card['review_count'] or 0,
+                review_count=card.get('review_count') or 0,
                 last_studied_at=last_studied_at_str,
-                best_score=card['best_score'],
-                attempt_count=card['attempt_count'] or 0,
+                best_score=card.get('best_score'),
+                attempt_count=card.get('attempt_count') or 0,
             ))
         
         return FlashCardListResponse(cards=card_items, total=total)
@@ -1425,30 +1529,29 @@ def get_weak_cards(
         # 构建参数化查询
         placeholders = ','.join(['%s'] * len(status_list))
         query_sql = f"""
-            SELECT 
+            SELECT
                 fc.id,
                 fc.term,
                 fc.status,
                 fc.note_id,
                 n.title as note_title,
-                fc.review_count,
-                MAX(lr.attempted_at) as last_studied_at,
-                MAX(lr.score) as best_score,
-                COUNT(lr.id) as attempt_count
+                COUNT(lr.id) as review_count,
+                MAX(lr.studied_at) as last_studied_at,
+                COUNT(lr.id) as attempt_count,
+                MAX(lr.score) as best_score
             FROM flash_cards fc
             INNER JOIN notes n ON fc.note_id = n.id
             LEFT JOIN learning_records lr ON fc.id = lr.card_id
             WHERE n.user_id = %s
                 AND fc.status IN ({placeholders})
-            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count
-            ORDER BY 
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title
+            ORDER BY
                 CASE fc.status
                     WHEN 'NOT_MASTERED' THEN 1
                     WHEN 'NEEDS_IMPROVE' THEN 2
                     WHEN 'NEEDS_REVIEW' THEN 3
                     ELSE 4
                 END,
-                COALESCE(MAX(lr.score), 0) ASC,
                 fc.id ASC
             LIMIT %s OFFSET %s
         """
@@ -1484,10 +1587,10 @@ def get_weak_cards(
                 status=card['status'],
                 note_id=card['note_id'],
                 note_title=card['note_title'] or '',
-                review_count=card['review_count'] or 0,
+                review_count=card.get('review_count') or 0,
                 last_studied_at=last_studied_at_str,
-                best_score=card['best_score'],
-                attempt_count=card['attempt_count'] or 0,
+                best_score=card.get('best_score'),
+                attempt_count=card.get('attempt_count') or 0,
             ))
         
         return FlashCardListResponse(cards=card_items, total=total)
@@ -1510,23 +1613,23 @@ def get_mastered_cards(
         user_id = get_default_user_id()
         
         query_sql = """
-            SELECT 
+            SELECT
                 fc.id,
                 fc.term,
                 fc.status,
                 fc.note_id,
                 n.title as note_title,
-                fc.review_count,
-                MAX(lr.attempted_at) as last_studied_at,
-                MAX(lr.score) as best_score,
-                COUNT(lr.id) as attempt_count
+                COUNT(lr.id) as review_count,
+                MAX(lr.studied_at) as last_studied_at,
+                COUNT(lr.id) as attempt_count,
+                MAX(lr.score) as best_score
             FROM flash_cards fc
             INNER JOIN notes n ON fc.note_id = n.id
             LEFT JOIN learning_records lr ON fc.id = lr.card_id
             WHERE n.user_id = %s
                 AND fc.status = 'MASTERED'
-            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count
-            ORDER BY fc.mastered_at DESC NULLS LAST, fc.id ASC
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title
+            ORDER BY fc.last_reviewed_at DESC NULLS LAST, fc.id ASC
             LIMIT %s OFFSET %s
         """
         cur.execute(query_sql, (user_id, limit, skip))
@@ -1561,10 +1664,10 @@ def get_mastered_cards(
                 status=card['status'],
                 note_id=card['note_id'],
                 note_title=card['note_title'] or '',
-                review_count=card['review_count'] or 0,
+                review_count=card.get('review_count') or 0,
                 last_studied_at=last_studied_at_str,
-                best_score=card['best_score'],
-                attempt_count=card['attempt_count'] or 0,
+                best_score=card.get('best_score'),
+                attempt_count=card.get('attempt_count') or 0,
             ))
         
         return FlashCardListResponse(cards=card_items, total=total)
@@ -1587,21 +1690,21 @@ def get_all_cards(
         user_id = get_default_user_id()
         
         query_sql = """
-            SELECT 
+            SELECT
                 fc.id,
                 fc.term,
                 fc.status,
                 fc.note_id,
                 n.title as note_title,
-                fc.review_count,
-                MAX(lr.attempted_at) as last_studied_at,
-                MAX(lr.score) as best_score,
-                COUNT(lr.id) as attempt_count
+                COUNT(lr.id) as review_count,
+                MAX(lr.studied_at) as last_studied_at,
+                COUNT(lr.id) as attempt_count,
+                MAX(lr.score) as best_score
             FROM flash_cards fc
             INNER JOIN notes n ON fc.note_id = n.id
             LEFT JOIN learning_records lr ON fc.id = lr.card_id
             WHERE n.user_id = %s
-            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.review_count
+            GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title
             ORDER BY fc.created_at DESC, fc.id ASC
             LIMIT %s OFFSET %s
         """
@@ -1636,10 +1739,10 @@ def get_all_cards(
                 status=card['status'],
                 note_id=card['note_id'],
                 note_title=card['note_title'] or '',
-                review_count=card['review_count'] or 0,
+                review_count=card.get('review_count') or 0,
                 last_studied_at=last_studied_at_str,
-                best_score=card['best_score'],
-                attempt_count=card['attempt_count'] or 0,
+                best_score=card.get('best_score'),
+                attempt_count=card.get('attempt_count') or 0,
             ))
         
         return FlashCardListResponse(cards=card_items, total=total)

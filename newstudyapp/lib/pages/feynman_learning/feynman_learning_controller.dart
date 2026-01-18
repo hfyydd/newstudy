@@ -35,11 +35,14 @@ class FeynmanLearningController extends GetxController {
     // 从路由参数获取主题信息
     final arguments = Get.arguments as Map<String, dynamic>?;
     if (arguments != null) {
-      // 保存笔记ID和默认角色
-      state.currentNoteId.value = arguments['noteId'] as int?;
+      // 1. 优先获取笔记ID
+      final noteIdArg = arguments['noteId'];
+      if (noteIdArg != null) {
+        state.currentNoteId.value = noteIdArg.toString();
+      }
       state.noteDefaultRole.value = arguments['defaultRole'] as String?;
       
-      // 1) 如果携带闪词卡片列表（带ID），使用完整的卡片信息
+      // 2) 如果携带闪词卡片列表（期望带真实ID），使用完整的卡片信息
       final flashCardsRaw = arguments['flashCards'];
       if (flashCardsRaw is List) {
         final cards = flashCardsRaw.whereType<Map<String, dynamic>>().toList();
@@ -49,18 +52,23 @@ class FeynmanLearningController extends GetxController {
           state.activeCategory.value = 'note';
           state.isCustomDeck.value = true;
           
+          // 如果 noteId 还没设置，尝试从第一张卡片中获取
+          if (state.currentNoteId.value == null || state.currentNoteId.value!.isEmpty) {
+            state.currentNoteId.value = cards.first['note_id']?.toString();
+          }
+
           // 保存分页信息（用于后续加载更多）
           state.pageType.value = arguments['pageType'] as String?;
           state.statusFilter.value = arguments['statusFilter'] as String?;
           state.currentSkip.value = arguments['currentSkip'] as int? ?? cards.length;
           state.totalCount.value = arguments['total'] as int? ?? cards.length;
           
-          // 从卡片信息中提取词条列表（过滤掉无效数据）
+          // 从卡片信息中提取词条列表
           state.terms.value = cards
               .where((c) => c['term'] != null && c['term'].toString().isNotEmpty)
               .map((c) => c['term'].toString())
               .toList();
-          // 保存完整的卡片信息供后续使用（过滤掉无效数据）
+          // 保存完整的卡片信息
           _flashCardsData = cards
               .where((c) => c['term'] != null && c['id'] != null)
               .toList();
@@ -70,7 +78,7 @@ class FeynmanLearningController extends GetxController {
             debugPrint('[FeynmanLearningController] 卡片: ${card['term']}, 状态: ${card['status']}, 复习次数: ${card['review_count']}');
           }
           
-          debugPrint('[FeynmanLearningController] 加载了 ${_flashCardsData.length} 张卡片，总数: ${state.totalCount.value}');
+          debugPrint('[FeynmanLearningController] 加载了 ${_flashCardsData.length} 张卡片，noteId: ${state.currentNoteId.value}');
           state.isLoading.value = false;
           state.errorMessage.value = null;
           // 加载角色列表
@@ -79,7 +87,7 @@ class FeynmanLearningController extends GetxController {
         }
       }
       
-      // 2) 如果携带自定义词表，直接使用，不再走后端 /topics/terms
+      // 3) 如果仅携带自定义词表（通常是解析失败或旧逻辑），直接使用
       final termsRaw = arguments['terms'];
       if (termsRaw is List) {
         final terms = termsRaw
@@ -93,8 +101,21 @@ class FeynmanLearningController extends GetxController {
           state.activeCategory.value = 'note';
           state.isCustomDeck.value = true;
           state.terms.value = List.of(terms);
+          
+          // 如果没有真实的 flashCards 数据，使用临时数据
+          _flashCardsData = terms.map((term) => {
+            'id': 'temp_${term.hashCode}',
+            'term': term,
+            'status': 'NOT_STARTED',
+            'review_count': 0,
+            'note_id': state.currentNoteId.value,
+          }).toList();
+          
+          debugPrint('[FeynmanLearningController] 从词条列表构建了 ${_flashCardsData.length} 张卡片，noteId: ${state.currentNoteId.value}');
           state.isLoading.value = false;
           state.errorMessage.value = null;
+          // 加载角色列表
+          _loadRoles();
           return;
         }
       }
@@ -276,6 +297,18 @@ class FeynmanLearningController extends GetxController {
       final response = await httpService.fetchTerms(category: categoryToUse);
       state.terms.value = List.of(response.terms);
       state.activeCategory.value = response.category;
+      
+      // 从词条列表构建闪卡数据（用于学习功能）
+      // 如果没有完整的 flashCards 数据，使用临时ID和默认状态
+      _flashCardsData = response.terms.map((term) => {
+        'id': 'temp_${term.hashCode}',  // 临时ID，用于标识
+        'term': term,
+        'status': 'NOT_STARTED',
+        'review_count': 0,
+        'note_id': state.currentNoteId.value?.toString(),
+      }).toList();
+      
+      debugPrint('[FeynmanLearningController] 从主题库加载了 ${_flashCardsData.length} 张卡片');
       state.isLoading.value = false;
     } catch (error) {
       state.errorMessage.value = '获取术语失败：$error';
@@ -933,8 +966,11 @@ class FeynmanLearningController extends GetxController {
     
     // 如果已经学习过，加载学习历史
     if (reviewCount > 0) {
-      await _loadCardLearningHistory(cardData['id'] as int);
-      debugPrint('[FeynmanLearningController] 学习历史加载完成，记录数: ${state.cardLearningHistory.length}');
+      final cardIdRaw = cardData['id'];
+      if (cardIdRaw != null && !cardIdRaw.toString().startsWith('temp_')) {
+        await _loadCardLearningHistory(cardIdRaw.toString());
+        debugPrint('[FeynmanLearningController] 学习历史加载完成，记录数: ${state.cardLearningHistory.length}');
+      }
     }
     
     state.isExplanationViewVisible.value = true;
@@ -995,7 +1031,7 @@ class FeynmanLearningController extends GetxController {
         feedback: _parseFeedbackFromJson(lastRecord.aiFeedback),
         highlights: [],
         suggestions: [],
-        learningRecordId: lastRecord.id,
+        learningRecordId: lastRecord.id.toString(),
       );
       state.userExplanation.value = lastRecord.userExplanation;
       state.learningPhase.value = LearningPhase.result;
@@ -1013,7 +1049,7 @@ class FeynmanLearningController extends GetxController {
   }
   
   /// 加载卡片的学习历史
-  Future<void> _loadCardLearningHistory(int cardId) async {
+  Future<void> _loadCardLearningHistory(String cardId) async {
     try {
       final cardDetail = await httpService.getCardDetail(cardId);
       // 转换为可增长的列表，避免固定长度列表的问题
@@ -1068,27 +1104,53 @@ class FeynmanLearningController extends GetxController {
     final selectedRole = state.selectedRole.value;
     final noteId = state.currentNoteId.value;
     
-    if (cardData == null || selectedRole == null || noteId == null) {
-      Get.snackbar('错误', '缺少必要信息', snackPosition: SnackPosition.BOTTOM);
+    if (cardData == null || selectedRole == null) {
+      Get.snackbar('错误', '缺少必要信息（卡片或角色）', snackPosition: SnackPosition.BOTTOM);
+      debugPrint('[FeynmanLearningController] 缺少信息: cardData=${cardData != null}, selectedRole=${selectedRole != null}, noteId=${noteId != null}');
       return;
     }
     
-    final cardId = cardData['id'] as int?;
-    if (cardId == null) {
+    final cardIdRaw = cardData['id'];
+    if (cardIdRaw == null) {
       Get.snackbar('错误', '卡片ID不存在', snackPosition: SnackPosition.BOTTOM);
       return;
     }
+    
+    final cardId = cardIdRaw.toString();
+    
+    // 优先从 state 获取 noteId，如果为空则尝试从 cardData 获取
+    String? finalNoteId = noteId;
+    if (finalNoteId == null || finalNoteId.isEmpty) {
+      finalNoteId = cardData['note_id']?.toString();
+    }
+    
+    debugPrint('[FeynmanLearningController] 准备评估: cardId=$cardId, noteId=$finalNoteId');
+
+    // 如果最终还是没有 noteId，且是临时卡片，则无法评估（后端需要 noteId 关联上下文）
+    if (cardId.startsWith('temp_') && (finalNoteId == null || finalNoteId.isEmpty)) {
+      debugPrint('[FeynmanLearningController] 评估中断: 临时卡片缺少 noteId');
+      Get.snackbar(
+        '提示',
+        '无法关联到原始笔记，请重新进入学习页面',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+    
+    // 确保 finalNoteId 不为 null 传给 httpService
+    final noteIdForService = finalNoteId ?? '';
     
     state.userExplanation.value = explanation.trim();
     state.isEvaluating.value = true;
     state.learningPhase.value = LearningPhase.evaluating;
     
     try {
-      debugPrint('[FeynmanLearningController] 提交评估: cardId=$cardId, noteId=$noteId, role=${selectedRole.id}');
+      debugPrint('[FeynmanLearningController] 提交评估: cardId=$cardId, noteId=$noteIdForService, role=${selectedRole.id}');
       
       final result = await httpService.evaluateExplanation(
         cardId: cardId,
-        noteId: noteId,
+        noteId: noteIdForService,
         selectedRole: selectedRole.id,
         userExplanation: explanation.trim(),
       );
@@ -1115,8 +1177,8 @@ class FeynmanLearningController extends GetxController {
   }
   
   /// 更新本地卡片状态
-  void _updateLocalCardStatus(int cardId, String newStatus) {
-    final index = _flashCardsData.indexWhere((c) => c['id'] == cardId);
+  void _updateLocalCardStatus(String cardId, String newStatus) {
+    final index = _flashCardsData.indexWhere((c) => c['id'].toString() == cardId);
     if (index != -1) {
       _flashCardsData[index]['status'] = newStatus;
       _flashCardsData[index]['review_count'] = 
@@ -1152,8 +1214,19 @@ class FeynmanLearningController extends GetxController {
     final cardData = state.currentCard.value;
     if (cardData == null) return;
     
-    final cardId = cardData['id'] as int?;
-    if (cardId == null) return;
+    final cardIdRaw = cardData['id'];
+    if (cardIdRaw == null) return;
+    
+    final cardId = cardIdRaw.toString();
+    
+    // 如果是临时ID，不能更新后端状态
+    if (cardId.startsWith('temp_')) {
+      // 只更新本地状态
+      _updateLocalCardStatus(cardId, 'MASTERED');
+      Get.snackbar('成功', '已标记为掌握（本地）', snackPosition: SnackPosition.BOTTOM);
+      continueToNextCard();
+      return;
+    }
     
     try {
       await httpService.updateCardStatus(cardId: cardId, status: 'MASTERED');

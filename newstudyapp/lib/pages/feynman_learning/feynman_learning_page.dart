@@ -88,6 +88,13 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
           )),
       centerTitle: true,
+      actions: [
+        IconButton(
+          icon: Icon(Icons.home, color: iconColor),
+          tooltip: '返回首页',
+          onPressed: () => Get.offAllNamed('/home'),
+        ),
+      ],
     );
   }
 
