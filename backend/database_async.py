@@ -335,11 +335,11 @@ class Database:
         async with self.get_connection() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, note_id, term, status, created_at, last_reviewed_at 
-                FROM flash_cards 
-                WHERE status IN ('needsReview', 'needsImprove') 
-                   OR (status = 'mastered' AND last_reviewed_at < NOW() - INTERVAL '7 days')
-                   OR (status = 'notStarted' AND created_at < NOW() - INTERVAL '1 day')
+                SELECT id, note_id, term, status, created_at, last_reviewed_at
+                FROM flash_cards
+                WHERE status IN ('NEEDS_REVIEW', 'NEEDS_IMPROVE')
+                   OR (status = 'MASTERED' AND last_reviewed_at < NOW() - INTERVAL '7 days')
+                   OR (status = 'NOT_STARTED' AND created_at < NOW() - INTERVAL '1 day')
                 ORDER BY last_reviewed_at ASC NULLS FIRST, created_at ASC
                 LIMIT $1
                 """,

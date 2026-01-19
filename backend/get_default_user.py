@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from db_sql import execute_one
 
 
-def get_default_user_id() -> int:
+def get_default_user_id() -> str:
     """
     获取默认用户的ID（纯 SQL 方式）
     
