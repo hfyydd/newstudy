@@ -134,32 +134,32 @@ NoSQL数据库：
     ]
     
     # 为每个笔记添加闪词卡片，并设置一些学习状态
-    status_distribution = ["mastered", "needsReview", "needsImprove", "notStarted"]
-    
+    status_distribution = ["MASTERED", "NEEDS_REVIEW", "NEEDS_IMPROVE", "NOT_STARTED"]
+
     for i, note in enumerate(created_notes):
         terms = flash_cards_data[i] if i < len(flash_cards_data) else []
-        
+
         # 创建闪词卡片
         cards = db.create_flash_cards(note.id, terms)
         print(f"✓ 为笔记 '{note.title}' 创建了 {len(cards)} 个闪词卡片")
-        
+
         # 更新一些卡片的学习状态（模拟学习进度）
         if cards:
             conn = db._get_connection()
             try:
                 cursor = conn.cursor()
-                
+
                 # 随机设置一些卡片的状态
                 for j, card in enumerate(cards):
                     # 根据索引分配状态，模拟学习进度
                     if j < len(cards) * 0.3:  # 30% 已掌握
-                        status = "mastered"
+                        status = "MASTERED"
                     elif j < len(cards) * 0.5:  # 20% 待复习
-                        status = "needsReview"
+                        status = "NEEDS_REVIEW"
                     elif j < len(cards) * 0.7:  # 20% 需改进
-                        status = "needsImprove"
+                        status = "NEEDS_IMPROVE"
                     else:  # 30% 未开始
-                        status = "notStarted"
+                        status = "NOT_STARTED"
                     
                     # 更新状态
                     cursor.execute("""

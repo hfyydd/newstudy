@@ -25,10 +25,10 @@ EVALUATOR_SYSTEM_PROMPT = """你是一位专业的学习评估专家，负责评
 4. 根据分数判定学习状态
 
 ## 评分标准
-- 90-100分（已掌握 mastered）：解释准确、完整、能用简单的话说清楚核心概念
-- 70-89分（需巩固 needs_review）：基本理解正确，但有些细节不够准确或遗漏
-- 50-69分（需改进 needs_improve）：有一定理解，但存在明显错误或遗漏重要内容
-- 0-49分（未掌握 not_mastered）：理解有严重偏差或基本没有理解
+- 90-100分（已掌握 MASTERED）：解释准确、完整、能用简单的话说清楚核心概念
+- 70-89分（需巩固 NEEDS_REVIEW）：基本理解正确，但有些细节不够准确或遗漏
+- 50-69分（需改进 NEEDS_IMPROVE）：有一定理解，但存在明显错误或遗漏重要内容
+- 0-49分（未掌握 NOT_MASTERED）：理解有严重偏差或基本没有理解
 
 ## 角色适配
 用户会选择一个角色来解释，你需要根据角色调整评分标准：
@@ -43,7 +43,7 @@ EVALUATOR_SYSTEM_PROMPT = """你是一位专业的学习评估专家，负责评
 ```json
 {
   "score": 85,
-  "status": "needs_review",
+  "status": "NEEDS_REVIEW",
   "feedback": "你的解释...",
   "highlights": ["做得好的点1", "做得好的点2"],
   "suggestions": ["可以改进的点1"]
@@ -74,7 +74,7 @@ def evaluate_explanation(
     Returns:
         Tuple[score, status, ai_feedback]:
         - score: 分数（0-100）
-        - status: 学习状态（mastered/needs_review/needs_improve/not_mastered）
+        - status: 学习状态（MASTERED/NEEDS_REVIEW/NEEDS_IMPROVE/NOT_MASTERED）
         - ai_feedback: AI反馈内容（JSON格式）
     """
     llm = get_default_llm()
@@ -121,9 +121,9 @@ def _parse_evaluation_response(reply: str) -> Tuple[int, str, str]:
             data = json.loads(json_str)
             score = int(data.get('score', 50))
             status = data.get('status', _score_to_status(score))
-            
+
             # 验证状态值
-            valid_statuses = ['mastered', 'needs_review', 'needs_improve', 'not_mastered']
+            valid_statuses = ['MASTERED', 'NEEDS_REVIEW', 'NEEDS_IMPROVE', 'NOT_MASTERED']
             if status not in valid_statuses:
                 status = _score_to_status(score)
             
@@ -141,12 +141,12 @@ def _parse_evaluation_response(reply: str) -> Tuple[int, str, str]:
     # 解析失败，返回默认值
     default_feedback = {
         "score": 60,
-        "status": "needs_improve",
+        "status": "NEEDS_IMPROVE",
         "feedback": "感谢你的解释！继续加油，多练习会越来越好的。",
         "highlights": ["尝试用自己的话解释"],
         "suggestions": ["可以尝试更详细地说明核心概念"]
     }
-    return 60, "needs_improve", json.dumps(default_feedback, ensure_ascii=False)
+    return 60, "NEEDS_IMPROVE", json.dumps(default_feedback, ensure_ascii=False)
 
 
 def _extract_json(text: str) -> str | None:
@@ -172,13 +172,13 @@ def _extract_json(text: str) -> str | None:
 def _score_to_status(score: int) -> str:
     """根据分数返回学习状态"""
     if score >= 90:
-        return 'mastered'
+        return 'MASTERED'
     elif score >= 70:
-        return 'needs_review'
+        return 'NEEDS_REVIEW'
     elif score >= 50:
-        return 'needs_improve'
+        return 'NEEDS_IMPROVE'
     else:
-        return 'not_mastered'
+        return 'NOT_MASTERED'
 
 
 # 角色列表

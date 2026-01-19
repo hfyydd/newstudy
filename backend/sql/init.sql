@@ -4,6 +4,15 @@
 -- 启用 pgvector 扩展
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- 创建闪词状态枚举类型
+CREATE TYPE card_status AS ENUM (
+    'NOT_STARTED',
+    'NEEDS_REVIEW',
+    'NEEDS_IMPROVE',
+    'NOT_MASTERED',
+    'MASTERED'
+);
+
 -- 创建用户表
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -24,6 +33,7 @@ CREATE TABLE IF NOT EXISTS notes (
     title VARCHAR(200) NOT NULL,
     content TEXT,
     markdown_content TEXT,
+    default_role VARCHAR(50) DEFAULT '5岁孩子',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -37,7 +47,7 @@ CREATE TABLE IF NOT EXISTS flash_cards (
     id SERIAL PRIMARY KEY,
     note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
     term VARCHAR(100) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'not_started',
+    status card_status NOT NULL DEFAULT 'NOT_STARTED',
     review_count INTEGER DEFAULT 0,
     last_reviewed_at TIMESTAMP WITH TIME ZONE,
     mastered_at TIMESTAMP WITH TIME ZONE,
@@ -59,7 +69,7 @@ CREATE TABLE IF NOT EXISTS learning_records (
     user_explanation TEXT NOT NULL,
     score INTEGER NOT NULL,
     ai_feedback TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL,
+    status card_status NOT NULL,
     attempt_number INTEGER NOT NULL DEFAULT 1,
     attempted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -98,9 +108,10 @@ COMMENT ON COLUMN notes.user_id IS '用户ID';
 COMMENT ON COLUMN notes.title IS '笔记标题';
 COMMENT ON COLUMN notes.content IS '原始内容';
 COMMENT ON COLUMN notes.markdown_content IS 'Markdown格式的笔记内容';
+COMMENT ON COLUMN notes.default_role IS '默认学习角色（如5岁孩子、小学生等）';
 COMMENT ON COLUMN flash_cards.note_id IS '笔记ID';
 COMMENT ON COLUMN flash_cards.term IS '闪词内容';
-COMMENT ON COLUMN flash_cards.status IS '学习状态: not_started, needs_review（需巩固）, needs_improve, not_mastered, mastered';
+COMMENT ON COLUMN flash_cards.status IS '学习状态: NOT_STARTED, NEEDS_REVIEW（需巩固）, NEEDS_IMPROVE, NOT_MASTERED, MASTERED';
 COMMENT ON COLUMN flash_cards.review_count IS '复习次数';
 COMMENT ON COLUMN flash_cards.last_reviewed_at IS '最后复习时间';
 COMMENT ON COLUMN flash_cards.mastered_at IS '掌握时间';

@@ -430,7 +430,7 @@ async def get_flash_cards_with_status(note_id: str):
             FlashCardDetailResponse(term=card.term, status=card.status)
             for card in cards
         ]
-        mastered_count = sum(1 for card in cards if card.status == "mastered")
+        mastered_count = sum(1 for card in cards if card.status == "MASTERED")
         return FlashCardListWithStatusResponse(
             note_id=note_id,
             cards=card_details,

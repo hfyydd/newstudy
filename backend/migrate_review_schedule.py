@@ -41,13 +41,13 @@ def migrate_review_schedule():
         
         for card_id, status, last_reviewed_at, created_at in cards:
             # 根据状态计算下次复习时间
-            if status == 'needsReview':
+            if status == 'NEEDS_REVIEW':
                 next_review = now + timedelta(days=1)  # 1天后
-            elif status == 'needsImprove':
+            elif status == 'NEEDS_IMPROVE':
                 next_review = now + timedelta(days=3)  # 3天后
-            elif status == 'mastered':
+            elif status == 'MASTERED':
                 next_review = now + timedelta(days=7)  # 7天后
-            else:  # notStarted 或其他状态
+            else:  # NOT_STARTED 或其他状态
                 next_review = now + timedelta(hours=4)  # 4小时后
             
             next_review_str = next_review.isoformat()

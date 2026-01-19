@@ -199,7 +199,7 @@ def get_learning_statistics() -> Dict[str, int]:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # 统计已掌握的词条数
             cur.execute("""
-                SELECT COUNT(*) as count FROM flash_cards WHERE status = 'mastered'
+                SELECT COUNT(*) as count FROM flash_cards WHERE status = 'MASTERED'
             """)
             mastered = cur.fetchone()['count']
             
@@ -214,8 +214,8 @@ def get_learning_statistics() -> Dict[str, int]:
             
             # 计算累计学习时长（分钟）
             cur.execute("""
-                SELECT COALESCE(SUM(duration_seconds), 0) as total_seconds 
-                FROM learning_history
+                SELECT COALESCE(SUM(duration_seconds), 0) as total_seconds
+                FROM learning_records
             """)
             total_seconds = cur.fetchone()['total_seconds']
             total_minutes = int(total_seconds / 60) if total_seconds else 0
@@ -240,7 +240,7 @@ def _calculate_consecutive_days(cur) -> int:
     # 获取所有学习时间（PostgreSQL可以直接使用DATE函数）
     cur.execute("""
         SELECT DISTINCT DATE(studied_at) as study_date
-        FROM learning_history
+        FROM learning_records
         ORDER BY study_date DESC
     """)
     
@@ -293,18 +293,18 @@ def get_today_review_statistics() -> Dict[str, int]:
             now = datetime.now()
             
             # 统计需要复习的词条总数（基于时间判断）
-            # 这里简化逻辑：需要复习的 = needsReview 状态的卡片
+            # 这里简化逻辑：需要复习的 = NEEDS_REVIEW 状态的卡片
             cur.execute("""
-                SELECT COUNT(*) as count 
-                FROM flash_cards 
-                WHERE status IN ('needsReview', 'notStarted')
+                SELECT COUNT(*) as count
+                FROM flash_cards
+                WHERE status IN ('NEEDS_REVIEW', 'NOT_STARTED')
             """)
             review_due = cur.fetchone()['count']
             
             # 统计今日已完成复习的词条数
             cur.execute("""
-                SELECT COUNT(DISTINCT card_id) as count 
-                FROM learning_history 
+                SELECT COUNT(DISTINCT card_id) as count
+                FROM learning_records
                 WHERE DATE(studied_at) = CURRENT_DATE
             """)
             review_completed = cur.fetchone()['count']
@@ -332,7 +332,7 @@ def record_learning_history(card_id: str, note_id: str, status: str, duration_se
     history_id = str(uuid.uuid4())
     
     query = """
-        INSERT INTO learning_history (id, card_id, note_id, status, duration_seconds, studied_at)
+        INSERT INTO learning_records (id, card_id, note_id, status, duration_seconds, studied_at)
         VALUES (%s, %s, %s, %s, %s, NOW())
         RETURNING id
     """

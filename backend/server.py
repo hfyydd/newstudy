@@ -547,6 +547,16 @@ class NoteDetailResponse(BaseModel):
     flash_cards: List[dict] = Field(..., description="闪词列表")
 
 
+# ========== 闪词卡片相关模型 ==========
+
+
+class FlashCardGenerateResponse(BaseModel):
+    """闪词卡片生成响应"""
+    note_id: str = Field(..., description="笔记ID")
+    terms: List[str] = Field(..., description="生成的闪词列表")
+    total: int = Field(..., description="生成的闪词数量")
+
+
 # ========== 学习相关模型 ==========
 
 class LearningRole(BaseModel):
@@ -834,6 +844,599 @@ def delete_note(
         raise
     except Exception as exc:
         logger.error(f"❌ 删除笔记失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ========== 闪词卡片相关 API ==========
+
+
+@app.get("/notes/{note_id}/flash-cards", response_model=FlashCardListResponse)
+def get_note_flash_cards(
+    note_id: str,
+    cur = Depends(get_db_cursor)
+) -> FlashCardListResponse:
+    """
+    获取指定笔记的闪词卡片列表
+    """
+    try:
+        user_id = get_default_user_id()
+
+        # 验证笔记是否存在且属于当前用户
+        check_sql = "SELECT id FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(check_sql, (note_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+
+        # 查询闪词卡片列表
+        query_sql = """
+            SELECT
+                fc.id,
+                fc.term,
+                fc.status,
+                fc.note_id,
+                n.title as note_title,
+                fc.review_count,
+                fc.last_reviewed_at as last_studied_at,
+                COALESCE(lr.attempt_count, 0) as attempt_count,
+                lr.best_score
+            FROM flash_cards fc
+            INNER JOIN notes n ON fc.note_id = n.id
+            LEFT JOIN (
+                SELECT card_id,
+                    COUNT(*) as attempt_count,
+                    MAX(score) as best_score
+                FROM learning_records
+                GROUP BY card_id
+            ) lr ON fc.id = lr.card_id
+            WHERE fc.note_id = %s
+            ORDER BY fc.id ASC
+        """
+        cur.execute(query_sql, (note_id,))
+        cards = cur.fetchall()
+
+        # 统计总数
+        count_sql = "SELECT COUNT(*) as count FROM flash_cards WHERE note_id = %s"
+        cur.execute(count_sql, (note_id,))
+        total_row = cur.fetchone()
+        total = total_row['count'] or 0
+
+        # 构建响应
+        card_items = []
+        for card in cards:
+            last_studied_at = card['last_studied_at']
+            last_studied_at_str = None
+            if last_studied_at:
+                if hasattr(last_studied_at, 'isoformat'):
+                    last_studied_at_str = last_studied_at.isoformat()
+                else:
+                    last_studied_at_str = str(last_studied_at)
+
+            card_items.append(FlashCardListItem(
+                id=str(card['id']),
+                term=card['term'],
+                status=card['status'],
+                note_id=str(card['note_id']),
+                note_title=card['note_title'] or '',
+                review_count=card.get('review_count') or 0,
+                last_studied_at=last_studied_at_str,
+                best_score=card.get('best_score'),
+                attempt_count=card.get('attempt_count') or 0,
+            ))
+
+        return FlashCardListResponse(cards=card_items, total=total)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 获取闪词卡片列表失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/notes/{note_id}/flash-cards/with-status")
+def get_note_flash_cards_with_status(
+    note_id: str,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    获取指定笔记的闪词卡片列表（含状态）
+    """
+    try:
+        user_id = get_default_user_id()
+
+        # 验证笔记是否存在且属于当前用户
+        check_sql = "SELECT id FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(check_sql, (note_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+
+        # 查询闪词卡片列表
+        query_sql = """
+            SELECT id, term, status
+            FROM flash_cards
+            WHERE note_id = %s
+            ORDER BY id ASC
+        """
+        cur.execute(query_sql, (note_id,))
+        cards = cur.fetchall()
+
+        # 统计各状态数量
+        stats_sql = """
+            SELECT
+                COUNT(*) as total,
+                COUNT(CASE WHEN status = 'MASTERED' THEN 1 END) as mastered_count
+            FROM flash_cards
+            WHERE note_id = %s
+        """
+        cur.execute(stats_sql, (note_id,))
+        stats = cur.fetchone()
+
+        # 构建卡片列表
+        card_list = []
+        for card in cards:
+            card_list.append({
+                "term": card['term'],
+                "status": card['status'],
+            })
+
+        return {
+            "note_id": note_id,
+            "cards": card_list,
+            "total": stats['total'] or 0,
+            "mastered_count": stats['mastered_count'] or 0,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 获取闪词卡片列表(含状态)失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/notes/{note_id}/flash-cards/progress")
+def get_note_flash_cards_progress(
+    note_id: str,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    获取指定笔记的闪词卡片学习进度
+    """
+    try:
+        user_id = get_default_user_id()
+
+        # 验证笔记是否存在且属于当前用户
+        check_sql = "SELECT id FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(check_sql, (note_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+
+        # 查询学习进度统计
+        progress_sql = """
+            SELECT
+                COUNT(*) as total_cards,
+                COUNT(CASE WHEN status = 'MASTERED' THEN 1 END) as mastered,
+                COUNT(CASE WHEN status = 'NEEDS_REVIEW' THEN 1 END) as needs_review,
+                COUNT(CASE WHEN status = 'NEEDS_IMPROVE' THEN 1 END) as needs_improve,
+                COUNT(CASE WHEN status = 'NOT_MASTERED' THEN 1 END) as not_mastered,
+                COUNT(CASE WHEN status = 'NOT_STARTED' THEN 1 END) as not_started,
+                COALESCE(SUM(review_count), 0) as total_reviews
+            FROM flash_cards
+            WHERE note_id = %s
+        """
+        cur.execute(progress_sql, (note_id,))
+        progress = cur.fetchone()
+
+        return {
+            "note_id": note_id,
+            "total_cards": progress['total_cards'] or 0,
+            "mastered": progress['mastered'] or 0,
+            "needs_review": progress['needs_review'] or 0,
+            "needs_improve": progress['needs_improve'] or 0,
+            "not_mastered": progress['not_mastered'] or 0,
+            "not_started": progress['not_started'] or 0,
+            "total_reviews": progress['total_reviews'] or 0,
+            "mastery_percentage": round(
+                (progress['mastered'] or 0) / max(progress['total_cards'] or 1, 1) * 100,
+                2
+            ) if progress['total_cards'] else 0,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 获取闪词卡片学习进度失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class FlashCardGenerateRequest(BaseModel):
+    """闪词卡片生成请求"""
+    max_terms: int = Field(default=30, ge=5, le=60, description="最多生成词语数量")
+
+
+@app.post("/notes/{note_id}/flash-cards/generate", response_model=FlashCardGenerateResponse)
+def generate_note_flash_cards(
+    note_id: str,
+    payload: FlashCardGenerateRequest,
+    cur = Depends(get_db_cursor)
+) -> FlashCardGenerateResponse:
+    """
+    为指定笔记生成闪词卡片
+    """
+    logger.info(f"📝 开始为笔记生成闪词卡片，笔记ID: {note_id}")
+
+    try:
+        user_id = get_default_user_id()
+
+        # 验证笔记是否存在且属于当前用户
+        check_sql = "SELECT id, title, content FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(check_sql, (note_id, user_id))
+        note = cur.fetchone()
+
+        if not note:
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+
+        # 获取笔记内容
+        content = note.get('content') or note.get('markdown_content') or ''
+        title = note.get('title', '')
+
+        # 如果内容为空，返回空列表
+        if not content:
+            logger.warning(f"笔记内容为空，无法生成闪词卡片: {note_id}")
+            return FlashCardGenerateResponse(
+                note_id=note_id,
+                terms=[],
+                total=0,
+            )
+
+        # 使用 AI 提取词汇
+        logger.info(f"笔记内容长度: {len(content)} 字符")
+        terms = extract_terms_from_note(content, max_terms=payload.max_terms)
+
+        if not terms:
+            logger.warning(f"未提取到任何词汇: {note_id}")
+            return FlashCardGenerateResponse(
+                note_id=note_id,
+                terms=[],
+                total=0,
+            )
+
+        # 删除已存在的闪词卡片（避免重复）
+        delete_sql = "DELETE FROM flash_cards WHERE note_id = %s"
+        cur.execute(delete_sql, (note_id,))
+
+        # 插入新的闪词卡片
+        insert_sql = """
+            INSERT INTO flash_cards (note_id, term, status, review_count, created_at, updated_at)
+            VALUES (%s, %s, %s::card_status, 0, NOW(), NOW())
+            RETURNING id, term
+        """
+        inserted_cards = []
+        for term in terms:
+            cur.execute(insert_sql, (note_id, term, 'NOT_STARTED'))
+            result = cur.fetchone()
+            inserted_cards.append({
+                "id": str(result['id']),
+                "term": result['term'],
+            })
+
+        logger.info(f"✅ 闪词卡片生成成功！笔记ID: {note_id}, 词汇数: {len(terms)}")
+
+        return FlashCardGenerateResponse(
+            note_id=note_id,
+            terms=terms,
+            total=len(terms),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 生成闪词卡片失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class UpdateFlashCardsStatusRequest(BaseModel):
+    """批量更新闪词卡片状态请求"""
+    updates: List[dict] = Field(..., description="状态更新列表，每项包含 term 和 status")
+
+
+@app.put("/notes/{note_id}/flash-cards/status")
+def update_flash_cards_status(
+    note_id: str,
+    payload: UpdateFlashCardsStatusRequest,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    批量更新指定笔记的闪词卡片状态
+    """
+    logger.info(f"📝 批量更新闪词卡片状态，笔记ID: {note_id}")
+
+    try:
+        user_id = get_default_user_id()
+
+        # 验证笔记是否存在且属于当前用户
+        check_sql = "SELECT id FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(check_sql, (note_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+
+        valid_statuses = ['NOT_STARTED', 'NEEDS_REVIEW', 'NEEDS_IMPROVE', 'NOT_MASTERED', 'MASTERED']
+        updated_count = 0
+
+        for update in payload.updates:
+            term = update.get('term')
+            status = update.get('status')
+
+            if not term or not status:
+                continue
+
+            status_upper = status.upper()
+            if status_upper not in valid_statuses:
+                logger.warning(f"跳过无效状态: {status} (term: {term})")
+                continue
+
+            # 更新单个闪词卡片状态
+            update_sql = """
+                UPDATE flash_cards
+                SET status = %s::card_status, updated_at = NOW()
+                WHERE note_id = %s AND term = %s
+            """
+            cur.execute(update_sql, (status_upper, note_id, term))
+            if cur.rowcount > 0:
+                updated_count += 1
+
+        logger.info(f"✅ 闪词卡片状态更新完成，共更新 {updated_count} 个卡片")
+
+        return {
+            "note_id": note_id,
+            "updated_count": updated_count,
+            "message": f"成功更新 {updated_count} 个闪词卡片状态",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 批量更新闪词卡片状态失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class AddConfusedTermsRequest(BaseModel):
+    """添加困惑词请求"""
+    terms: List[str] = Field(..., min_length=1, description="困惑词列表")
+    status: str = Field(default="NEEDS_REVIEW", description="初始状态")
+
+
+@app.post("/notes/{note_id}/confused-terms")
+def add_confused_terms(
+    note_id: str,
+    payload: AddConfusedTermsRequest,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    为指定笔记添加困惑词（作为新的闪词卡片）
+    """
+    logger.info(f"📝 添加困惑词，笔记ID: {note_id}, 词汇数: {len(payload.terms)}")
+
+    try:
+        user_id = get_default_user_id()
+
+        # 验证笔记是否存在且属于当前用户
+        check_sql = "SELECT id FROM notes WHERE id = %s AND user_id = %s"
+        cur.execute(check_sql, (note_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="笔记不存在或无权访问")
+
+        # 验证状态值
+        valid_statuses = ['NOT_STARTED', 'NEEDS_REVIEW', 'NEEDS_IMPROVE', 'NOT_MASTERED', 'MASTERED']
+        status_upper = payload.status.upper()
+        if status_upper not in valid_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"无效的状态值，有效值为: {valid_statuses}"
+            )
+
+        added_count = 0
+        # 插入新的闪词卡片（忽略已存在的）
+        for term in payload.terms:
+            term = term.strip()
+            if not term:
+                continue
+
+            # 检查是否已存在
+            check_term_sql = "SELECT id FROM flash_cards WHERE note_id = %s AND term = %s"
+            cur.execute(check_term_sql, (note_id, term))
+            if cur.fetchone():
+                logger.debug(f"闪词已存在，跳过: {term}")
+                continue
+
+            # 插入新的闪词卡片
+            insert_sql = """
+                INSERT INTO flash_cards (note_id, term, status, review_count, created_at, updated_at)
+                VALUES (%s, %s, %s::card_status, 0, NOW(), NOW())
+            """
+            cur.execute(insert_sql, (note_id, term, status_upper))
+            added_count += 1
+
+        logger.info(f"✅ 困惑词添加完成，共添加 {added_count} 个新闪词")
+
+        return {
+            "note_id": note_id,
+            "added_count": added_count,
+            "message": f"成功添加 {added_count} 个困惑词",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 添加困惑词失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/review/cards", response_model=FlashCardListResponse)
+def get_review_cards(
+    cur = Depends(get_db_cursor),
+    skip: int = Query(0, ge=0, description="跳过数量"),
+    limit: int = Query(100, ge=1, le=100, description="返回数量"),
+    include_all: bool = Query(False, description="是否包含全部卡片（不仅是今日需要复习的）")
+) -> FlashCardListResponse:
+    """
+    获取复习闪词卡片列表
+
+    如果 include_all 为 true，返回所有闪词卡片
+    如果 include_all 为 false（默认），只返回今日需要复习的卡片
+    """
+    try:
+        user_id = get_default_user_id()
+
+        if include_all:
+            # 返回全部闪词卡片
+            query_sql = """
+                SELECT
+                    fc.id,
+                    fc.term,
+                    fc.status,
+                    fc.note_id,
+                    n.title as note_title,
+                    COUNT(lr.id) as review_count,
+                    MAX(lr.studied_at) as last_studied_at,
+                    COUNT(lr.id) as attempt_count,
+                    MAX(lr.score) as best_score
+                FROM flash_cards fc
+                INNER JOIN notes n ON fc.note_id = n.id
+                LEFT JOIN learning_records lr ON fc.id = lr.card_id
+                WHERE n.user_id = %s
+                GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title
+                ORDER BY fc.created_at DESC, fc.id ASC
+                LIMIT %s OFFSET %s
+            """
+            cur.execute(query_sql, (user_id, limit, skip))
+            cards = cur.fetchall()
+
+            # 统计总数
+            count_sql = """
+                SELECT COUNT(DISTINCT fc.id) as count
+                FROM flash_cards fc
+                INNER JOIN notes n ON fc.note_id = n.id
+                WHERE n.user_id = %s
+            """
+            cur.execute(count_sql, (user_id,))
+        else:
+            # 只返回今日需要复习的卡片（使用与 study-center/today-review 相同的逻辑）
+            query_sql = """
+                SELECT
+                    fc.id,
+                    fc.term,
+                    fc.status,
+                    fc.note_id,
+                    n.title as note_title,
+                    COUNT(lr.id) as review_count,
+                    MAX(lr.studied_at) as last_studied_at,
+                    COUNT(lr.id) as attempt_count,
+                    MAX(lr.score) as best_score,
+                    fc.last_reviewed_at
+                FROM flash_cards fc
+                INNER JOIN notes n ON fc.note_id = n.id
+                LEFT JOIN learning_records lr ON fc.id = lr.card_id
+                WHERE n.user_id = %s
+                    AND (
+                        -- 未掌握：4小时后需要复习
+                        (fc.status = 'NOT_MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '4 hours' <= NOW()
+                        ))
+                        OR
+                        -- 需改进：3天后需要复习
+                        (fc.status = 'NEEDS_IMPROVE' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '3 days' <= NOW()
+                        ))
+                        OR
+                        -- 需巩固：1天后需要复习
+                        (fc.status = 'NEEDS_REVIEW' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '1 day' <= NOW()
+                        ))
+                        OR
+                        -- 已掌握：7天后需要复习（长期巩固）
+                        (fc.status = 'MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '7 days' <= NOW()
+                        ))
+                    )
+                GROUP BY fc.id, fc.term, fc.status, fc.note_id, n.title, fc.last_reviewed_at
+                ORDER BY
+                    CASE fc.status
+                        WHEN 'NOT_MASTERED' THEN 1
+                        WHEN 'NEEDS_IMPROVE' THEN 2
+                        WHEN 'NEEDS_REVIEW' THEN 3
+                        WHEN 'MASTERED' THEN 4
+                        ELSE 5
+                    END,
+                    fc.last_reviewed_at ASC NULLS FIRST,
+                    fc.id ASC
+                LIMIT %s OFFSET %s
+            """
+            cur.execute(query_sql, (user_id, limit, skip))
+            cards = cur.fetchall()
+
+            # 统计总数
+            count_sql = """
+                SELECT COUNT(DISTINCT fc.id) as count
+                FROM flash_cards fc
+                INNER JOIN notes n ON fc.note_id = n.id
+                WHERE n.user_id = %s
+                    AND (
+                        (fc.status = 'NOT_MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '4 hours' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'NEEDS_IMPROVE' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '3 days' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'NEEDS_REVIEW' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '1 day' <= NOW()
+                        ))
+                        OR
+                        (fc.status = 'MASTERED' AND (
+                            fc.last_reviewed_at IS NULL OR
+                            fc.last_reviewed_at + INTERVAL '7 days' <= NOW()
+                        ))
+                    )
+            """
+            cur.execute(count_sql, (user_id,))
+
+        total_row = cur.fetchone()
+        total = total_row['count'] or 0
+
+        # 构建响应
+        card_items = []
+        for card in cards:
+            last_studied_at = card['last_studied_at']
+            last_studied_at_str = None
+            if last_studied_at:
+                if hasattr(last_studied_at, 'isoformat'):
+                    last_studied_at_str = last_studied_at.isoformat()
+                else:
+                    last_studied_at_str = str(last_studied_at)
+
+            card_items.append(FlashCardListItem(
+                id=str(card['id']),
+                term=card['term'],
+                status=card['status'],
+                note_id=str(card['note_id']),
+                note_title=card['note_title'] or '',
+                review_count=card.get('review_count') or 0,
+                last_studied_at=last_studied_at_str,
+                best_score=card.get('best_score'),
+                attempt_count=card.get('attempt_count') or 0,
+            ))
+
+        return FlashCardListResponse(cards=card_items, total=total)
+
+    except Exception as exc:
+        logger.error(f"❌ 获取复习闪词卡片列表失败: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
