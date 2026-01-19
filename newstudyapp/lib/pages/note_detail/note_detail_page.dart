@@ -562,10 +562,10 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   /// 构建进度条
   Widget _buildProgressBar(FlashCardProgress progress, bool isDark) {
     final masteredPercent = progress.masteredPercent;
-    final reviewPercent = progress.needsReview / progress.total;
-    final improvePercent = progress.needsImprove / progress.total;
-    final notMasteredPercent = progress.notMastered / progress.total;
-    final notStartedPercent = progress.notStarted / progress.total;
+    final reviewPercent = progress.total > 0 ? progress.needsReview / progress.total : 0.0;
+    final improvePercent = progress.total > 0 ? progress.needsImprove / progress.total : 0.0;
+    final notMasteredPercent = progress.total > 0 ? progress.notMastered / progress.total : 0.0;
+    final notStartedPercent = progress.total > 0 ? progress.notStarted / progress.total : 0.0;
 
     return Column(
       children: [
