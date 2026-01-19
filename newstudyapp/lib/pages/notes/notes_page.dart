@@ -148,11 +148,11 @@ class NotesPage extends StatelessWidget {
 
                 return _buildNoteCard(
                   isDark: isDark,
-                  noteId: note.id,
+                  noteId: note.id.toString(),
                   title: note.title ?? '无标题',
                   progress: note.masteredCount,
-                  total: note.termCount,
-                  reviewCount: note.reviewCount,
+                  total: note.flashCardCount,
+                  reviewCount: note.needsReviewCount,
                   color: color,
                   cardColor: cardColor,
                   borderColor: borderColor,

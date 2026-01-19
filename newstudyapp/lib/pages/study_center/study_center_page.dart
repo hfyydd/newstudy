@@ -1106,6 +1106,7 @@ class StudyCenterPage extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _buildCardListItem(
+                      controller: controller,
                       isDark: isDark,
                       card: card,
                       cardColor: cardColor,
@@ -1125,6 +1126,7 @@ class StudyCenterPage extends StatelessWidget {
 
   /// 构建词条列表项
   Widget _buildCardListItem({
+    required StudyCenterController controller,
     required bool isDark,
     required FlashCardListItem card,
     required Color cardColor,
@@ -1164,14 +1166,7 @@ class StudyCenterPage extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () {
-        // TODO: 跳转到词条详情或费曼学习页面
-        Get.snackbar(
-          '提示',
-          '点击词条：${card.term}',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      },
+      onTap: () => controller.handleFlashCardTap(card),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -1379,14 +1374,11 @@ class StudyCenterPage extends StatelessWidget {
                       masteredCount: noteItem.masteredCount,
                       needsImproveCount: noteItem.needsImproveCount,
                       notMasteredCount: noteItem.notMasteredCount,
-                      onTap: () {
-                        // TODO: 跳转到笔记详情页或该笔记的词条列表
-                        Get.snackbar(
-                          '提示',
-                          '点击笔记：${noteItem.noteTitle}',
-                          snackPosition: SnackPosition.BOTTOM,
-                        );
-                      },
+                      onTap: () => controller.handleNoteCardTap(
+                        noteItem.noteId,
+                        noteItem.noteTitle,
+                        noteItem.totalCount,
+                      ),
                       isDark: isDark,
                       cardColor: cardColor,
                       borderColor: borderColor,

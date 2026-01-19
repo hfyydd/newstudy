@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/services/http_service.dart';
 import 'package:newstudyapp/models/note_models.dart';
+import 'package:newstudyapp/pages/home/home_state.dart';
 import 'package:newstudyapp/pages/study_center/study_center_state.dart';
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_page.dart';
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.dart';
@@ -9,6 +11,7 @@ import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.d
 /// 首页控制器
 class HomeController extends GetxController {
   final HttpService _httpService = HttpService();
+  final HomeState state = HomeState();
 
   // 笔记列表
   final RxList<NoteListItem> notes = <NoteListItem>[].obs;
@@ -156,6 +159,65 @@ class HomeController extends GetxController {
         '加载词条失败：$e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
+      );
+    }
+  }
+
+  /// 删除笔记
+  Future<void> deleteNote(String noteId, String noteTitle) async {
+    // 显示确认对话框
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('删除笔记'),
+        content: Text('确定要删除「$noteTitle」吗？此操作无法撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    // 如果用户取消，直接返回
+    if (confirmed != true) return;
+
+    try {
+      // 调用删除接口
+      await _httpService.deleteNote(noteId);
+
+      // 从列表中移除
+      notes.removeWhere((note) => note.id == noteId);
+      totalNotes.value = notes.length;
+
+      // 显示成功提示
+      Get.snackbar(
+        '成功',
+        '笔记已删除',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+
+      // 刷新统计数据
+      await loadHomeStatistics();
+    } catch (e) {
+      debugPrint('删除笔记失败: $e');
+      Get.snackbar(
+        '错误',
+        '删除笔记失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
     }
   }

@@ -32,8 +32,8 @@ class NoteModel {
   });
 
   /// 是否已生成闪词
-  bool get hasFlashCards => termCount > 0 || terms.isNotEmpty;
-  
+  bool get hasFlashCards => termCount > 0;
+
   /// 是否有Markdown内容
   bool get hasMarkdownContent => markdownContent != null && markdownContent!.isNotEmpty;
 
@@ -78,6 +78,17 @@ class FlashCardProgress {
     this.notMastered = 0,
     required this.notStarted,
   });
+
+  factory FlashCardProgress.fromJson(Map<String, dynamic> json) {
+    return FlashCardProgress(
+      total: json['total'] as int,
+      mastered: json['mastered'] as int,
+      needsReview: json['needsReview'] as int,
+      needsImprove: json['needsImprove'] as int,
+      notMastered: json['notMastered'] as int? ?? 0,
+      notStarted: json['notStarted'] as int,
+    );
+  }
 
   /// 已掌握百分比
   double get masteredPercent => total > 0 ? mastered / total : 0;
@@ -127,4 +138,28 @@ class NoteDetailState {
   
   /// 笔记的默认学习角色
   final RxString defaultRole = ''.obs;
+
+  /// 是否已加载闪词卡片（懒加载控制）
+  final RxBool flashCardsLoaded = false.obs;
+
+  /// 是否展开笔记完整内容（用于内容过长的懒加载）
+  final RxBool isNoteContentExpanded = false.obs;
+
+  /// 笔记内容是否过长（超过一定字数）
+  bool get isContentTooLong => markdownContent.length > 800;
+
+  /// 截断后的笔记内容（用于预览）
+  String get truncatedContent {
+    if (!isContentTooLong) return markdownContent;
+    final preview = markdownContent.substring(0, 800);
+    // 在合适的分隔符处截断（如段落、标题等）
+    final breakPoints = ['\n\n', '\n# ', '\n## ', '。', '！', '？', '.'];
+    for (final bp in breakPoints) {
+      final lastIndex = preview.lastIndexOf(bp);
+      if (lastIndex > 200) {
+        return preview.substring(0, lastIndex + bp.length);
+      }
+    }
+    return preview;
+  }
 }

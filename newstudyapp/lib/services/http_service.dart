@@ -169,6 +169,11 @@ class HttpService {
       final response = await _dio.post(
         ApiConfig.extractNoteTermsFile,
         data: formData,
+        options: Options(
+          // 文件上传和解析（特别是PDF和图片OCR）可能需要较长时间
+          receiveTimeout: const Duration(seconds: 120),  // 2分钟
+          sendTimeout: const Duration(seconds: 60),    // 1分钟（上传文件）
+        ),
       );
       return NoteExtractResponse.fromJson(
           response.data as Map<String, dynamic>);
@@ -181,50 +186,6 @@ class HttpService {
   }
 
   // ==================== 笔记管理接口 ====================
-
-  /// 获取笔记列表
-  Future<NotesListResponse> listNotes() async {
-    try {
-      final url = '${ApiConfig.baseUrl}${ApiConfig.listNotes}';
-      print('[HttpService] 请求笔记列表: $url');
-      final response = await _dio.get(
-        ApiConfig.listNotes,
-      );
-      print('[HttpService] 响应状态码: ${response.statusCode}');
-      print('[HttpService] 响应数据: ${response.data}');
-      return NotesListResponse.fromJson(response.data as Map<String, dynamic>);
-    } on DioException catch (e) {
-      print('[HttpService] 请求失败: ${e.message}');
-      print('[HttpService] 错误类型: ${e.type}');
-      if (e.response != null) {
-        print('[HttpService] 响应状态码: ${e.response?.statusCode}');
-        print('[HttpService] 响应数据: ${e.response?.data}');
-      }
-      throw _handleError(e);
-    } catch (e) {
-      print('[HttpService] 未知错误: $e');
-      rethrow;
-    }
-  }
-
-  /// 创建笔记
-  Future<NoteResponse> createNote({
-    String? title,
-    required String content,
-  }) async {
-    try {
-      final response = await _dio.post(
-        ApiConfig.createNote,
-        data: {
-          'title': title,
-          'content': content,
-        },
-      );
-      return NoteResponse.fromJson(response.data as Map<String, dynamic>);
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
-  }
 
   /// 获取笔记详情
   Future<NoteResponse> getNote(String noteId) async {
@@ -341,7 +302,7 @@ class HttpService {
       final response = await _dio.get(
         ApiConfig.getFlashCardProgress(noteId),
       );
-      return flashCardProgressFromJson(response.data as Map<String, dynamic>);
+      return FlashCardProgress.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -469,14 +430,22 @@ class HttpService {
   Future<CreateNoteResponse> createNote({
     required String userInput,
     int maxTerms = 30,
+    String? title,
+    List<String>? terms,
+    String? content,
   }) async {
     try {
+      final data = {
+        'user_input': userInput,
+        'max_terms': maxTerms,
+      };
+      if (title != null) data['title'] = title;
+      if (terms != null) data['terms'] = terms;
+      if (content != null) data['content'] = content;
+
       final response = await _dio.post(
         ApiConfig.createNote,
-        data: {
-          'user_input': userInput,
-          'max_terms': maxTerms,
-        },
+        data: data,
         options: Options(
           // 创建笔记可能需要较长时间（AI生成+数据库保存）
           receiveTimeout: const Duration(seconds: 90),
@@ -509,7 +478,7 @@ class HttpService {
   }
 
   /// 获取笔记详情
-  Future<Map<String, dynamic>> getNoteDetail(int noteId) async {
+  Future<Map<String, dynamic>> getNoteDetail(String noteId) async {
     try {
       final response = await _dio.get(ApiConfig.getNoteDetail(noteId));
       return response.data as Map<String, dynamic>;
@@ -520,7 +489,7 @@ class HttpService {
 
   /// 设置笔记默认角色
   Future<Map<String, dynamic>> setNoteDefaultRole({
-    required int noteId,
+    required String noteId,
     required String roleId,
   }) async {
     try {
@@ -548,8 +517,8 @@ class HttpService {
 
   /// 评估用户解释
   Future<EvaluateResponse> evaluateExplanation({
-    required int cardId,
-    required int noteId,
+    required String cardId,
+    required String noteId,
     required String selectedRole,
     required String userExplanation,
   }) async {
@@ -564,8 +533,8 @@ class HttpService {
         },
         options: Options(
           // AI 评估可能需要较长时间
-          receiveTimeout: const Duration(seconds: 60),
-          sendTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 120),
+          sendTimeout: const Duration(seconds: 120),
         ),
       );
       return EvaluateResponse.fromJson(response.data as Map<String, dynamic>);
@@ -576,7 +545,7 @@ class HttpService {
 
   /// 更新闪词卡片状态
   Future<CardStatusResponse> updateCardStatus({
-    required int cardId,
+    required String cardId,
     required String status,
   }) async {
     try {
@@ -591,7 +560,7 @@ class HttpService {
   }
 
   /// 获取闪词卡片详情（包含学习历史）
-  Future<FlashCard> getCardDetail(int cardId) async {
+  Future<FlashCard> getCardDetail(String cardId) async {
     try {
       final response = await _dio.get(ApiConfig.getCardDetail(cardId));
       return FlashCard.fromJson(response.data as Map<String, dynamic>);

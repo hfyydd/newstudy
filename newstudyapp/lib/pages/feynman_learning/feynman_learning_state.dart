@@ -126,11 +126,8 @@ class FeynmanLearningState {
   final userExplanation = Rxn<String>();
 
   // ========== 新增：角色选择和评估相关状态 ==========
-  
+
   // ========== 语音输入相关状态 ==========
-  /// 是否正在语音识别
-  final isListening = false.obs;
-  
   /// 语音识别的文本结果
   final speechText = ''.obs;
   
@@ -147,7 +144,7 @@ class FeynmanLearningState {
   final currentCard = Rxn<Map<String, dynamic>>();
   
   /// 当前笔记ID
-  final currentNoteId = Rxn<int>();
+  final currentNoteId = Rxn<String>();
   
   /// 笔记的默认角色（从笔记详情获取）
   final noteDefaultRole = Rxn<String>();

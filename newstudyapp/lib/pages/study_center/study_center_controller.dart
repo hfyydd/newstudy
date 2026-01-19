@@ -319,7 +319,7 @@ class StudyCenterController extends GetxController {
   /// 处理笔记卡片点击
   /// 智能判断：如果有词条则直接进入学习，如果没有词条则进入详情页
   Future<void> handleNoteCardTap(
-      int noteId, String noteTitle, int totalCount) async {
+      String noteId, String noteTitle, int totalCount) async {
     // 如果笔记没有词条，跳转到笔记详情页让用户生成闪词卡片
     if (totalCount == 0) {
       Get.toNamed(
@@ -389,6 +389,56 @@ class StudyCenterController extends GetxController {
         arguments: {
           'noteId': noteId,
         },
+      );
+    } finally {
+      state.isLoading.value = false;
+    }
+  }
+
+  /// 处理单个闪词卡片点击
+  /// 跳转到费曼学习页面，只学习该卡片
+  Future<void> handleFlashCardTap(FlashCardListItem card) async {
+    try {
+      state.isLoading.value = true;
+
+      // 获取笔记详情以获取默认角色
+      final noteDetail = await _httpService.getNoteDetail(card.noteId);
+      final defaultRole = noteDetail['default_role'] as String? ?? '';
+
+      // 转换为费曼学习页面需要的格式
+      final flashCard = {
+        'id': card.id,
+        'term': card.term,
+        'status': card.status,
+        'review_count': card.reviewCount,
+        'last_reviewed_at': null,
+        'mastered_at': null,
+      };
+
+      // 跳转到费曼学习页面，只学习该卡片
+      Get.to(
+        () {
+          if (!Get.isRegistered<FeynmanLearningController>()) {
+            Get.lazyPut<FeynmanLearningController>(
+                () => FeynmanLearningController());
+          }
+          return const FeynmanLearningPage();
+        },
+        arguments: {
+          'flashCards': [flashCard], // 只包含当前卡片
+          'topic': '学习词条',
+          'defaultRole': defaultRole,
+          'singleCardMode': true, // 标记为单卡片模式
+          'fromStudyCenter': true, // 标记来自学习中心
+        },
+        transition: Transition.noTransition,
+      );
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '跳转到学习页面失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
       );
     } finally {
       state.isLoading.value = false;

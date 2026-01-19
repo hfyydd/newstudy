@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
+import 'package:newstudyapp/pages/note_creation/note_creation_controller.dart';
 import 'package:newstudyapp/models/note_models.dart';
 
 class HomePage extends StatefulWidget {
@@ -48,30 +50,31 @@ class _HomePageState extends State<HomePage>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-
-                // 大标题
-                _buildHeader(isDark),
-                const SizedBox(height: 40),
-
-                // 今日复习卡片
-                _buildTodayReviewCard(isDark),
-                const SizedBox(height: 24),
-
-                // 学习统计
-                _buildStatsSection(isDark),
-                const SizedBox(height: 24),
-
-                // 我的笔记区域（放在学习统计之后，降低权重）
-                _buildNotesSection(isDark),
-                const SizedBox(height: 100),
-              ],
+        child: RefreshIndicator(
+          onRefresh: () => _homeController.refreshNotes(),
+          color: AppTheme.darkPrimary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(), // 确保即使内容少也能下拉
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  // 大标题
+                  _buildHeader(isDark),
+                  const SizedBox(height: 40),
+                  // 今日复习卡片
+                  _buildTodayReviewCard(isDark),
+                  const SizedBox(height: 24),
+                  // 学习统计
+                  _buildStatsSection(isDark),
+                  const SizedBox(height: 24),
+                  // 我的笔记区域（放在学习统计之后，降低权重）
+                  _buildNotesSection(isDark),
+                  const SizedBox(height: 100),
+                ],
+              ),
             ),
           ),
         ),
@@ -525,9 +528,32 @@ class _HomePageState extends State<HomePage>
             children: [
               ...notes.map((note) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildNoteCard(
-                      isDark: isDark,
-                      note: note,
+                    child: Dismissible(
+                      key: Key(note.id),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (direction) async {
+                        // 调用控制器的删除方法，它会处理确认对话框
+                        await _homeController.deleteNote(note.id, note.title);
+                        // 返回 false 因为我们在 deleteNote 中已经手动从列表移除了
+                        return false;
+                      },
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      child: _buildNoteCard(
+                        isDark: isDark,
+                        note: note,
+                      ),
                     ),
                   )),
             ],
@@ -1314,6 +1340,39 @@ class _CreateNoteBottomSheet extends StatelessWidget {
           if (result != null) {
             Get.back();
           }
+        } else if (item.label == 'PDF文档' ||
+            item.label == 'Word文档' ||
+            item.label == '其他文档') {
+          // 文档类功能：跳转到笔记创建页面，并自动触发文件选择
+          Get.back(); // 先关闭弹窗
+          await Get.toNamed(AppRoutes.noteCreation);
+          // 等待页面加载后自动触发文件选择
+          Future.delayed(const Duration(milliseconds: 300), () {
+            try {
+              final controller = Get.find<NoteCreationController>();
+              controller.pickFile();
+            } catch (e) {
+              // 如果控制器还未初始化，忽略错误
+              debugPrint('NoteCreationController not found: $e');
+            }
+          });
+        } else if (item.label == '拍照' || item.label == '上传图片') {
+          // 图片类功能：跳转到笔记创建页面，并自动触发图片选择
+          Get.back(); // 先关闭弹窗
+          await Get.toNamed(AppRoutes.noteCreation);
+          // 等待页面加载后自动触发图片选择
+          Future.delayed(const Duration(milliseconds: 300), () {
+            try {
+              final controller = Get.find<NoteCreationController>();
+              final imageSource = item.label == '拍照'
+                  ? ImageSource.camera
+                  : ImageSource.gallery;
+              controller.pickImage(imageSource);
+            } catch (e) {
+              // 如果控制器还未初始化，忽略错误
+              debugPrint('NoteCreationController not found: $e');
+            }
+          });
         } else {
           // 其他功能先关闭弹窗，再显示提示
           Get.back();

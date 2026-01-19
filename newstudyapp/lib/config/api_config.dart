@@ -5,7 +5,7 @@ class ApiConfig {
   /// 后端服务基础地址
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000',
+    defaultValue: 'http://192.168.101.30:8000',
   );
 
   // ==================== Agent 相关接口 ====================
@@ -39,10 +39,19 @@ class ApiConfig {
   static const String listNotes = '/notes/list';
 
   /// 获取笔记详情
-  static String getNoteDetail(int noteId) => '/notes/$noteId';
+  static String getNoteDetail(String noteId) => '/notes/$noteId';
+
+  /// 获取笔记（通用方法）
+  static String getNote(String noteId) => '/notes/$noteId';
+
+  /// 更新笔记
+  static String updateNote(String noteId) => '/notes/$noteId';
+
+  /// 删除笔记
+  static String deleteNote(String noteId) => '/notes/$noteId';
 
   /// 设置笔记默认角色
-  static String setNoteDefaultRole(int noteId) => '/notes/$noteId/default-role';
+  static String setNoteDefaultRole(String noteId) => '/notes/$noteId/default-role';
 
   // ==================== 学习相关接口 ====================
 
@@ -52,11 +61,37 @@ class ApiConfig {
   /// 评估用户解释
   static const String evaluateExplanation = '/learning/evaluate';
 
-  /// 更新闪词卡片状态
-  static String updateCardStatus(int cardId) => '/flash-cards/$cardId/status';
+  // ==================== 闪卡相关接口 ====================
+
+  /// 生成闪卡
+  static String generateFlashCards(String noteId) =>
+      '/notes/$noteId/flash-cards/generate';
+
+  /// 获取笔记的闪卡列表
+  static String getFlashCards(String noteId) => '/notes/$noteId/flash-cards';
+
+  /// 获取笔记的闪卡列表（含状态）
+  static String getFlashCardsWithStatus(String noteId) =>
+      '/notes/$noteId/flash-cards/with-status';
+
+  /// 获取闪卡学习进度
+  static String getFlashCardProgress(String noteId) =>
+      '/notes/$noteId/flash-cards/progress';
+
+  /// 更新闪卡状态（批量）
+  static String updateFlashCardStatus(String noteId) =>
+      '/notes/$noteId/flash-cards/status';
+
+  /// 添加混淆术语
+  static String addConfusedTerms(String noteId) =>
+      '/notes/$noteId/confused-terms';
+
+  /// 更新闪词卡片状态（单个）
+  static String updateCardStatus(String cardId) =>
+      '/flash-cards/$cardId/status';
 
   /// 获取闪词卡片详情
-  static String getCardDetail(int cardId) => '/flash-cards/$cardId';
+  static String getCardDetail(String cardId) => '/flash-cards/$cardId';
 
   // ==================== 学习中心相关接口 ====================
 
@@ -65,6 +100,9 @@ class ApiConfig {
 
   /// 获取今日复习词条列表
   static const String todayReviewCards = '/study-center/today-review';
+
+  /// 获取复习闪卡列表
+  static const String getReviewFlashCards = '/review/cards';
 
   /// 获取薄弱词条列表（需巩固、需改进、未掌握）
   static const String weakCards = '/study-center/weak-cards';
@@ -82,6 +120,12 @@ class ApiConfig {
 
   /// 获取首页学习统计数据（含趋势、streak、周进度）
   static const String homeStatistics = '/home/statistics';
+
+  /// 获取学习统计数据（掌握数、总术语数、连续天数、学习时长）
+  static const String getStatistics = '/statistics';
+
+  /// 获取今日复习统计数据（待复习数、已完成数）
+  static const String getTodayReviewStatistics = '/review/today';
 
   // ==================== 辅助方法 ====================
 

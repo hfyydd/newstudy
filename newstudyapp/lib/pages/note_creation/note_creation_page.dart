@@ -314,7 +314,7 @@ class NoteCreationPage extends StatelessWidget {
               child: Obx(() {
                 final isSaving = controller.state.isSaving.value;
                 return ElevatedButton.icon(
-                  onPressed: isSaving ? null : controller.startLearning,
+                  onPressed: isSaving ? null : controller.saveAndExit,
                   icon: isSaving
                       ? const SizedBox(
                           width: 20,
@@ -325,9 +325,9 @@ class NoteCreationPage extends StatelessWidget {
                                 AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Icon(Icons.rocket_launch),
+                      : const Icon(Icons.save),
                   label: Text(
-                    isSaving ? '保存中...' : '开始学习',
+                    isSaving ? '保存中...' : '提交并保存',
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w600),
                   ),

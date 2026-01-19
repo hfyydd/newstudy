@@ -47,7 +47,9 @@ class NoteCreationController extends GetxController {
         maxTerms: 30,
       );
 
-      state.terms.value = List.of(resp.terms);
+      // 提取成功后，执行“自动保存并获取真实ID”的逻辑
+      await _autoSaveAndRefetch(text, initialTerms: resp.terms);
+
       state.isEditingTerms.value = true;
 
       if (state.terms.isEmpty) {
@@ -207,10 +209,21 @@ class NoteCreationController extends GetxController {
       if (state.titleController.text.trim().isEmpty && resp.title != null) {
         state.titleController.text = resp.title!;
       }
+      
       // 保存提取的文本内容（用于保存笔记）
-      state.extractedText.value = resp.text;
-      state.noteTextController.text = resp.text;
-      state.terms.value = List.of(resp.terms);
+      final extractedText = resp.text ?? '';
+      state.extractedText.value = extractedText;
+      state.noteTextController.text = extractedText;
+
+      // 提取成功后，执行“自动保存并获取真实ID”的逻辑
+      if (extractedText.isNotEmpty) {
+        await _autoSaveAndRefetch(extractedText, initialTerms: resp.terms);
+      } else {
+        // 如果没提取到文本但有词条（罕见），直接更新词条
+        state.terms.value = List.of(resp.terms);
+      }
+
+      // 准备好数据后进入编辑模式
       state.isEditingTerms.value = true;
 
       if (state.terms.isEmpty) {
@@ -230,6 +243,74 @@ class NoteCreationController extends GetxController {
       );
     } finally {
       state.isLoading.value = false;
+    }
+  }
+
+  /// 内部核心方法：自动保存笔记，并立即重新获取详情以同步真实卡片ID
+  Future<void> _autoSaveAndRefetch(String text, {List<String>? initialTerms}) async {
+    try {
+      state.isSaving.value = true;
+      debugPrint('[NoteCreationController] 开始自动保存笔记并获取详情... 内容长度: ${text.length}');
+      
+      final noteResponse = await httpService.createNote(
+        userInput: text,
+        maxTerms: 30,
+        title: state.selectedFileName.value, // 如果有文件名，作为标题
+        terms: initialTerms, // 如果有提取的词条，直接传入
+        content: text, // 如果是提取的全文，直接作为内容
+      );
+      
+      final noteId = noteResponse.noteId;
+      state.savedNoteId.value = noteId;
+      debugPrint('[NoteCreationController] 笔记自动保存成功: $noteId');
+
+      // 立即重新获取笔记详情，以获取由后端生成的真实闪词卡片数据（带真实ID）
+      try {
+        final noteDetail = await httpService.getNoteDetail(noteId);
+        final flashCardsRaw = noteDetail['flash_cards'] as List? ?? [];
+        
+        final savedCards = flashCardsRaw
+            .whereType<Map<String, dynamic>>()
+            .where((card) => card['term'] != null && card['id'] != null)
+            .toList();
+        
+        state.savedFlashCards.value = savedCards;
+        
+        // 重要：将 state.terms 同步为真实卡片的词条，确保编辑时与后端一致
+        if (savedCards.isNotEmpty) {
+          state.terms.value = savedCards
+              .map((c) => c['term'].toString())
+              .toList();
+          debugPrint('[NoteCreationController] 同步了 ${savedCards.length} 张真实卡片到界面');
+        } else if (initialTerms != null) {
+          state.terms.value = List.of(initialTerms);
+        }
+      } catch (e) {
+        debugPrint('[NoteCreationController] 重新获取笔记详情失败: $e');
+        if (initialTerms != null) {
+          state.terms.value = List.of(initialTerms);
+        }
+      }
+
+      // 刷新首页笔记列表
+      if (Get.isRegistered<HomeController>()) {
+        Get.find<HomeController>().loadNotes();
+      }
+    } catch (e) {
+      debugPrint('[NoteCreationController] 自动保存笔记失败: $e');
+      if (initialTerms != null) {
+        state.terms.value = List.of(initialTerms);
+      }
+      Get.snackbar(
+        '错误',
+        '自动保存失败 (请检查网络或重启后端):\n$e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    } finally {
+      state.isSaving.value = false;
     }
   }
 
@@ -265,43 +346,86 @@ class NoteCreationController extends GetxController {
     }
 
     final title = state.titleController.text.trim();
+    final String? noteId = state.savedNoteId.value;
+    final List<Map<String, dynamic>> savedCards = state.savedFlashCards.toList();
 
-    // 如果有提取的文本内容，先保存笔记到数据库
-    final extractedText = state.noteTextController.text.trim();
-    String? savedNoteId;
+    debugPrint('[NoteCreationController] 进入学习: noteId=$noteId, cardsCount=${savedCards.length}');
 
-    if (extractedText.isNotEmpty) {
-      state.isSaving.value = true;
-      try {
-        final noteResponse = await httpService.createNote(
-          title: title.isEmpty ? 'PDF笔记' : title,
-          content: extractedText,
-        );
-        savedNoteId = noteResponse.id;
-        debugPrint('[NoteCreationController] 笔记创建成功: $savedNoteId');
-
-        // 通知 HomeController 刷新列表
-        if (Get.isRegistered<HomeController>()) {
-          final homeController = Get.find<HomeController>();
-          await homeController.loadNotes();
-          debugPrint('[NoteCreationController] 已刷新笔记列表');
-        }
-      } catch (e) {
-        debugPrint('[NoteCreationController] 笔记创建失败: $e');
-        // 即使保存失败也继续学习，只是不会有笔记ID
-      } finally {
-        state.isSaving.value = false;
+    // 如果还没有保存笔记ID但有文字内容，尝试最后补救性保存一次
+    if (noteId == null) {
+      final text = state.noteTextController.text.trim();
+      if (text.isNotEmpty) {
+        await _autoSaveAndRefetch(text);
       }
     }
 
-    // 跳转到学习页面，传递笔记ID以便标记已掌握
+    // 跳转到学习页面
     Get.toNamed(
       AppRoutes.feynmanLearning,
       arguments: {
         'topic': title.isEmpty ? '我的笔记' : title,
+        'flashCards': state.savedFlashCards.toList(),
         'terms': state.terms.toList(growable: false),
-        'noteId': savedNoteId,
+        'noteId': state.savedNoteId.value,
       },
     );
+  }
+
+  /// 保存并返回首页
+  Future<void> saveAndExit() async {
+    final text = state.noteTextController.text.trim();
+    final title = state.titleController.text.trim();
+    
+    debugPrint('[NoteCreationController] 执行 saveAndExit: title=$title, textLength=${text.length}, termsCount=${state.terms.length}');
+    
+    try {
+      state.isSaving.value = true;
+
+      // 1. 如果还没有保存过笔记，先创建
+      if (state.savedNoteId.value == null && text.isNotEmpty) {
+        debugPrint('[NoteCreationController] 笔记未保存，开始自动保存...');
+        await _autoSaveAndRefetch(text);
+      }
+
+      // 2. 如果已经有笔记ID，同步最新的标题和内容（用户可能在界面上修改过）
+      if (state.savedNoteId.value != null) {
+        debugPrint('[NoteCreationController] 同步最新的标题和内容...');
+        await httpService.updateNote(
+          noteId: state.savedNoteId.value!,
+          title: title.isEmpty ? '我的笔记' : title,
+          content: text,
+        );
+      }
+
+      // 3. 刷新首页数据
+      debugPrint('[NoteCreationController] 准备刷新首页并跳转...');
+      if (Get.isRegistered<HomeController>()) {
+        final homeController = Get.find<HomeController>();
+        await homeController.loadNotes();
+        await homeController.loadHomeStatistics();
+      }
+
+      // 4. 跳转回首页
+      // 使用 offAllNamed 确保清理栈，或者如果确信是从首页来的，可以使用 Get.until
+      Get.offAllNamed(AppRoutes.main);
+      
+      Get.snackbar(
+        '成功',
+        '笔记已保存',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      debugPrint('[NoteCreationController] 保存并退出失败: $e');
+      Get.snackbar(
+        '错误',
+        '保存失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      state.isSaving.value = false;
+    }
   }
 }
