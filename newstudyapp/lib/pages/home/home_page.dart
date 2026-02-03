@@ -621,19 +621,68 @@ class _HomePageState extends State<HomePage>
             return _buildEmptyNotes(isDark);
           }
 
+          // 首页只显示前3条笔记
+          final displayNotes = notes.take(3).toList();
+          final hasMore = notes.length > 3;
+
           return Column(
             children: [
-              ...notes.map((note) => Padding(
+              ...displayNotes.map((note) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _buildNoteCard(
                       isDark: isDark,
                       note: note,
                     ),
                   )),
+              // 如果超过3条，显示"查看更多"按钮
+              if (hasMore)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _buildViewMoreButton(isDark),
+                ),
             ],
           );
         }),
       ],
+    );
+  }
+
+  /// 构建"查看更多"按钮
+  Widget _buildViewMoreButton(bool isDark) {
+    final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+    final cardColor = isDark ? Colors.grey[900] : Colors.white;
+
+    return GestureDetector(
+      onTap: () {
+        Get.toNamed(AppRoutes.notesList);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor!, width: 1),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '查看更多',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.darkPrimary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 12,
+              color: AppTheme.darkPrimary,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
