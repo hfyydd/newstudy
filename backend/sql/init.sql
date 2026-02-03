@@ -4,6 +4,12 @@
 -- 启用 pgvector 扩展
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- 删除已有表及数据（按依赖关系逆序删除，使用 CASCADE 自动处理外键约束）
+DROP TABLE IF EXISTS learning_records CASCADE;
+DROP TABLE IF EXISTS flash_cards CASCADE;
+DROP TABLE IF EXISTS notes CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- 创建用户表
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -24,6 +30,7 @@ CREATE TABLE IF NOT EXISTS notes (
     title VARCHAR(200) NOT NULL,
     content TEXT,
     markdown_content TEXT,
+    default_role VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -98,6 +105,7 @@ COMMENT ON COLUMN notes.user_id IS '用户ID';
 COMMENT ON COLUMN notes.title IS '笔记标题';
 COMMENT ON COLUMN notes.content IS '原始内容';
 COMMENT ON COLUMN notes.markdown_content IS 'Markdown格式的笔记内容';
+COMMENT ON COLUMN notes.default_role IS '笔记的默认学习角色（如：5岁孩子、小学生、中学生、大学生、研究生）';
 COMMENT ON COLUMN flash_cards.note_id IS '笔记ID';
 COMMENT ON COLUMN flash_cards.term IS '闪词内容';
 COMMENT ON COLUMN flash_cards.status IS '学习状态: not_started, needs_review（需巩固）, needs_improve, not_mastered, mastered';

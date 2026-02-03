@@ -43,8 +43,11 @@ class HomeController extends GetxController {
   }
 
   /// 加载笔记列表
-  Future<void> loadNotes() async {
-    isLoading.value = true;
+  /// [showLoading] - 是否显示加载状态（初次加载时为true，下拉刷新时为false）
+  Future<void> loadNotes({bool showLoading = true}) async {
+    if (showLoading) {
+      isLoading.value = true;
+    }
     try {
       final response = await _httpService.listNotes(skip: 0, limit: 100);
       notes.value = response.notes;
@@ -57,7 +60,9 @@ class HomeController extends GetxController {
         duration: const Duration(seconds: 2),
       );
     } finally {
-      isLoading.value = false;
+      if (showLoading) {
+        isLoading.value = false;
+      }
     }
   }
 
@@ -98,6 +103,15 @@ class HomeController extends GetxController {
     await loadNotes();
   }
 
+  /// 刷新所有数据（笔记列表 + 统计数据）
+  /// 下拉刷新时不显示全屏加载状态，由 RefreshIndicator 处理刷新动画
+  Future<void> refreshData() async {
+    await Future.wait([
+      loadNotes(showLoading: false),
+      loadHomeStatistics(),
+    ]);
+  }
+
   /// 直接跳转到费曼学习页面（今日需要复习）
   Future<void> navigateToTodayReviewFeynmanLearning({
     int initialLimit = 30, // 初始加载30条
@@ -124,7 +138,7 @@ class HomeController extends GetxController {
       if (flashCards.isEmpty) {
         Get.snackbar(
           '提示',
-          '暂无词条可学习',
+          '暂无闪词可学习',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
@@ -153,7 +167,7 @@ class HomeController extends GetxController {
     } catch (e) {
       Get.snackbar(
         '错误',
-        '加载词条失败：$e',
+        '加载闪词失败：$e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );

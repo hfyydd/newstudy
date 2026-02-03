@@ -47,23 +47,29 @@ class StudyCenterPage extends StatelessWidget {
     final cardColor = isDark ? Colors.grey[900]! : Colors.white;
     final borderColor = isDark ? Colors.grey[800]! : Colors.grey[300]!;
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            // 标题
-            Text(
-              '学习中心',
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                color: textColor,
+    return RefreshIndicator(
+      onRefresh: () async {
+        await controller.refreshStatistics();
+      },
+      color: AppTheme.darkPrimary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
+              // 标题
+              Text(
+                '学习中心',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 40),
+              const SizedBox(height: 40),
 
             // 今日复习卡片（突出显示）
             _buildTodayReviewHighlightCard(
@@ -185,7 +191,7 @@ class StudyCenterPage extends StatelessWidget {
                               ),
                               _buildHorizontalCard(
                                 context: context,
-                                title: '全部词条',
+                                title: '全部闪词',
                                 count: controller.state.totalCardsCount.value,
                                 icon: Icons.library_books,
                                 iconColor: Colors.blue,
@@ -226,7 +232,7 @@ class StudyCenterPage extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    '创建笔记后，词条会按笔记分类显示',
+                                    '创建笔记后，闪词会按笔记分类显示',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isDark
@@ -254,7 +260,7 @@ class StudyCenterPage extends StatelessWidget {
                                         noteItem.needsImproveCount,
                                     notMasteredCount: noteItem.notMasteredCount,
                                     onTap: () {
-                                      // 智能跳转：有词条直接学习，无词条进入详情页
+                                      // 智能跳转：有闪词直接学习，无闪词进入详情页
                                       controller.handleNoteCardTap(
                                         noteItem.noteId,
                                         noteItem.noteTitle,
@@ -272,8 +278,9 @@ class StudyCenterPage extends StatelessWidget {
                     ],
                   ],
                 )),
-            const SizedBox(height: 100),
-          ],
+              const SizedBox(height: 100),
+            ],
+          ),
         ),
       ),
     );
@@ -388,7 +395,7 @@ class StudyCenterPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            '个词条',
+                            '个闪词',
                             style: TextStyle(
                                 fontSize: 18,
                                 color: Colors.white,
@@ -517,6 +524,7 @@ class StudyCenterPage extends StatelessWidget {
   void _showTodayReviewExplanation(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
 
     showDialog(
@@ -563,11 +571,11 @@ class StudyCenterPage extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               Text(
-                '根据复习计划，今天应该复习的词条。',
+                '基于艾宾浩斯遗忘曲线，系统会根据闪词状态和上次学习时间，智能计算今日需要复习的闪词。',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: textColor,
                   height: 1.5,
                 ),
@@ -583,32 +591,72 @@ class StudyCenterPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '包含状态：',
+                      '间隔复习规则：',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: textColor,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    _buildStatusItem(
-                        '需巩固', '上次学习评分70-89分', AppTheme.statusNeedsReview),
-                    const SizedBox(height: 6),
-                    _buildStatusItem(
-                        '需改进', '上次学习评分50-69分', AppTheme.statusNeedsImprove),
-                    const SizedBox(height: 6),
-                    _buildStatusItem(
-                        '未掌握', '上次学习评分0-49分', AppTheme.statusNotMastered),
+                    const SizedBox(height: 12),
+                    _buildIntervalItem(
+                      status: '未掌握',
+                      score: '0-49分',
+                      interval: '4小时后',
+                      reason: '遗忘最快，需快速强化',
+                      color: AppTheme.statusNotMastered,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildIntervalItem(
+                      status: '需改进',
+                      score: '50-69分',
+                      interval: '3天后',
+                      reason: '有一定理解，给予消化时间',
+                      color: AppTheme.statusNeedsImprove,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildIntervalItem(
+                      status: '需巩固',
+                      score: '70-89分',
+                      interval: '1天后',
+                      reason: '基本掌握，在遗忘临界点前巩固',
+                      color: AppTheme.statusNeedsReview,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildIntervalItem(
+                      status: '已掌握',
+                      score: '90-100分',
+                      interval: '7天后',
+                      reason: '已形成长期记忆，延长间隔巩固',
+                      color: AppTheme.statusMastered,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              Text(
+                '💡 下方显示的"需巩固"等数量是当前状态的闪词总数，而非今日需复习数量。',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: secondaryColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.statusNeedsReview,
+                    backgroundColor: AppTheme.darkPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -631,25 +679,77 @@ class StudyCenterPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusItem(String status, String desc, Color color) {
+  /// 构建间隔规则项
+  Widget _buildIntervalItem({
+    required String status,
+    required String score,
+    required String interval,
+    required String reason,
+    required Color color,
+    required Color textColor,
+    required Color? secondaryColor,
+  }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 10,
+          height: 10,
+          margin: const EdgeInsets.only(top: 4),
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            '$status：$desc',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    '（$score）',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: secondaryColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      interval,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                reason,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: secondaryColor,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -865,7 +965,7 @@ class StudyCenterPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '$totalCount个词条',
+                  '$totalCount个闪词',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -902,35 +1002,35 @@ class StudyCenterPage extends StatelessWidget {
     );
   }
 
-  /// 构建薄弱词条页面（需巩固、需改进、未掌握共用此页面）
+  /// 构建薄弱闪词页面（需巩固、需改进、未掌握共用此页面）
   Widget _buildWeakCardsPage(
       BuildContext context, StudyCenterController controller, bool isDark) {
     // 根据状态筛选显示不同的标题
     return Obx(() {
-      String title = '薄弱词条';
+      String title = '薄弱闪词';
       String? subtitle;
 
       final statusFilter = controller.state.weakCardsStatusFilter.value;
       if (statusFilter != null) {
         switch (statusFilter) {
           case 'NEEDS_REVIEW':
-            title = '需巩固词条';
-            subtitle = '需要巩固复习的词条（70-89分）';
+            title = '需巩固闪词';
+            subtitle = '需要巩固复习的闪词（70-89分）';
             break;
           case 'NEEDS_IMPROVE':
-            title = '需改进词条';
-            subtitle = '需要改进的词条（60-69分）';
+            title = '需改进闪词';
+            subtitle = '需要改进的闪词（60-69分）';
             break;
           case 'NOT_MASTERED':
-            title = '未掌握词条';
-            subtitle = '未掌握的词条（0-59分）';
+            title = '未掌握闪词';
+            subtitle = '未掌握的闪词（0-59分）';
             break;
           default:
-            title = '薄弱词条';
-            subtitle = '需改进和未掌握的词条';
+            title = '薄弱闪词';
+            subtitle = '需改进和未掌握的闪词';
         }
       } else {
-        subtitle = '需改进和未掌握的词条';
+        subtitle = '需改进和未掌握的闪词';
       }
 
       return _buildCardListPage(
@@ -948,14 +1048,14 @@ class StudyCenterPage extends StatelessWidget {
     });
   }
 
-  /// 构建已掌握词条页面
+  /// 构建已掌握闪词页面
   Widget _buildMasteredCardsPage(
       BuildContext context, StudyCenterController controller, bool isDark) {
     return _buildCardListPage(
       context: context,
       controller: controller,
       isDark: isDark,
-      title: '已掌握词条',
+      title: '已掌握闪词',
       cards: controller.state.masteredCards,
       total: controller.state.masteredCardsTotal,
       onRefresh: () async {
@@ -964,14 +1064,14 @@ class StudyCenterPage extends StatelessWidget {
     );
   }
 
-  /// 构建全部词条页面
+  /// 构建全部闪词页面
   Widget _buildAllCardsPage(
       BuildContext context, StudyCenterController controller, bool isDark) {
     return _buildCardListPage(
       context: context,
       controller: controller,
       isDark: isDark,
-      title: '全部词条',
+      title: '全部闪词',
       cards: controller.state.allCards,
       total: controller.state.allCardsTotal,
       onRefresh: () async {
@@ -990,7 +1090,7 @@ class StudyCenterPage extends StatelessWidget {
     );
   }
 
-  /// 构建词条列表页面
+  /// 构建闪词列表页面
   Widget _buildCardListPage({
     required BuildContext context,
     required StudyCenterController controller,
@@ -1053,7 +1153,7 @@ class StudyCenterPage extends StatelessWidget {
                 ),
               ),
               Obx(() => Text(
-                    '${total.value}个词条',
+                    '${total.value}个闪词',
                     style: TextStyle(
                       fontSize: 14,
                       color: secondaryColor,
@@ -1085,7 +1185,7 @@ class StudyCenterPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '暂无词条',
+                      '暂无闪词',
                       style: TextStyle(
                         fontSize: 16,
                         color: secondaryColor,
@@ -1123,7 +1223,7 @@ class StudyCenterPage extends StatelessWidget {
     );
   }
 
-  /// 构建词条列表项
+  /// 构建闪词列表项
   Widget _buildCardListItem({
     required bool isDark,
     required FlashCardListItem card,
@@ -1165,10 +1265,10 @@ class StudyCenterPage extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        // TODO: 跳转到词条详情或费曼学习页面
+        // TODO: 跳转到闪词详情或费曼学习页面
         Get.snackbar(
           '提示',
-          '点击词条：${card.term}',
+          '点击闪词：${card.term}',
           snackPosition: SnackPosition.BOTTOM,
         );
       },
@@ -1380,7 +1480,7 @@ class StudyCenterPage extends StatelessWidget {
                       needsImproveCount: noteItem.needsImproveCount,
                       notMasteredCount: noteItem.notMasteredCount,
                       onTap: () {
-                        // TODO: 跳转到笔记详情页或该笔记的词条列表
+                        // TODO: 跳转到笔记详情页或该笔记的闪词列表
                         Get.snackbar(
                           '提示',
                           '点击笔记：${noteItem.noteTitle}',

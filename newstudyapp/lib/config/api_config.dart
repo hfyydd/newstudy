@@ -63,19 +63,19 @@ class ApiConfig {
   /// 获取学习中心统计数据
   static const String studyCenterStatistics = '/study-center/statistics';
 
-  /// 获取今日复习词条列表
+  /// 获取今日复习闪词列表
   static const String todayReviewCards = '/study-center/today-review';
 
-  /// 获取薄弱词条列表（需巩固、需改进、未掌握）
+  /// 获取薄弱闪词列表（需巩固、需改进、未掌握）
   static const String weakCards = '/study-center/weak-cards';
 
-  /// 获取已掌握词条列表
+  /// 获取已掌握闪词列表
   static const String masteredCards = '/study-center/mastered-cards';
 
-  /// 获取全部词条列表
+  /// 获取全部闪词列表
   static const String allCards = '/study-center/all-cards';
 
-  /// 按笔记分类获取词条列表
+  /// 按笔记分类获取闪词列表
   static const String cardsByNote = '/study-center/cards-by-note';
 
   // ==================== 首页学习统计 ====================

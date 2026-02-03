@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/models/agent_models.dart';
 import 'package:newstudyapp/models/note_models.dart';
+import 'package:newstudyapp/services/toast_service.dart';
 
 /// HTTP 网络请求服务（单例模式）
 /// 
@@ -57,6 +58,52 @@ class HttpService {
         responseHeader: false,
       ),
     );
+
+    // 添加全局错误处理拦截器
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (DioException error, ErrorInterceptorHandler handler) {
+          // 自动显示错误 Toast
+          _showErrorToast(error);
+          // 继续传递错误
+          handler.next(error);
+        },
+      ),
+    );
+  }
+
+  /// 显示错误 Toast（根据错误类型显示不同提示）
+  void _showErrorToast(DioException error) {
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        ToastService.showTimeoutError();
+        break;
+      case DioExceptionType.badResponse:
+        final statusCode = error.response?.statusCode ?? 0;
+        // 尝试从响应中提取错误信息
+        String? message;
+        final data = error.response?.data;
+        if (data is Map<String, dynamic>) {
+          message = data['detail'] as String? ?? 
+                    data['message'] as String? ?? 
+                    data['error'] as String?;
+        } else if (data is String && data.isNotEmpty) {
+          message = data;
+        }
+        ToastService.showServerError(statusCode: statusCode, message: message);
+        break;
+      case DioExceptionType.connectionError:
+        ToastService.showNetworkError();
+        break;
+      case DioExceptionType.cancel:
+        // 请求取消不显示 Toast
+        break;
+      default:
+        ToastService.showError(error.message ?? '请求失败，请稍后重试');
+        break;
+    }
   }
 
   /// 获取 Dio 实例（用于特殊场景）
@@ -326,7 +373,7 @@ class HttpService {
     }
   }
 
-  /// 获取今日复习词条列表
+  /// 获取今日复习闪词列表
   Future<FlashCardListResponse> getTodayReviewCards({
     int skip = 0,
     int limit = 100,
@@ -345,7 +392,7 @@ class HttpService {
     }
   }
 
-  /// 获取薄弱词条列表（需巩固、需改进、未掌握）
+  /// 获取薄弱闪词列表（需巩固、需改进、未掌握）
   Future<FlashCardListResponse> getWeakCards({
     int skip = 0,
     int limit = 100,
@@ -369,7 +416,7 @@ class HttpService {
     }
   }
 
-  /// 获取已掌握词条列表
+  /// 获取已掌握闪词列表
   Future<FlashCardListResponse> getMasteredCards({
     int skip = 0,
     int limit = 100,
@@ -388,7 +435,7 @@ class HttpService {
     }
   }
 
-  /// 获取全部词条列表
+  /// 获取全部闪词列表
   Future<FlashCardListResponse> getAllCards({
     int skip = 0,
     int limit = 100,
@@ -407,7 +454,7 @@ class HttpService {
     }
   }
 
-  /// 按笔记分类获取词条列表
+  /// 按笔记分类获取闪词列表
   Future<CardsByNoteResponse> getCardsByNote({
     int skip = 0,
     int limit = 100,

@@ -22,8 +22,11 @@ class StudyCenterController extends GetxController {
   }
 
   /// 加载统计数据
-  Future<void> _loadStatistics() async {
-    state.isLoading.value = true;
+  /// [showLoading] - 是否显示加载状态（初次加载时为true，下拉刷新时为false）
+  Future<void> _loadStatistics({bool showLoading = true}) async {
+    if (showLoading) {
+      state.isLoading.value = true;
+    }
     try {
       final statistics = await _httpService.getStudyCenterStatistics();
       state.todayReviewCount.value = statistics.todayReviewCount;
@@ -42,7 +45,9 @@ class StudyCenterController extends GetxController {
       // 如果API调用失败，使用假数据作为降级方案
       _loadFallbackStatistics();
     } finally {
-      state.isLoading.value = false;
+      if (showLoading) {
+        state.isLoading.value = false;
+      }
     }
   }
 
@@ -56,15 +61,19 @@ class StudyCenterController extends GetxController {
     state.totalCardsCount.value = 50;
   }
 
-  /// 刷新统计数据
+  /// 刷新统计数据（包括笔记分类数据）
+  /// 下拉刷新时不显示全屏加载状态，由 RefreshIndicator 处理刷新动画
   Future<void> refreshStatistics() async {
-    await _loadStatistics();
+    await Future.wait([
+      _loadStatistics(showLoading: false),
+      _loadCardsByNote(),
+    ]);
   }
 
   /// 导航到指定页面
   void navigateToPage(StudyCenterPageType pageType, {String? statusFilter}) {
     state.currentPage.value = pageType;
-    // 如果是薄弱词条页面，设置状态筛选
+    // 如果是薄弱闪词页面，设置状态筛选
     if (pageType == StudyCenterPageType.weakCards) {
       state.weakCardsStatusFilter.value = statusFilter;
     } else {
@@ -103,13 +112,13 @@ class StudyCenterController extends GetxController {
           );
           // 根据状态筛选设置标题
           if (statusFilter == 'NEEDS_REVIEW') {
-            pageTitle = '需巩固词条';
+            pageTitle = '需巩固闪词';
           } else if (statusFilter == 'NEEDS_IMPROVE') {
-            pageTitle = '需改进词条';
+            pageTitle = '需改进闪词';
           } else if (statusFilter == 'NOT_MASTERED') {
-            pageTitle = '未掌握词条';
+            pageTitle = '未掌握闪词';
           } else {
-            pageTitle = '薄弱词条';
+            pageTitle = '薄弱闪词';
           }
           break;
         case StudyCenterPageType.masteredCards:
@@ -117,14 +126,14 @@ class StudyCenterController extends GetxController {
             skip: 0,
             limit: initialLimit,
           );
-          pageTitle = '已掌握词条';
+          pageTitle = '已掌握闪词';
           break;
         case StudyCenterPageType.allCards:
           response = await _httpService.getAllCards(
             skip: 0,
             limit: initialLimit,
           );
-          pageTitle = '全部词条';
+          pageTitle = '全部闪词';
           break;
         default:
           // 其他类型不支持直接跳转
@@ -147,7 +156,7 @@ class StudyCenterController extends GetxController {
       if (flashCards.isEmpty) {
         Get.snackbar(
           '提示',
-          '暂无词条可学习',
+          '暂无闪词可学习',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
@@ -177,7 +186,7 @@ class StudyCenterController extends GetxController {
     } catch (e) {
       Get.snackbar(
         '错误',
-        '加载词条失败：$e',
+        '加载闪词失败：$e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
@@ -234,7 +243,7 @@ class StudyCenterController extends GetxController {
     }
   }
 
-  /// 加载今日复习词条列表
+  /// 加载今日复习闪词列表
   Future<void> _loadTodayReviewCards() async {
     try {
       final response = await _httpService.getTodayReviewCards(
@@ -250,7 +259,7 @@ class StudyCenterController extends GetxController {
     }
   }
 
-  /// 加载薄弱词条列表
+  /// 加载薄弱闪词列表
   Future<void> _loadWeakCards() async {
     try {
       final response = await _httpService.getWeakCards(
@@ -266,7 +275,7 @@ class StudyCenterController extends GetxController {
     }
   }
 
-  /// 加载已掌握词条列表
+  /// 加载已掌握闪词列表
   Future<void> _loadMasteredCards() async {
     try {
       final response = await _httpService.getMasteredCards(
@@ -281,7 +290,7 @@ class StudyCenterController extends GetxController {
     }
   }
 
-  /// 加载全部词条列表
+  /// 加载全部闪词列表
   Future<void> _loadAllCards() async {
     try {
       final response = await _httpService.getAllCards(
@@ -296,7 +305,7 @@ class StudyCenterController extends GetxController {
     }
   }
 
-  /// 加载按笔记分类的词条列表
+  /// 加载按笔记分类的闪词列表
   Future<void> _loadCardsByNote() async {
     try {
       final response = await _httpService.getCardsByNote(
@@ -317,10 +326,10 @@ class StudyCenterController extends GetxController {
   }
 
   /// 处理笔记卡片点击
-  /// 智能判断：如果有词条则直接进入学习，如果没有词条则进入详情页
+  /// 智能判断：如果有闪词则直接进入学习，如果没有闪词则进入详情页
   Future<void> handleNoteCardTap(
       int noteId, String noteTitle, int totalCount) async {
-    // 如果笔记没有词条，跳转到笔记详情页让用户生成闪词卡片
+    // 如果笔记没有闪词，跳转到笔记详情页让用户生成闪词卡片
     if (totalCount == 0) {
       Get.toNamed(
         AppRoutes.noteDetail,
@@ -331,7 +340,7 @@ class StudyCenterController extends GetxController {
       return;
     }
 
-    // 如果笔记有词条，先获取笔记详情（包含闪词卡片数据），然后直接进入学习
+    // 如果笔记有闪词，先获取笔记详情（包含闪词卡片数据），然后直接进入学习
     try {
       state.isLoading.value = true;
       final noteDetail = await _httpService.getNoteDetail(noteId);

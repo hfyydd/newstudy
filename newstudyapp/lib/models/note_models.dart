@@ -586,7 +586,7 @@ class HomeStatisticsResponse {
   final List<DailyStudyCount> trend7d;
 }
 
-/// 按笔记分类的词条统计模型
+/// 按笔记分类的闪词统计模型
 class CardsByNoteItem {
   const CardsByNoteItem({
     required this.noteId,
@@ -619,7 +619,7 @@ class CardsByNoteItem {
   final int notMasteredCount;
 }
 
-/// 按笔记分类的词条列表响应模型
+/// 按笔记分类的闪词列表响应模型
 class CardsByNoteResponse {
   const CardsByNoteResponse({
     required this.notes,

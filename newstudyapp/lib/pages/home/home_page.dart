@@ -48,30 +48,37 @@ class _HomePageState extends State<HomePage>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await _homeController.refreshData();
+          },
+          color: AppTheme.darkPrimary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
 
-                // 大标题
-                _buildHeader(isDark),
-                const SizedBox(height: 40),
+                  // 大标题
+                  _buildHeader(isDark),
+                  const SizedBox(height: 40),
 
-                // 今日复习卡片
-                _buildTodayReviewCard(isDark),
-                const SizedBox(height: 24),
+                  // 今日复习卡片
+                  _buildTodayReviewCard(isDark),
+                  const SizedBox(height: 24),
 
-                // 学习统计
-                _buildStatsSection(isDark),
-                const SizedBox(height: 24),
+                  // 学习统计
+                  _buildStatsSection(isDark),
+                  const SizedBox(height: 24),
 
-                // 我的笔记区域（放在学习统计之后，降低权重）
-                _buildNotesSection(isDark),
-                const SizedBox(height: 100),
-              ],
+                  // 我的笔记区域（放在学习统计之后，降低权重）
+                  _buildNotesSection(isDark),
+                  const SizedBox(height: 100),
+                ],
+              ),
             ),
           ),
         ),
@@ -276,7 +283,7 @@ class _HomePageState extends State<HomePage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '个词条',
+                            '个闪词',
                             style: TextStyle(
                                 fontSize: 18,
                                 color: Colors.white,
@@ -342,6 +349,7 @@ class _HomePageState extends State<HomePage>
   void _showTodayReviewExplanation(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
 
     showDialog(
@@ -388,11 +396,11 @@ class _HomePageState extends State<HomePage>
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               Text(
-                '根据复习计划，今天应该复习的词条。',
+                '基于艾宾浩斯遗忘曲线，系统会根据闪词状态和上次学习时间，智能计算今日需要复习的闪词。',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: textColor,
                   height: 1.5,
                 ),
@@ -408,32 +416,72 @@ class _HomePageState extends State<HomePage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '包含状态：',
+                      '间隔复习规则：',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: textColor,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    _buildStatusItem(
-                        '需巩固', '上次学习评分70-89分', AppTheme.statusNeedsReview),
-                    const SizedBox(height: 6),
-                    _buildStatusItem(
-                        '需改进', '上次学习评分50-69分', AppTheme.statusNeedsImprove),
-                    const SizedBox(height: 6),
-                    _buildStatusItem(
-                        '未掌握', '上次学习评分0-49分', AppTheme.statusNotMastered),
+                    const SizedBox(height: 12),
+                    _buildIntervalItem(
+                      status: '未掌握',
+                      score: '0-49分',
+                      interval: '4小时后',
+                      reason: '遗忘最快，需快速强化',
+                      color: AppTheme.statusNotMastered,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildIntervalItem(
+                      status: '需改进',
+                      score: '50-69分',
+                      interval: '3天后',
+                      reason: '有一定理解，给予消化时间',
+                      color: AppTheme.statusNeedsImprove,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildIntervalItem(
+                      status: '需巩固',
+                      score: '70-89分',
+                      interval: '1天后',
+                      reason: '基本掌握，在遗忘临界点前巩固',
+                      color: AppTheme.statusNeedsReview,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildIntervalItem(
+                      status: '已掌握',
+                      score: '90-100分',
+                      interval: '7天后',
+                      reason: '已形成长期记忆，延长间隔巩固',
+                      color: AppTheme.statusMastered,
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              Text(
+                '💡 下方显示的"需巩固"等数量是当前状态的闪词总数，而非今日需复习数量。',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: secondaryColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.statusNeedsReview,
+                    backgroundColor: AppTheme.darkPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -456,25 +504,77 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildStatusItem(String status, String desc, Color color) {
+  /// 构建间隔规则项
+  Widget _buildIntervalItem({
+    required String status,
+    required String score,
+    required String interval,
+    required String reason,
+    required Color color,
+    required Color textColor,
+    required Color? secondaryColor,
+  }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 10,
+          height: 10,
+          margin: const EdgeInsets.only(top: 4),
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            '$status：$desc',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    '（$score）',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: secondaryColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      interval,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                reason,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: secondaryColor,
+                ),
+              ),
+            ],
           ),
         ),
       ],

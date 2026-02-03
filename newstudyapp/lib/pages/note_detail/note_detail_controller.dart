@@ -423,7 +423,7 @@ class NoteDetailController extends GetxController {
       return;
     }
 
-    // 根据状态筛选词条
+    // 根据状态筛选闪词
     final filteredCards = _flashCardsData.where((card) {
       final cardStatus = card['status'] as String?;
       return cardStatus == status;
@@ -432,7 +432,7 @@ class NoteDetailController extends GetxController {
     if (filteredCards.isEmpty) {
       Get.snackbar(
         '提示',
-        '该状态下暂无词条可学习',
+        '该状态下暂无闪词可学习',
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -455,7 +455,7 @@ class NoteDetailController extends GetxController {
     };
     final statusName = statusNames[status] ?? status;
 
-    // 跳转到费曼学习页面，传递筛选后的词条
+    // 跳转到费曼学习页面，传递筛选后的闪词
     Get.toNamed(
       AppRoutes.feynmanLearning,
       arguments: {
@@ -541,9 +541,9 @@ class NoteDetailController extends GetxController {
         children: [
           Text('将会：'),
           SizedBox(height: 8),
-          Text('✓ 保留所有已有词条的学习记录'),
-          Text('✓ 添加新提取的词条到学习列表'),
-          Text('✓ 新旧词条自动去重合并'),
+          Text('✓ 保留所有已有闪词的学习记录'),
+          Text('✓ 添加新提取的闪词到学习列表'),
+          Text('✓ 新旧闪词自动去重合并'),
         ],
       ),
       actions: [

@@ -258,7 +258,7 @@ class FeynmanLearningPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 词条类型标签
+                  // 闪词类型标签
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -279,7 +279,7 @@ class FeynmanLearningPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
 
-                  // 词条名称
+                  // 闪词名称
                   Text(
                     term,
                     style: const TextStyle(
@@ -615,7 +615,7 @@ class FeynmanLearningPage extends StatelessWidget {
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
-                          // 当前词条
+                          // 当前闪词
             Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 20, vertical: 12),
@@ -742,7 +742,7 @@ class FeynmanLearningPage extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Text(
-                        '解释词条',
+                        '解释闪词',
                         style: TextStyle(
                 color: textColor,
                           fontSize: 17,
@@ -784,7 +784,7 @@ class FeynmanLearningPage extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    // 词条名称
+                    // 闪词名称
                     Container(
                       padding:
                           const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1228,7 +1228,7 @@ class FeynmanLearningPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 词条和状态
+                    // 闪词和状态
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -1614,7 +1614,7 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              '暂无词条',
+              '暂无闪词',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,

@@ -55,7 +55,7 @@ class FeynmanLearningController extends GetxController {
           state.currentSkip.value = arguments['currentSkip'] as int? ?? cards.length;
           state.totalCount.value = arguments['total'] as int? ?? cards.length;
           
-          // 从卡片信息中提取词条列表（过滤掉无效数据）
+          // 从卡片信息中提取闪词列表（过滤掉无效数据）
           state.terms.value = cards
               .where((c) => c['term'] != null && c['term'].toString().isNotEmpty)
               .map((c) => c['term'].toString())
@@ -314,7 +314,7 @@ class FeynmanLearningController extends GetxController {
     }
   }
   
-  /// 加载更多词条（分页加载）
+  /// 加载更多闪词（分页加载）
   Future<void> _loadMoreCards() async {
     if (state.isLoadingMore.value || 
         state.currentSkip.value >= state.totalCount.value ||
@@ -385,7 +385,7 @@ class FeynmanLearningController extends GetxController {
           .map((c) => c['term'].toString())
           .toList();
       
-      // 更新词条列表和卡片数据
+      // 更新闪词列表和卡片数据
       if (state.terms.value != null) {
         state.terms.value!.addAll(newTerms);
         state.terms.refresh();
@@ -866,7 +866,7 @@ class FeynmanLearningController extends GetxController {
     return null;
   }
   
-  /// 根据词条获取卡片数据
+  /// 根据闪词获取卡片数据
   Map<String, dynamic>? getCardDataByTerm(String term) {
     try {
       final cardData = _flashCardsData.firstWhere(
@@ -889,7 +889,7 @@ class FeynmanLearningController extends GetxController {
     }
     
     if (term.isEmpty) {
-      Get.snackbar('提示', '词条信息无效', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar('提示', '闪词信息无效', snackPosition: SnackPosition.BOTTOM);
       return;
     }
     
@@ -908,7 +908,7 @@ class FeynmanLearningController extends GetxController {
     
     if (cardData.isEmpty) {
       Get.snackbar('提示', '未找到卡片信息', snackPosition: SnackPosition.BOTTOM);
-      debugPrint('[FeynmanLearningController] 未找到词条: $term');
+      debugPrint('[FeynmanLearningController] 未找到闪词: $term');
       return;
     }
     
@@ -948,7 +948,7 @@ class FeynmanLearningController extends GetxController {
     if (reviewCount > 0 && state.cardLearningHistory.isNotEmpty) {
       // 显示最后一次的学习记录
       final lastRecord = state.cardLearningHistory.first;
-      debugPrint('[FeynmanLearningController] ✅ 已学习的词条，显示学习历史。分数: ${lastRecord.score}, 状态: ${lastRecord.status}');
+      debugPrint('[FeynmanLearningController] ✅ 已学习的闪词，显示学习历史。分数: ${lastRecord.score}, 状态: ${lastRecord.status}');
       debugPrint('[FeynmanLearningController] 学习记录中的角色ID: ${lastRecord.selectedRole}');
       
       // 先确保角色列表已加载（无论是否有角色都需要加载，因为UI可能需要）
@@ -999,12 +999,12 @@ class FeynmanLearningController extends GetxController {
       );
       state.userExplanation.value = lastRecord.userExplanation;
       state.learningPhase.value = LearningPhase.result;
-      // 已学习的词条直接显示结果
+      // 已学习的闪词直接显示结果
       return;
     }
     
-    // 未学习过的词条：正常学习流程
-    debugPrint('[FeynmanLearningController] 🆕 未学习的词条，进入正常学习流程');
+    // 未学习过的闪词：正常学习流程
+    debugPrint('[FeynmanLearningController] 🆕 未学习的闪词，进入正常学习流程');
     state.selectedRole.value = null;
     state.learningPhase.value = LearningPhase.selectingRole;
     
