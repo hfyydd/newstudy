@@ -74,6 +74,14 @@ class NoteDetailController extends GetxController {
         _createNoteFromUrl(url);
         return;
       }
+      
+      // 检查是否有youtubeUrl（从YouTube创建笔记）
+      final youtubeUrl = args['youtubeUrl'] as String?;
+      if (youtubeUrl != null && youtubeUrl.isNotEmpty) {
+        // 调用API创建笔记（保存到数据库）
+        _createNoteFromYoutube(youtubeUrl);
+        return;
+      }
     }
     
     // 如果没有传入任何参数，显示空状态
@@ -211,6 +219,66 @@ class NoteDetailController extends GetxController {
       // 调用后端API创建笔记（生成并保存到数据库）
       final response = await _httpService.createNoteFromUrl(
         url: url,
+        maxTerms: 30,
+      );
+
+      // 创建成功后，通过noteId加载笔记详情
+      await _loadNoteById(response.noteId);
+
+      // 刷新首页的笔记列表
+      try {
+        final homeController = Get.find<HomeController>();
+        homeController.loadNotes(showLoading: false);
+      } catch (e) {
+        // 如果首页控制器不存在，忽略错误
+        print('首页控制器未找到，跳过刷新: $e');
+      }
+
+      // 显示成功提示
+      Get.snackbar(
+        '成功',
+        '笔记创建成功',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF4ECDC4),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+
+    } catch (e) {
+      // 标记创建失败，防止显示"此笔记尚未生成闪词卡片"页面
+      state.hasError.value = true;
+      // 创建失败，直接返回上一页
+      Get.back();
+      Get.snackbar(
+        '创建失败',
+        '笔记创建失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFFF6B6B),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+    } finally {
+      state.isLoading.value = false;
+      state.isGenerating.value = false;
+      state.generatingStatus.value = '';
+    }
+  }
+
+  /// 从YouTube创建笔记（保存到数据库）
+  Future<void> _createNoteFromYoutube(String youtubeUrl) async {
+    state.isLoading.value = true;
+    state.isGenerating.value = true;
+    state.hasError.value = false;
+    state.generatingStatus.value = '正在获取视频字幕...';
+
+    try {
+      // 调用后端API创建笔记（生成并保存到数据库）
+      final response = await _httpService.createNoteFromYoutube(
+        youtubeUrl: youtubeUrl,
         maxTerms: 30,
       );
 

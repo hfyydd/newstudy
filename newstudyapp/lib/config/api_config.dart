@@ -41,6 +41,9 @@ class ApiConfig {
   /// 从图片创建笔记
   static const String createNoteFromImage = '/notes/create-from-image';
 
+  /// 从YouTube创建笔记
+  static const String createNoteFromYoutube = '/notes/create-from-youtube';
+
   /// 获取笔记列表
   static const String listNotes = '/notes/list';
 

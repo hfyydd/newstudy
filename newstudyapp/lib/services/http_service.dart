@@ -300,6 +300,32 @@ class HttpService {
     }
   }
 
+  /// 从YouTube视频创建笔记
+  Future<CreateNoteResponse> createNoteFromYoutube({
+    required String youtubeUrl,
+    int maxTerms = 30,
+    int maxTextLength = 50000,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.createNoteFromYoutube,
+        data: {
+          'youtube_url': youtubeUrl,
+          'max_terms': maxTerms,
+          'max_text_length': maxTextLength,
+        },
+        options: Options(
+          // YouTube字幕获取+AI生成可能需要较长时间
+          receiveTimeout: const Duration(seconds: 120),
+          sendTimeout: const Duration(seconds: 120),
+        ),
+      );
+      return CreateNoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// 获取笔记列表
   Future<NotesListResponse> listNotes({
     int skip = 0,

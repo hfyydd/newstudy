@@ -7,6 +7,8 @@ import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
 import 'package:newstudyapp/pages/create_note_from_url/create_note_from_url_page.dart';
 import 'package:newstudyapp/pages/create_note_from_url/create_note_from_url_controller.dart';
 import 'package:newstudyapp/pages/create_note_from_image/create_note_from_image_controller.dart';
+import 'package:newstudyapp/pages/create_note_from_youtube/create_note_from_youtube_page.dart';
+import 'package:newstudyapp/pages/create_note_from_youtube/create_note_from_youtube_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/models/note_models.dart';
 
@@ -1402,6 +1404,28 @@ class _CreateNoteBottomSheet extends StatelessWidget {
         } else if (item.label == '图片') {
           // 直接弹出拍照/相册选择框
           _showImageSourceBottomSheet(context, isDark);
+        } else if (item.label == 'Youtube') {
+          // 删除旧的控制器（如果存在），确保每次打开都是新实例
+          if (Get.isRegistered<CreateNoteFromYoutubeController>()) {
+            Get.delete<CreateNoteFromYoutubeController>();
+          }
+          
+          // 在打开 BottomSheet 前注入新的控制器
+          Get.put(CreateNoteFromYoutubeController());
+
+          await Get.bottomSheet(
+            const CreateNoteFromYoutubePage(),
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            enableDrag: true,
+          );
+
+          // BottomSheet 关闭后，延迟删除控制器，确保 UI 完全关闭
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (Get.isRegistered<CreateNoteFromYoutubeController>()) {
+              Get.delete<CreateNoteFromYoutubeController>();
+            }
+          });
         } else {
           // 其他功能显示提示
           Get.snackbar(
