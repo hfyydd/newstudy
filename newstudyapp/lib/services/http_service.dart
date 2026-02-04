@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:dio/dio.dart' show MultipartFile, FormData;
 import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/models/agent_models.dart';
 import 'package:newstudyapp/models/note_models.dart';
@@ -318,6 +319,68 @@ class HttpService {
           // YouTube字幕获取+AI生成可能需要较长时间
           receiveTimeout: const Duration(seconds: 120),
           sendTimeout: const Duration(seconds: 120),
+        ),
+      );
+      return CreateNoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 从Bilibili视频创建笔记
+  Future<CreateNoteResponse> createNoteFromBilibili({
+    required String bilibiliUrl,
+    int maxTerms = 30,
+    int maxTextLength = 50000,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.createNoteFromBilibili,
+        data: {
+          'bilibili_url': bilibiliUrl,
+          'max_terms': maxTerms,
+          'max_text_length': maxTextLength,
+        },
+        options: Options(
+          // Bilibili字幕获取+AI生成可能需要较长时间
+          receiveTimeout: const Duration(seconds: 120),
+          sendTimeout: const Duration(seconds: 120),
+        ),
+      );
+      return CreateNoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 从PDF文件创建笔记
+  Future<CreateNoteResponse> createNoteFromPdf({
+    required String pdfFilePath,
+    int maxTerms = 30,
+    int maxPages = 50,
+    int maxChars = 50000,
+  }) async {
+    try {
+      final fileName = pdfFilePath.split('/').last;
+      final file = await MultipartFile.fromFile(
+        pdfFilePath,
+        filename: fileName,
+      );
+      
+      final formData = FormData.fromMap({
+        'pdf_file': file,
+        'max_terms': maxTerms,
+        'max_pages': maxPages,
+        'max_chars': maxChars,
+      });
+      
+      final response = await _dio.post(
+        ApiConfig.createNoteFromPdf,
+        data: formData,
+        options: Options(
+          // PDF提取+AI生成可能需要较长时间
+          receiveTimeout: const Duration(seconds: 300),
+          sendTimeout: const Duration(seconds: 300),
         ),
       );
       return CreateNoteResponse.fromJson(response.data as Map<String, dynamic>);

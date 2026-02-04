@@ -21,6 +21,8 @@ dependencies = [
     "playwright>=1.48.0",
     # YouTube 字幕获取
     "youtube-transcript-api>=0.6.0",
+    # Bilibili API
+    "bilibili-api-python>=16.0.0",
     # 数据库相关
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",

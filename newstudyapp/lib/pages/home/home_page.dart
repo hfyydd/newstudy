@@ -9,8 +9,12 @@ import 'package:newstudyapp/pages/create_note_from_url/create_note_from_url_cont
 import 'package:newstudyapp/pages/create_note_from_image/create_note_from_image_controller.dart';
 import 'package:newstudyapp/pages/create_note_from_youtube/create_note_from_youtube_page.dart';
 import 'package:newstudyapp/pages/create_note_from_youtube/create_note_from_youtube_controller.dart';
+import 'package:newstudyapp/pages/create_note_from_bilibili/create_note_from_bilibili_page.dart';
+import 'package:newstudyapp/pages/create_note_from_bilibili/create_note_from_bilibili_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/models/note_models.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:newstudyapp/services/toast_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -1338,6 +1342,11 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                     color: const Color(0xFFFF0000),
               ),
                   _SourceItem(
+                    icon: Icons.play_circle_filled,
+                    label: 'Bilibili',
+                    color: const Color(0xFFFF6699),
+              ),
+                  _SourceItem(
                       icon: Icons.text_fields,
                       label: '自定义文本',
                     color: const Color(0xFF1ABC9C),
@@ -1426,6 +1435,31 @@ class _CreateNoteBottomSheet extends StatelessWidget {
               Get.delete<CreateNoteFromYoutubeController>();
             }
           });
+        } else if (item.label == 'Bilibili') {
+          // 删除旧的控制器（如果存在），确保每次打开都是新实例
+          if (Get.isRegistered<CreateNoteFromBilibiliController>()) {
+            Get.delete<CreateNoteFromBilibiliController>();
+          }
+          
+          // 在打开 BottomSheet 前注入新的控制器
+          Get.put(CreateNoteFromBilibiliController());
+
+          await Get.bottomSheet(
+            const CreateNoteFromBilibiliPage(),
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            enableDrag: true,
+          );
+
+          // BottomSheet 关闭后，延迟删除控制器，确保 UI 完全关闭
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (Get.isRegistered<CreateNoteFromBilibiliController>()) {
+              Get.delete<CreateNoteFromBilibiliController>();
+            }
+          });
+        } else if (item.label == 'PDF') {
+          // 直接打开文件选择器
+          _pickPdfFileAndCreateNote();
         } else {
           // 其他功能显示提示
           Get.snackbar(
@@ -1674,6 +1708,48 @@ class _CreateNoteBottomSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// 直接选择PDF文件并创建笔记
+  Future<void> _pickPdfFileAndCreateNote() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        withData: false,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        // 用户取消了选择
+        return;
+      }
+
+      final file = result.files.first;
+      if (file.path == null) {
+        ToastService.showError('无法获取文件路径，请重试');
+        return;
+      }
+
+      // 检查文件大小（限制为 50MB）
+      if (file.size > 50 * 1024 * 1024) {
+        ToastService.showError('PDF文件过大，请选择小于 50MB 的文件');
+        return;
+      }
+
+      // 延迟一小段时间，确保 BottomSheet 完全关闭后再跳转
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      // 跳转到笔记详情页，传递 pdfFilePath，让详情页负责创建笔记并显示 Loading
+      Get.toNamed(
+        AppRoutes.noteDetail,
+        arguments: {
+          'pdfFilePath': file.path!,
+        },
+      );
+    } catch (e) {
+      ToastService.showError('选择PDF文件失败: $e');
+      debugPrint('选择PDF文件失败: $e');
+    }
   }
 
 }

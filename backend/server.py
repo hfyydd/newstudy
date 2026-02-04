@@ -27,6 +27,8 @@ try:
     from .smart_note_generator import generate_smart_note, generate_smart_note_from_image
     from .web_scraper import scrape_website
     from .youtube_transcript import get_transcript_from_url as get_youtube_transcript
+    from .bilibili_transcript import get_transcript_from_url as get_bilibili_transcript
+    from .pdf_extractor import extract_text_from_pdf
     from .db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from .get_default_user import get_default_user_id
     from .feynman_evaluator import evaluate_explanation, get_available_roles
@@ -39,6 +41,8 @@ except ImportError:  # pragma: no cover
     from smart_note_generator import generate_smart_note, generate_smart_note_from_image
     from web_scraper import scrape_website
     from youtube_transcript import get_transcript_from_url as get_youtube_transcript
+    from bilibili_transcript import get_transcript_from_url as get_bilibili_transcript
+    from pdf_extractor import extract_text_from_pdf
     from db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from get_default_user import get_default_user_id
     from feynman_evaluator import evaluate_explanation, get_available_roles
@@ -124,6 +128,13 @@ class CreateNoteFromImageRequest(BaseModel):
 class CreateNoteFromYoutubeRequest(BaseModel):
     """从YouTube创建笔记请求"""
     youtube_url: str = Field(..., min_length=1, description="YouTube视频URL")
+    max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+    max_text_length: int = Field(default=50000, ge=1000, le=100000, description="最大文本长度")
+
+
+class CreateNoteFromBilibiliRequest(BaseModel):
+    """从Bilibili创建笔记请求"""
+    bilibili_url: str = Field(..., min_length=1, description="Bilibili视频URL")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
     max_text_length: int = Field(default=50000, ge=1000, le=100000, description="最大文本长度")
 
@@ -683,6 +694,258 @@ def create_note_from_youtube(
     except Exception as exc:  # noqa: BLE001
         error_msg = str(exc)
         logger.error(f"❌ 从YouTube创建笔记失败: {error_msg}", exc_info=True)
+        if error_msg == "0":
+            error_msg = "数据库操作失败，未插入任何记录"
+        raise HTTPException(status_code=500, detail=error_msg) from exc
+
+
+@app.post("/notes/create-from-bilibili", response_model=CreateNoteResponse)
+def create_note_from_bilibili(
+    payload: CreateNoteFromBilibiliRequest,
+    cur = Depends(get_db_cursor)
+) -> CreateNoteResponse:
+    """
+    从Bilibili视频创建笔记并保存到数据库。
+    
+    - 获取Bilibili视频字幕
+    - 调用 AI 生成智能笔记和闪词列表
+    - 使用 SQL INSERT 保存笔记到数据库
+    """
+    logger.info(f"📺 开始从Bilibili创建笔记: {payload.bilibili_url}")
+    
+    try:
+        # 1. 获取Bilibili视频字幕
+        try:
+            transcript_text, language, bv_id = get_bilibili_transcript(payload.bilibili_url)
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ Bilibili字幕获取失败: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        
+        logger.info(f"✅ 获取字幕成功，语言: {language}，长度: {len(transcript_text)} 字符")
+        
+        # 2. 检查字幕长度
+        if len(transcript_text) < 50:
+            raise HTTPException(
+                status_code=400,
+                detail="视频字幕内容过短，无法生成有效笔记"
+            )
+        
+        # 3. 限制文本长度
+        if len(transcript_text) > payload.max_text_length:
+            transcript_text = transcript_text[:payload.max_text_length]
+            logger.info(f"⚠️ 字幕文本过长，已截断为 {payload.max_text_length} 字符")
+        
+        # 4. 获取默认用户ID
+        user_id = get_default_user_id()
+        
+        # 5. 使用 LLM 生成智能笔记和闪词
+        note_content, terms = generate_smart_note(
+            transcript_text,
+            max_terms=payload.max_terms
+        )
+        
+        if not note_content:
+            raise HTTPException(
+                status_code=400,
+                detail="无法从视频内容生成有效笔记"
+            )
+        
+        # 6. 从Markdown内容中提取标题
+        title = "Bilibili视频笔记"
+        for line in note_content.split('\n'):
+            line = line.strip()
+            if line:
+                title = line.replace('#', '').strip()
+                if title:
+                    if len(title) > 50:
+                        title = title[:50] + "..."
+                    break
+        
+        # 7. 使用 SQL INSERT 创建笔记
+        insert_note_sql = """
+            INSERT INTO notes (user_id, title, content, markdown_content, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, NOW(), NOW())
+            RETURNING id
+        """
+        # content 存储视频信息
+        content_info = f"Bilibili视频: {payload.bilibili_url}\n视频BV号: {bv_id}\n字幕语言: {language}\n\n原始字幕:\n{transcript_text[:1000]}..."
+        cur.execute(insert_note_sql, (user_id, title, content_info, note_content))
+        result = cur.fetchone()
+        
+        if not result:
+            raise ValueError("插入笔记失败，未返回笔记ID")
+        
+        note_id = result['id']
+        logger.info(f"✅ 获取到笔记ID: {note_id}")
+        
+        # 8. 使用 SQL INSERT 批量创建闪词卡片
+        if terms:
+            insert_flashcard_sql = """
+                INSERT INTO flash_cards (note_id, term, status, review_count, created_at, updated_at)
+                VALUES (%s, %s, %s::card_status, 0, NOW(), NOW())
+            """
+            flashcard_data = [(note_id, term, 'NOT_STARTED') for term in terms]
+            cur.executemany(insert_flashcard_sql, flashcard_data)
+            affected_rows = cur.rowcount
+            logger.info(f"✅ 插入 {len(flashcard_data)} 个闪词卡片，影响行数: {affected_rows}")
+            
+            if affected_rows != len(flashcard_data):
+                logger.warning(f"⚠️ 插入闪词数量不匹配: 期望 {len(flashcard_data)}, 实际 {affected_rows}")
+        
+        logger.info(f"✅ 从Bilibili创建笔记成功！")
+        logger.info(f"   - 笔记ID: {note_id}")
+        logger.info(f"   - 标题: {title}")
+        logger.info(f"   - 闪词数量: {len(terms)}")
+        
+        return CreateNoteResponse(
+            note_id=note_id,
+            title=title,
+            flash_card_count=len(terms),
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        error_msg = str(exc)
+        logger.error(f"❌ 从Bilibili创建笔记失败: {error_msg}", exc_info=True)
+        if error_msg == "0":
+            error_msg = "数据库操作失败，未插入任何记录"
+        raise HTTPException(status_code=500, detail=error_msg) from exc
+
+
+@app.post("/notes/create-from-pdf", response_model=CreateNoteResponse)
+def create_note_from_pdf(
+    pdf_file: UploadFile = File(...),
+    max_terms: int = Query(default=30, ge=5, le=60),
+    max_pages: int = Query(default=50, ge=1, le=200),
+    max_chars: int = Query(default=50000, ge=1000, le=100000),
+    cur = Depends(get_db_cursor)
+) -> CreateNoteResponse:
+    """
+    从PDF文件创建笔记并保存到数据库。
+    
+    - 提取PDF文本（支持页数和字符数限制）
+    - 调用 AI 生成智能笔记和闪词列表
+    - 使用 SQL INSERT 保存笔记到数据库
+    
+    对于大PDF文件：
+    - 默认提取前 50 页
+    - 默认最多 50000 字符
+    - 可以通过参数调整限制
+    """
+    logger.info(f"📄 开始从PDF创建笔记: {pdf_file.filename}")
+    
+    try:
+        # 1. 读取PDF文件
+        raw = pdf_file.file.read()
+        
+        if not raw:
+            raise HTTPException(status_code=400, detail="PDF文件为空")
+        
+        logger.info(f"✅ PDF文件读取成功，大小: {len(raw)} 字节")
+        
+        # 2. 提取PDF文本（带页数和字符数限制）
+        try:
+            text, total_pages, extracted_pages = extract_text_from_pdf(
+                raw,
+                max_pages=max_pages,
+                max_chars=max_chars
+            )
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ PDF文本提取失败: {error_msg}")
+            raise HTTPException(status_code=400, detail=f"PDF文本提取失败: {error_msg}")
+        
+        # 3. 检查提取的文本长度
+        if len(text) < 50:
+            raise HTTPException(
+                status_code=400,
+                detail="PDF内容过短，无法生成有效笔记"
+            )
+        
+        # 4. 如果PDF页数较多，在日志中提示
+        if total_pages > extracted_pages:
+            logger.info(f"ℹ️ PDF共 {total_pages} 页，已提取前 {extracted_pages} 页")
+        
+        # 5. 获取默认用户ID
+        user_id = get_default_user_id()
+        
+        # 6. 使用 LLM 生成智能笔记和闪词
+        note_content, terms = generate_smart_note(
+            text,
+            max_terms=max_terms
+        )
+        
+        if not note_content:
+            raise HTTPException(
+                status_code=400,
+                detail="无法从PDF内容生成有效笔记"
+            )
+        
+        # 7. 从Markdown内容中提取标题
+        title = pdf_file.filename or "PDF笔记"
+        if title.endswith('.pdf'):
+            title = title[:-4]  # 移除 .pdf 扩展名
+        
+        # 尝试从笔记内容中提取更好的标题
+        for line in note_content.split('\n'):
+            line = line.strip()
+            if line:
+                potential_title = line.replace('#', '').strip()
+                if potential_title and len(potential_title) > 3:
+                    title = potential_title
+                    if len(title) > 50:
+                        title = title[:50] + "..."
+                    break
+        
+        # 8. 使用 SQL INSERT 创建笔记
+        insert_note_sql = """
+            INSERT INTO notes (user_id, title, content, markdown_content, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, NOW(), NOW())
+            RETURNING id
+        """
+        # content 存储PDF信息
+        content_info = f"PDF文件: {pdf_file.filename}\n总页数: {total_pages}\n提取页数: {extracted_pages}\n\n原始文本:\n{text[:1000]}..."
+        cur.execute(insert_note_sql, (user_id, title, content_info, note_content))
+        result = cur.fetchone()
+        
+        if not result:
+            raise ValueError("插入笔记失败，未返回笔记ID")
+        
+        note_id = result['id']
+        logger.info(f"✅ 获取到笔记ID: {note_id}")
+        
+        # 9. 使用 SQL INSERT 批量创建闪词卡片
+        if terms:
+            insert_flashcard_sql = """
+                INSERT INTO flash_cards (note_id, term, status, review_count, created_at, updated_at)
+                VALUES (%s, %s, %s::card_status, 0, NOW(), NOW())
+            """
+            flashcard_data = [(note_id, term, 'NOT_STARTED') for term in terms]
+            cur.executemany(insert_flashcard_sql, flashcard_data)
+            affected_rows = cur.rowcount
+            logger.info(f"✅ 插入 {len(flashcard_data)} 个闪词卡片，影响行数: {affected_rows}")
+            
+            if affected_rows != len(flashcard_data):
+                logger.warning(f"⚠️ 插入闪词数量不匹配: 期望 {len(flashcard_data)}, 实际 {affected_rows}")
+        
+        logger.info(f"✅ 从PDF创建笔记成功！")
+        logger.info(f"   - 笔记ID: {note_id}")
+        logger.info(f"   - 标题: {title}")
+        logger.info(f"   - 闪词数量: {len(terms)}")
+        
+        return CreateNoteResponse(
+            note_id=note_id,
+            title=title,
+            flash_card_count=len(terms),
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        error_msg = str(exc)
+        logger.error(f"❌ 从PDF创建笔记失败: {error_msg}", exc_info=True)
         if error_msg == "0":
             error_msg = "数据库操作失败，未插入任何记录"
         raise HTTPException(status_code=500, detail=error_msg) from exc

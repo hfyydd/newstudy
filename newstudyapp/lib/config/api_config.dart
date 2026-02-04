@@ -44,6 +44,12 @@ class ApiConfig {
   /// 从YouTube创建笔记
   static const String createNoteFromYoutube = '/notes/create-from-youtube';
 
+  /// 从Bilibili创建笔记
+  static const String createNoteFromBilibili = '/notes/create-from-bilibili';
+
+  /// 从PDF创建笔记
+  static const String createNoteFromPdf = '/notes/create-from-pdf';
+
   /// 获取笔记列表
   static const String listNotes = '/notes/list';
 
