@@ -35,6 +35,9 @@ class ApiConfig {
   /// 创建笔记（生成并保存到数据库）
   static const String createNote = '/notes/create';
 
+  /// 从URL创建笔记
+  static const String createNoteFromUrl = '/notes/create-from-url';
+
   /// 获取笔记列表
   static const String listNotes = '/notes/list';
 

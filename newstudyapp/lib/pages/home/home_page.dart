@@ -4,6 +4,8 @@ import 'package:newstudyapp/routes/app_routes.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
+import 'package:newstudyapp/pages/create_note_from_url/create_note_from_url_page.dart';
+import 'package:newstudyapp/pages/create_note_from_url/create_note_from_url_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/models/note_models.dart';
 
@@ -53,31 +55,31 @@ class _HomePageState extends State<HomePage>
             await _homeController.refreshData();
           },
           color: AppTheme.darkPrimary,
-          child: SingleChildScrollView(
+        child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
 
-                  // 大标题
-                  _buildHeader(isDark),
-                  const SizedBox(height: 40),
+                // 大标题
+                _buildHeader(isDark),
+                const SizedBox(height: 40),
 
-                  // 今日复习卡片
-                  _buildTodayReviewCard(isDark),
-                  const SizedBox(height: 24),
+                // 今日复习卡片
+                _buildTodayReviewCard(isDark),
+                const SizedBox(height: 24),
 
-                  // 学习统计
-                  _buildStatsSection(isDark),
-                  const SizedBox(height: 24),
+                // 学习统计
+                _buildStatsSection(isDark),
+                const SizedBox(height: 24),
 
-                  // 我的笔记区域（放在学习统计之后，降低权重）
-                  _buildNotesSection(isDark),
-                  const SizedBox(height: 100),
-                ],
+                // 我的笔记区域（放在学习统计之后，降低权重）
+                _buildNotesSection(isDark),
+                const SizedBox(height: 100),
+              ],
               ),
             ),
           ),
@@ -543,8 +545,8 @@ class _HomePageState extends State<HomePage>
                   ),
                   Text(
                     '（$score）',
-                    style: TextStyle(
-                      fontSize: 12,
+            style: TextStyle(
+              fontSize: 12,
                       color: secondaryColor,
                     ),
                   ),
@@ -565,7 +567,7 @@ class _HomePageState extends State<HomePage>
                     ),
                   ),
                 ],
-              ),
+            ),
               const SizedBox(height: 2),
               Text(
                 reason,
@@ -1298,99 +1300,48 @@ class _CreateNoteBottomSheet extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              // 文档类
-              _buildCategorySection(
-                isDark: isDark,
-                textColor: textColor,
-                title: '文档',
-                icon: Icons.description_outlined,
-                iconColor: AppTheme.statusMastered,
-                items: [
+              // 创建源选项网格
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.8,
+                children: [
                   _SourceItem(
                       icon: Icons.picture_as_pdf,
-                      label: 'PDF文档',
-                      color: const Color(0xFFE74C3C)),
-                  _SourceItem(
-                      icon: Icons.article_outlined,
-                      label: 'Word文档',
-                      color: const Color(0xFF2980B9)),
-                  _SourceItem(
-                      icon: Icons.insert_drive_file_outlined,
-                      label: '其他文档',
-                      color: const Color(0xFF95A5A6)),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // 音频类
-              _buildCategorySection(
-                isDark: isDark,
-                textColor: textColor,
-                title: '音频',
-                icon: Icons.mic_outlined,
-                iconColor: const Color(0xFFFF6B6B),
-                items: [
-                  _SourceItem(
-                      icon: Icons.fiber_manual_record,
-                      label: '录制音频',
-                      color: const Color(0xFFE74C3C)),
+                    label: 'PDF',
+                    color: const Color(0xFFE74C3C),
+                  ),
                   _SourceItem(
                       icon: Icons.audiotrack,
-                      label: '上传音频',
-                      color: const Color(0xFFF39C12)),
-                ],
+                    label: '音频',
+                    color: const Color(0xFFF39C12),
               ),
-              const SizedBox(height: 20),
-
-              // 图片类
-              _buildCategorySection(
-                isDark: isDark,
-                textColor: textColor,
-                title: '图片',
+                  _SourceItem(
                 icon: Icons.image_outlined,
-                iconColor: const Color(0xFFFFD93D),
-                items: [
+                    label: '图片',
+                    color: const Color(0xFF9B59B6),
+                  ),
                   _SourceItem(
-                      icon: Icons.camera_alt_outlined,
-                      label: '拍照',
-                      color: const Color(0xFF3498DB)),
-                  _SourceItem(
-                      icon: Icons.photo_library_outlined,
-                      label: '上传图片',
-                      color: const Color(0xFF9B59B6)),
-                ],
+                    icon: Icons.language,
+                    label: '网站',
+                    color: const Color(0xFF3498DB),
               ),
-              const SizedBox(height: 20),
-
-              // 视频类
-              _buildCategorySection(
-                isDark: isDark,
-                textColor: textColor,
-                title: '视频',
-                icon: Icons.video_library_outlined,
-                iconColor: const Color(0xFFE67E22),
-                items: [
                   _SourceItem(
-                      icon: Icons.link,
-                      label: 'YouTube链接',
-                      color: const Color(0xFFFF0000)),
-                ],
+                    icon: Icons.play_circle_outline,
+                    label: 'Youtube',
+                    color: const Color(0xFFFF0000),
               ),
-              const SizedBox(height: 20),
-
-              // 自定义文本
-              _buildCategorySection(
-                isDark: isDark,
-                textColor: textColor,
-                title: '自定义',
-                icon: Icons.edit_outlined,
-                iconColor: const Color(0xFF95E1D3),
-                items: [
                   _SourceItem(
                       icon: Icons.text_fields,
                       label: '自定义文本',
-                      color: const Color(0xFF1ABC9C)),
-                ],
+                    color: const Color(0xFF1ABC9C),
+                  ),
+                ]
+                    .map((item) => _buildSourceButton(isDark, textColor, item))
+                    .toList(),
               ),
 
               const SizedBox(height: 20),
@@ -1401,42 +1352,6 @@ class _CreateNoteBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildCategorySection({
-    required bool isDark,
-    required Color textColor,
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required List<_SourceItem> items,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: iconColor, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16.5,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: items
-              .map((item) => _buildSourceButton(isDark, textColor, item))
-              .toList(),
-        ),
-      ],
-    );
-  }
 
   Widget _buildSourceButton(bool isDark, Color textColor, _SourceItem item) {
     final cardColor =
@@ -1444,28 +1359,47 @@ class _CreateNoteBottomSheet extends StatelessWidget {
 
     return GestureDetector(
       onTap: () async {
-        // 如果是自定义文本，从底部弹出创建笔记页面
+        // 关闭创建源选择弹窗
+        Get.back();
+
+        // 根据不同的创建源打开对应的页面
         if (item.label == '自定义文本') {
           // 在打开 BottomSheet 前注入控制器
           Get.put(CreateNoteController());
 
-          final result = await Get.bottomSheet(
+          await Get.bottomSheet(
             const CreateNotePage(),
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             enableDrag: true,
           );
 
-          // 结束后可以根据需要移除控制器（如果不需要保持状态）
-          // Get.delete<CreateNoteController>();
-
-          // 如果创建成功，关闭创建源选择弹窗
-          if (result != null) {
-            Get.back();
+          // 注意：CreateNotePage 内部已经处理了跳转和关闭
+        } else if (item.label == '网站') {
+          // 删除旧的控制器（如果存在），确保每次打开都是新实例
+          if (Get.isRegistered<CreateNoteFromUrlController>()) {
+            Get.delete<CreateNoteFromUrlController>();
           }
+          
+          // 在打开 BottomSheet 前注入新的控制器
+          Get.put(CreateNoteFromUrlController());
+
+          await Get.bottomSheet(
+            const CreateNoteFromUrlPage(),
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            enableDrag: true,
+          );
+
+          // BottomSheet 关闭后，延迟删除控制器，确保 UI 完全关闭
+          // 延迟删除以避免在 BottomSheet 关闭动画期间访问已删除的控制器
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (Get.isRegistered<CreateNoteFromUrlController>()) {
+              Get.delete<CreateNoteFromUrlController>();
+            }
+          });
         } else {
-          // 其他功能先关闭弹窗，再显示提示
-          Get.back();
+          // 其他功能显示提示
           Get.snackbar(
             '提示',
             '${item.label}功能开发中',
@@ -1479,7 +1413,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(16),
@@ -1488,24 +1422,30 @@ class _CreateNoteBottomSheet extends StatelessWidget {
             width: 1,
           ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: item.color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(item.icon, color: item.color, size: 18),
+              child: Icon(item.icon, color: item.color, size: 20),
             ),
-            const SizedBox(width: 10),
-            Text(
+            const SizedBox(height: 6),
+            Flexible(
+              child: Text(
               item.label,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 color: textColor,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

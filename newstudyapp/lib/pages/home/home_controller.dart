@@ -46,7 +46,7 @@ class HomeController extends GetxController {
   /// [showLoading] - 是否显示加载状态（初次加载时为true，下拉刷新时为false）
   Future<void> loadNotes({bool showLoading = true}) async {
     if (showLoading) {
-      isLoading.value = true;
+    isLoading.value = true;
     }
     try {
       final response = await _httpService.listNotes(skip: 0, limit: 100);
@@ -61,7 +61,7 @@ class HomeController extends GetxController {
       );
     } finally {
       if (showLoading) {
-        isLoading.value = false;
+      isLoading.value = false;
       }
     }
   }

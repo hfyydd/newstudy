@@ -25,7 +25,7 @@ class StudyCenterController extends GetxController {
   /// [showLoading] - 是否显示加载状态（初次加载时为true，下拉刷新时为false）
   Future<void> _loadStatistics({bool showLoading = true}) async {
     if (showLoading) {
-      state.isLoading.value = true;
+    state.isLoading.value = true;
     }
     try {
       final statistics = await _httpService.getStudyCenterStatistics();
@@ -46,7 +46,7 @@ class StudyCenterController extends GetxController {
       _loadFallbackStatistics();
     } finally {
       if (showLoading) {
-        state.isLoading.value = false;
+      state.isLoading.value = false;
       }
     }
   }

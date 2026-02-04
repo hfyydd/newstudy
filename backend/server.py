@@ -25,6 +25,7 @@ try:
     from .note_terms_extractor import extract_terms_from_note
     from .file_text_extractor import extract_text_from_upload
     from .smart_note_generator import generate_smart_note
+    from .web_scraper import scrape_website
     from .db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from .get_default_user import get_default_user_id
     from .feynman_evaluator import evaluate_explanation, get_available_roles
@@ -35,6 +36,7 @@ except ImportError:  # pragma: no cover
     from note_terms_extractor import extract_terms_from_note
     from file_text_extractor import extract_text_from_upload
     from smart_note_generator import generate_smart_note
+    from web_scraper import scrape_website
     from db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from get_default_user import get_default_user_id
     from feynman_evaluator import evaluate_explanation, get_available_roles
@@ -70,7 +72,7 @@ class AgentResponse(BaseModel):
 
 class TermsResponse(BaseModel):
     category: str = Field(..., min_length=1, description="术语类别标识")
-    terms: List[str] = Field(..., min_items=1, description="术语列表")
+    terms: List[str] = Field(..., min_length=1, description="术语列表")
 
 
 class NoteExtractRequest(BaseModel):
@@ -102,6 +104,13 @@ class CreateNoteRequest(BaseModel):
     """创建笔记请求"""
     user_input: str = Field(..., min_length=1, description="用户输入的学习内容")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+
+
+class CreateNoteFromUrlRequest(BaseModel):
+    """从URL创建笔记请求"""
+    url: str = Field(..., min_length=1, description="网页URL")
+    max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+    max_text_length: int = Field(default=50000, ge=1000, le=100000, description="最大文本长度")
 
 
 class CreateNoteResponse(BaseModel):
@@ -444,6 +453,109 @@ def create_note(
         # 如果错误信息是 "0"，可能是 rowcount 返回的，需要更详细的错误信息
         if error_msg == "0":
             logger.error("⚠️ 错误信息是 '0'，可能是数据库操作返回的行数为 0")
+            error_msg = "数据库操作失败，未插入任何记录"
+        raise HTTPException(status_code=500, detail=error_msg) from exc
+
+
+@app.post("/notes/create-from-url", response_model=CreateNoteResponse)
+def create_note_from_url(
+    payload: CreateNoteFromUrlRequest,
+    cur = Depends(get_db_cursor)
+) -> CreateNoteResponse:
+    """
+    从网页URL创建笔记并保存到数据库。
+    
+    - 抓取网页内容并提取可见文本
+    - 调用 AI 生成智能笔记和闪词列表
+    - 使用 SQL INSERT 保存笔记到数据库
+    """
+    logger.info(f"🌐 开始从URL创建笔记: {payload.url}")
+    
+    try:
+        # 1. 抓取网页并提取文本
+        text, error = scrape_website(payload.url, payload.max_text_length)
+        
+        if error:
+            logger.error(f"❌ 网页抓取失败: {error}")
+            raise HTTPException(status_code=400, detail=error)
+        
+        # 检查文本长度（与 web_scraper.py 中的检查保持一致）
+        text_stripped = text.strip() if text else ""
+        if not text or len(text_stripped) < 50:
+            logger.warning(f"⚠️ 提取的文本太短: {len(text_stripped)} 字符")
+            raise HTTPException(
+                status_code=400,
+                detail=f"无法从网页中提取有效文本（仅提取到 {len(text_stripped)} 字符），请检查URL是否正确或网页是否需要登录"
+            )
+        
+        logger.info(f"✅ 网页文本提取成功，长度: {len(text)} 字符")
+        
+        # 2. 获取默认用户ID
+        user_id = get_default_user_id()
+        
+        # 3. 生成智能笔记和闪词
+        note_content, terms = generate_smart_note(
+            text,
+            max_terms=payload.max_terms
+        )
+        
+        # 4. 从Markdown内容中提取标题
+        title = "网页笔记"
+        for line in note_content.split('\n'):
+            line = line.strip()
+            if line:
+                title = line.replace('#', '').strip()
+                if title:
+                    if len(title) > 50:
+                        title = title[:50] + "..."
+                    break
+        
+        # 5. 使用 SQL INSERT 创建笔记
+        insert_note_sql = """
+            INSERT INTO notes (user_id, title, content, markdown_content, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, NOW(), NOW())
+            RETURNING id
+        """
+        cur.execute(insert_note_sql, (user_id, title, text, note_content))
+        result = cur.fetchone()
+        
+        if not result:
+            raise ValueError("插入笔记失败，未返回笔记ID")
+        
+        note_id = result['id']
+        logger.info(f"✅ 获取到笔记ID: {note_id}")
+        
+        # 6. 使用 SQL INSERT 批量创建闪词卡片
+        if terms:
+            insert_flashcard_sql = """
+                INSERT INTO flash_cards (note_id, term, status, review_count, created_at, updated_at)
+                VALUES (%s, %s, %s::card_status, 0, NOW(), NOW())
+            """
+            flashcard_data = [(note_id, term, 'NOT_STARTED') for term in terms]
+            cur.executemany(insert_flashcard_sql, flashcard_data)
+            affected_rows = cur.rowcount
+            logger.info(f"✅ 插入 {len(flashcard_data)} 个闪词卡片，影响行数: {affected_rows}")
+            
+            if affected_rows != len(flashcard_data):
+                logger.warning(f"⚠️ 插入闪词数量不匹配: 期望 {len(flashcard_data)}, 实际 {affected_rows}")
+        
+        logger.info(f"✅ 从URL创建笔记成功！")
+        logger.info(f"   - 笔记ID: {note_id}")
+        logger.info(f"   - 标题: {title}")
+        logger.info(f"   - 闪词数量: {len(terms)}")
+        
+        return CreateNoteResponse(
+            note_id=note_id,
+            title=title,
+            flash_card_count=len(terms),
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        error_msg = str(exc)
+        logger.error(f"❌ 从URL创建笔记失败: {error_msg}", exc_info=True)
+        if error_msg == "0":
             error_msg = "数据库操作失败，未插入任何记录"
         raise HTTPException(status_code=500, detail=error_msg) from exc
 

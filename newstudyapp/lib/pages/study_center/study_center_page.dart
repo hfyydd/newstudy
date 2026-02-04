@@ -54,22 +54,22 @@ class StudyCenterPage extends StatelessWidget {
       color: AppTheme.darkPrimary,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              // 标题
-              Text(
-                '学习中心',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            // 标题
+            Text(
+              '学习中心',
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                color: textColor,
               ),
-              const SizedBox(height: 40),
+            ),
+            const SizedBox(height: 40),
 
             // 今日复习卡片（突出显示）
             _buildTodayReviewHighlightCard(
@@ -278,8 +278,8 @@ class StudyCenterPage extends StatelessWidget {
                     ],
                   ],
                 )),
-              const SizedBox(height: 100),
-            ],
+            const SizedBox(height: 100),
+          ],
           ),
         ),
       ),
@@ -718,8 +718,8 @@ class StudyCenterPage extends StatelessWidget {
                   ),
                   Text(
                     '（$score）',
-                    style: TextStyle(
-                      fontSize: 12,
+            style: TextStyle(
+              fontSize: 12,
                       color: secondaryColor,
                     ),
                   ),
@@ -740,7 +740,7 @@ class StudyCenterPage extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
+            ),
               const SizedBox(height: 2),
               Text(
                 reason,
