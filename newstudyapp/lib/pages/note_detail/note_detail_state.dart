@@ -107,6 +107,9 @@ class NoteDetailState {
   /// 生成状态文本
   final RxString generatingStatus = ''.obs;
 
+  /// 是否创建/加载失败（用于防止显示"此笔记尚未生成闪词卡片"页面）
+  final RxBool hasError = false.obs;
+
   /// 是否已生成闪词
   bool get hasFlashCards => note.value?.hasFlashCards ?? false;
   

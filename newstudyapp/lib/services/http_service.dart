@@ -276,6 +276,30 @@ class HttpService {
     }
   }
 
+  /// 从图片创建笔记
+  Future<CreateNoteResponse> createNoteFromImage({
+    required String imageBase64,
+    int maxTerms = 30,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.createNoteFromImage,
+        data: {
+          'image_base64': imageBase64,
+          'max_terms': maxTerms,
+        },
+        options: Options(
+          // 图片识别+AI生成可能需要较长时间
+          receiveTimeout: const Duration(seconds: 120),
+          sendTimeout: const Duration(seconds: 120),
+        ),
+      );
+      return CreateNoteResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// 获取笔记列表
   Future<NotesListResponse> listNotes({
     int skip = 0,

@@ -38,6 +38,9 @@ class ApiConfig {
   /// 从URL创建笔记
   static const String createNoteFromUrl = '/notes/create-from-url';
 
+  /// 从图片创建笔记
+  static const String createNoteFromImage = '/notes/create-from-image';
+
   /// 获取笔记列表
   static const String listNotes = '/notes/list';
 

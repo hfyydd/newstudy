@@ -313,6 +313,12 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       final hasFlashCards = controller.state.hasFlashCards;
       final progress = controller.state.progress.value;
       final isGenerating = controller.state.isGenerating.value;
+      final hasError = controller.state.hasError.value;
+
+      // 如果创建失败，不显示任何内容（页面即将关闭）
+      if (hasError) {
+        return const SizedBox.shrink();
+      }
 
       if (isGenerating) {
         return _buildGeneratingCard(isDark, cardColor, borderColor);

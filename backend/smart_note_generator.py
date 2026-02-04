@@ -192,5 +192,106 @@ def generate_smart_note(user_input: str, max_terms: int = 30) -> tuple[str, List
     return _generate_fallback_note(text)
 
 
-__all__ = ["generate_smart_note"]
+def generate_smart_note_from_image(image_base64: str, max_terms: int = 30) -> tuple[str, List[str]]:
+    """
+    根据图片生成智能笔记和闪词列表（使用多模态 LLM）
+    
+    Args:
+        image_base64: 图片的 Base64 编码字符串（不包含 data:image/... 前缀）
+        max_terms: 最多返回的词语数量
+        
+    Returns:
+        tuple[str, List[str]]: (Markdown格式的笔记内容, 闪词列表)
+    """
+    if not image_base64:
+        logger.warning("图片数据为空，返回空结果")
+        return "", []
+    
+    logger.info(f"📖 开始调用多模态 LLM 从图片生成智能笔记...")
+    
+    # 1) 尝试使用 LLM 生成
+    try:
+        llm = get_default_llm()
+        logger.info("✅ LLM 实例获取成功")
+        
+        # 构建图片 URL（使用 data URI 格式）
+        # 假设是 JPEG 格式，如果不是需要根据实际情况调整
+        image_url = f"data:image/jpeg;base64,{image_base64}"
+        
+        # 使用多模态消息格式
+        messages = [
+            SystemMessage(content=SMART_NOTE_SYSTEM_PROMPT),
+            HumanMessage(
+                content=[
+                    {
+                        "type": "text",
+                        "text": (
+                            f"请分析这张图片中的内容，生成结构化笔记和闪词列表。\n\n"
+                            f"如果图片中包含文字，请提取并整理；如果包含图表、表格等，请描述其内容。\n\n"
+                            f"闪词列表最多返回 {max_terms} 个词语。"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": image_url}
+                    }
+                ]
+            ),
+        ]
+        
+        logger.info("🤖 正在调用多模态 LLM API...")
+        response = llm.invoke(messages)
+        content = str(getattr(response, "content", "")).strip()
+        logger.info(f"📨 LLM 响应长度: {len(content)} 字符")
+        logger.debug(f"LLM 原始响应: {content[:500]}...")
+        
+        json_str = _extract_json(content)
+        
+        if json_str:
+            logger.info("✅ JSON 解析成功")
+            data = json.loads(json_str)
+            note_content = data.get("note_content", "")
+            terms_raw = data.get("terms", [])
+            
+            if isinstance(terms_raw, list) and note_content:
+                terms = [str(t).strip() for t in terms_raw if str(t).strip()]
+                # 去重并截断
+                uniq: List[str] = []
+                seen: set[str] = set()
+                for t in terms:
+                    if t in seen:
+                        continue
+                    seen.add(t)
+                    uniq.append(t)
+                    if len(uniq) >= max_terms:
+                        break
+                logger.info(f"✅ LLM 生成完成: 笔记 {len(note_content)} 字符, 闪词 {len(uniq)} 个")
+                return note_content, uniq
+        else:
+            logger.warning("⚠️ 无法从 LLM 响应中提取 JSON")
+    except Exception as e:
+        # 任何 LLM 错误都直接走兜底
+        logger.error(f"❌ LLM 生成失败: {e}", exc_info=True)
+        pass
+    
+    # 2) 兜底方案：返回提示信息
+    logger.info("🔄 使用兜底方案...")
+    note_content = """# 图片笔记
+
+## 提示
+
+无法从图片中提取内容，可能是：
+1. 图片格式不支持
+2. 图片中没有可识别的文字或内容
+3. LLM 服务暂时不可用
+
+请尝试：
+- 确保图片清晰
+- 包含文字或图表内容
+- 重新上传图片
+"""
+    return note_content, []
+
+
+__all__ = ["generate_smart_note", "generate_smart_note_from_image"]
 

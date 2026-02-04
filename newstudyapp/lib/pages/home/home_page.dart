@@ -6,6 +6,7 @@ import 'package:newstudyapp/pages/create_note/create_note_page.dart';
 import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
 import 'package:newstudyapp/pages/create_note_from_url/create_note_from_url_page.dart';
 import 'package:newstudyapp/pages/create_note_from_url/create_note_from_url_controller.dart';
+import 'package:newstudyapp/pages/create_note_from_image/create_note_from_image_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/models/note_models.dart';
 
@@ -1340,7 +1341,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                     color: const Color(0xFF1ABC9C),
                   ),
                 ]
-                    .map((item) => _buildSourceButton(isDark, textColor, item))
+                    .map((item) => _buildSourceButton(isDark, textColor, item, context))
                     .toList(),
               ),
 
@@ -1353,7 +1354,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
   }
 
 
-  Widget _buildSourceButton(bool isDark, Color textColor, _SourceItem item) {
+  Widget _buildSourceButton(bool isDark, Color textColor, _SourceItem item, BuildContext context) {
     final cardColor =
         isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5);
 
@@ -1398,6 +1399,9 @@ class _CreateNoteBottomSheet extends StatelessWidget {
               Get.delete<CreateNoteFromUrlController>();
             }
           });
+        } else if (item.label == '图片') {
+          // 直接弹出拍照/相册选择框
+          _showImageSourceBottomSheet(context, isDark);
         } else {
           // 其他功能显示提示
           Get.snackbar(
@@ -1453,6 +1457,201 @@ class _CreateNoteBottomSheet extends StatelessWidget {
       ),
     );
   }
+
+  /// 显示图片源选择底部弹框（拍照/相册）
+  void _showImageSourceBottomSheet(
+    BuildContext context,
+    bool isDark,
+  ) {
+    final textColor =
+        isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
+    final borderColor =
+        isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+
+    // 创建控制器（临时使用，选择后立即创建笔记）
+    final controller = CreateNoteFromImageController();
+    Get.put(controller);
+
+    Get.bottomSheet(
+      Container(
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(28),
+            topRight: Radius.circular(28),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 顶部拖拽指示器
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // 标题
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Text(
+                '选择图片',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+
+            // 选择按钮
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildImageSourceOption(
+                      isDark: isDark,
+                      textColor: textColor,
+                      borderColor: borderColor,
+                      icon: Icons.camera_alt,
+                      label: '拍照',
+                      onTap: () async {
+                        Get.back(); // 关闭选择框
+                        await controller.pickImageFromCamera();
+                        if (controller.selectedImage.value != null) {
+                          // 跳转到详情页，由详情页负责创建笔记并显示 Loading
+                          await controller.createNote();
+                        }
+                        // 延迟删除控制器
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (Get.isRegistered<CreateNoteFromImageController>()) {
+                            Get.delete<CreateNoteFromImageController>();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildImageSourceOption(
+                      isDark: isDark,
+                      textColor: textColor,
+                      borderColor: borderColor,
+                      icon: Icons.photo_library,
+                      label: '相册',
+                      onTap: () async {
+                        Get.back(); // 关闭选择框
+                        await controller.pickImageFromGallery();
+                        if (controller.selectedImage.value != null) {
+                          // 跳转到详情页，由详情页负责创建笔记并显示 Loading
+                          await controller.createNote();
+                        }
+                        // 延迟删除控制器
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (Get.isRegistered<CreateNoteFromImageController>()) {
+                            Get.delete<CreateNoteFromImageController>();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // 取消按钮
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () {
+                    Get.back();
+                    // 延迟删除控制器
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (Get.isRegistered<CreateNoteFromImageController>()) {
+                        Get.delete<CreateNoteFromImageController>();
+                      }
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    '取消',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 底部安全区域
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+    );
+  }
+
+  /// 构建图片源选择选项
+  Widget _buildImageSourceOption({
+    required bool isDark,
+    required Color textColor,
+    required Color borderColor,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF8F8F8),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: AppTheme.darkPrimary,
+              size: 32,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 }
 
 // 创建源项数据类

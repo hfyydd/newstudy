@@ -24,7 +24,7 @@ try:
     from .terms_generator import generate_terms_for_topic
     from .note_terms_extractor import extract_terms_from_note
     from .file_text_extractor import extract_text_from_upload
-    from .smart_note_generator import generate_smart_note
+    from .smart_note_generator import generate_smart_note, generate_smart_note_from_image
     from .web_scraper import scrape_website
     from .db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from .get_default_user import get_default_user_id
@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover
     from terms_generator import generate_terms_for_topic
     from note_terms_extractor import extract_terms_from_note
     from file_text_extractor import extract_text_from_upload
-    from smart_note_generator import generate_smart_note
+    from smart_note_generator import generate_smart_note, generate_smart_note_from_image
     from web_scraper import scrape_website
     from db_sql import get_db_cursor, execute_query, execute_one, execute_insert_return_id
     from get_default_user import get_default_user_id
@@ -111,6 +111,12 @@ class CreateNoteFromUrlRequest(BaseModel):
     url: str = Field(..., min_length=1, description="网页URL")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
     max_text_length: int = Field(default=50000, ge=1000, le=100000, description="最大文本长度")
+
+
+class CreateNoteFromImageRequest(BaseModel):
+    """从图片创建笔记请求"""
+    image_base64: str = Field(..., min_length=1, description="图片的 Base64 编码（不包含 data:image/... 前缀）")
+    max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
 
 
 class CreateNoteResponse(BaseModel):
@@ -453,6 +459,107 @@ def create_note(
         # 如果错误信息是 "0"，可能是 rowcount 返回的，需要更详细的错误信息
         if error_msg == "0":
             logger.error("⚠️ 错误信息是 '0'，可能是数据库操作返回的行数为 0")
+            error_msg = "数据库操作失败，未插入任何记录"
+        raise HTTPException(status_code=500, detail=error_msg) from exc
+
+
+@app.post("/notes/create-from-image", response_model=CreateNoteResponse)
+def create_note_from_image(
+    payload: CreateNoteFromImageRequest,
+    cur = Depends(get_db_cursor)
+) -> CreateNoteResponse:
+    """
+    从图片创建笔记并保存到数据库。
+    
+    - 使用多模态 LLM 识别图片内容
+    - 调用 AI 生成智能笔记和闪词列表
+    - 使用 SQL INSERT 保存笔记到数据库
+    """
+    logger.info(f"🖼️ 开始从图片创建笔记，图片大小: {len(payload.image_base64)} 字符")
+    
+    try:
+        # 1. 验证 Base64 格式
+        import base64
+        try:
+            # 尝试解码验证格式
+            base64.b64decode(payload.image_base64, validate=True)
+        except Exception as e:
+            logger.error(f"❌ Base64 格式无效: {e}")
+            raise HTTPException(status_code=400, detail="图片 Base64 格式无效")
+        
+        # 2. 获取默认用户ID
+        user_id = get_default_user_id()
+        
+        # 3. 使用多模态 LLM 生成智能笔记和闪词
+        note_content, terms = generate_smart_note_from_image(
+            payload.image_base64,
+            max_terms=payload.max_terms
+        )
+        
+        if not note_content:
+            raise HTTPException(
+                status_code=400,
+                detail="无法从图片中提取内容，请确保图片清晰且包含可识别的内容"
+            )
+        
+        # 4. 从Markdown内容中提取标题
+        title = "图片笔记"
+        for line in note_content.split('\n'):
+            line = line.strip()
+            if line:
+                title = line.replace('#', '').strip()
+                if title:
+                    if len(title) > 50:
+                        title = title[:50] + "..."
+                    break
+        
+        # 5. 使用 SQL INSERT 创建笔记
+        # content 字段存储图片的 Base64（用于后续可能的重新处理）
+        insert_note_sql = """
+            INSERT INTO notes (user_id, title, content, markdown_content, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, NOW(), NOW())
+            RETURNING id
+        """
+        cur.execute(insert_note_sql, (user_id, title, f"[图片笔记，Base64长度: {len(payload.image_base64)}]", note_content))
+        result = cur.fetchone()
+        
+        if not result:
+            raise ValueError("插入笔记失败，未返回笔记ID")
+        
+        note_id = result['id']
+        logger.info(f"✅ 获取到笔记ID: {note_id}")
+        
+        # 6. 使用 SQL INSERT 批量创建闪词卡片
+        if terms:
+            insert_flashcard_sql = """
+                INSERT INTO flash_cards (note_id, term, status, review_count, created_at, updated_at)
+                VALUES (%s, %s, %s::card_status, 0, NOW(), NOW())
+            """
+            flashcard_data = [(note_id, term, 'NOT_STARTED') for term in terms]
+            cur.executemany(insert_flashcard_sql, flashcard_data)
+            affected_rows = cur.rowcount
+            logger.info(f"✅ 插入 {len(flashcard_data)} 个闪词卡片，影响行数: {affected_rows}")
+            
+            if affected_rows != len(flashcard_data):
+                logger.warning(f"⚠️ 插入闪词数量不匹配: 期望 {len(flashcard_data)}, 实际 {affected_rows}")
+        
+        logger.info(f"✅ 从图片创建笔记成功！")
+        logger.info(f"   - 笔记ID: {note_id}")
+        logger.info(f"   - 标题: {title}")
+        logger.info(f"   - 闪词数量: {len(terms)}")
+        
+        return CreateNoteResponse(
+            note_id=note_id,
+            title=title,
+            flash_card_count=len(terms),
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        error_msg = str(exc)
+        logger.error(f"❌ 从图片创建笔记失败: {error_msg}", exc_info=True)
+        if error_msg == "0":
             error_msg = "数据库操作失败，未插入任何记录"
         raise HTTPException(status_code=500, detail=error_msg) from exc
 

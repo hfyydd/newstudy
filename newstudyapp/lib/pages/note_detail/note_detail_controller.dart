@@ -50,12 +50,28 @@ class NoteDetailController extends GetxController {
         return;
       }
       
-      // 检查是否有userInput（创建新笔记）
+      // 检查是否有userInput（从自定义文本创建笔记）
       final userInput = args['userInput'] as String?;
       if (userInput != null && userInput.isNotEmpty) {
         state.userInput.value = userInput;
         // 调用API创建笔记（保存到数据库）
         _createNote(userInput);
+        return;
+      }
+      
+      // 检查是否有imageBase64（从图片创建笔记）
+      final imageBase64 = args['imageBase64'] as String?;
+      if (imageBase64 != null && imageBase64.isNotEmpty) {
+        // 调用API创建笔记（保存到数据库）
+        _createNoteFromImage(imageBase64);
+        return;
+      }
+      
+      // 检查是否有url（从网站创建笔记）
+      final url = args['url'] as String?;
+      if (url != null && url.isNotEmpty) {
+        // 调用API创建笔记（保存到数据库）
+        _createNoteFromUrl(url);
         return;
       }
     }
@@ -68,6 +84,7 @@ class NoteDetailController extends GetxController {
   Future<void> _createNote(String userInput) async {
     state.isLoading.value = true;
     state.isGenerating.value = true;
+    state.hasError.value = false;
     state.generatingStatus.value = 'AI 正在分析内容...';
 
     try {
@@ -102,6 +119,130 @@ class NoteDetailController extends GetxController {
       );
 
     } catch (e) {
+      // 标记创建失败，防止显示"此笔记尚未生成闪词卡片"页面
+      state.hasError.value = true;
+      // 创建失败，直接返回上一页
+      Get.back();
+      Get.snackbar(
+        '创建失败',
+        '笔记创建失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFFF6B6B),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+    } finally {
+      state.isLoading.value = false;
+      state.isGenerating.value = false;
+      state.generatingStatus.value = '';
+    }
+  }
+
+  /// 从图片创建笔记（保存到数据库）
+  Future<void> _createNoteFromImage(String imageBase64) async {
+    state.isLoading.value = true;
+    state.isGenerating.value = true;
+    state.hasError.value = false;
+    state.generatingStatus.value = '正在识别图片内容...';
+
+    try {
+      // 调用后端API创建笔记（生成并保存到数据库）
+      final response = await _httpService.createNoteFromImage(
+        imageBase64: imageBase64,
+        maxTerms: 30,
+      );
+
+      // 创建成功后，通过noteId加载笔记详情
+      await _loadNoteById(response.noteId);
+
+      // 刷新首页的笔记列表
+      try {
+        final homeController = Get.find<HomeController>();
+        homeController.loadNotes(showLoading: false);
+      } catch (e) {
+        // 如果首页控制器不存在，忽略错误
+        print('首页控制器未找到，跳过刷新: $e');
+      }
+
+      // 显示成功提示
+      Get.snackbar(
+        '成功',
+        '笔记创建成功',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF4ECDC4),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+
+    } catch (e) {
+      // 标记创建失败，防止显示"此笔记尚未生成闪词卡片"页面
+      state.hasError.value = true;
+      // 创建失败，直接返回上一页
+      Get.back();
+      Get.snackbar(
+        '创建失败',
+        '笔记创建失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFFF6B6B),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+    } finally {
+      state.isLoading.value = false;
+      state.isGenerating.value = false;
+      state.generatingStatus.value = '';
+    }
+  }
+
+  /// 从网站创建笔记（保存到数据库）
+  Future<void> _createNoteFromUrl(String url) async {
+    state.isLoading.value = true;
+    state.isGenerating.value = true;
+    state.hasError.value = false;
+    state.generatingStatus.value = '正在抓取网页内容...';
+
+    try {
+      // 调用后端API创建笔记（生成并保存到数据库）
+      final response = await _httpService.createNoteFromUrl(
+        url: url,
+        maxTerms: 30,
+      );
+
+      // 创建成功后，通过noteId加载笔记详情
+      await _loadNoteById(response.noteId);
+
+      // 刷新首页的笔记列表
+      try {
+        final homeController = Get.find<HomeController>();
+        homeController.loadNotes(showLoading: false);
+      } catch (e) {
+        // 如果首页控制器不存在，忽略错误
+        print('首页控制器未找到，跳过刷新: $e');
+      }
+
+      // 显示成功提示
+      Get.snackbar(
+        '成功',
+        '笔记创建成功',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF4ECDC4),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+      );
+
+    } catch (e) {
+      // 标记创建失败，防止显示"此笔记尚未生成闪词卡片"页面
+      state.hasError.value = true;
+      // 创建失败，直接返回上一页
+      Get.back();
       Get.snackbar(
         '创建失败',
         '笔记创建失败：$e',
