@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/config/theme_controller.dart';
 import 'package:newstudyapp/config/app_theme.dart';
+import 'package:newstudyapp/config/language_controller.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -11,6 +13,7 @@ class ProfilePage extends StatelessWidget {
     final themeController = Get.find<ThemeController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
+    final l10n = AppLocalizations.of(context)!;
     
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -24,7 +27,7 @@ class ProfilePage extends StatelessWidget {
               children: [
                 const SizedBox(height: 20),
                 Text(
-                  '个人中心',
+                  l10n.profile,
                   style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
@@ -34,11 +37,11 @@ class ProfilePage extends StatelessWidget {
                 const SizedBox(height: 40),
                 
                 // 用户信息卡片
-                _buildUserCard(isDark),
+                _buildUserCard(context, isDark),
                 const SizedBox(height: 24),
                 
                 // 设置列表
-                _buildSettingsSection(isDark, themeController),
+                _buildSettingsSection(context, isDark, themeController),
                 
                 const SizedBox(height: 40),
               ],
@@ -49,7 +52,8 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildUserCard(bool isDark) {
+  Widget _buildUserCard(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final iconBgColor = isDark ? Colors.grey[800] : Colors.grey[200];
@@ -86,7 +90,7 @@ class ProfilePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '学习中...',
+                  l10n.studying,
                   style: TextStyle(fontSize: 14, color: secondaryColor),
                 ),
               ],
@@ -98,14 +102,16 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsSection(bool isDark, ThemeController themeController) {
+  Widget _buildSettingsSection(BuildContext context, bool isDark, ThemeController themeController) {
     final textColor = isDark ? Colors.white : Colors.black;
+    final l10n = AppLocalizations.of(context)!;
+    final languageController = Get.find<LanguageController>();
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '设置',
+          l10n.settings,
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
         ),
         const SizedBox(height: 16),
@@ -114,8 +120,8 @@ class ProfilePage extends StatelessWidget {
         Obx(() => _buildSettingItem(
           isDark: isDark,
           icon: themeController.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-          title: '主题模式',
-          subtitle: themeController.isDarkMode ? '深色模式' : '浅色模式',
+          title: l10n.themeMode,
+          subtitle: themeController.isDarkMode ? l10n.darkMode : l10n.lightMode,
           trailing: Switch(
             value: themeController.isDarkMode,
             onChanged: (value) => themeController.toggleTheme(),
@@ -128,8 +134,8 @@ class ProfilePage extends StatelessWidget {
         _buildSettingItem(
           isDark: isDark,
           icon: Icons.notifications_outlined,
-          title: '通知设置',
-          subtitle: '管理推送通知',
+          title: l10n.notifications,
+          subtitle: l10n.manageNotifications,
           trailing: Icon(
             Icons.chevron_right,
             color: isDark ? Colors.grey[600] : Colors.grey[500],
@@ -139,25 +145,25 @@ class ProfilePage extends StatelessWidget {
         
         const SizedBox(height: 12),
         
-        _buildSettingItem(
+        Obx(() => _buildSettingItem(
           isDark: isDark,
           icon: Icons.language_outlined,
-          title: '语言',
-          subtitle: '简体中文',
+          title: l10n.language,
+          subtitle: languageController.currentLanguage.nativeName,
           trailing: Icon(
             Icons.chevron_right,
             color: isDark ? Colors.grey[600] : Colors.grey[500],
           ),
-          onTap: () {},
-        ),
+          onTap: () => _showLanguageSelector(context, isDark),
+        )),
         
         const SizedBox(height: 12),
         
         _buildSettingItem(
           isDark: isDark,
           icon: Icons.info_outline,
-          title: '关于',
-          subtitle: '版本 1.0.0',
+          title: l10n.about,
+          subtitle: l10n.version('1.0.0'),
           trailing: Icon(
             Icons.chevron_right,
             color: isDark ? Colors.grey[600] : Colors.grey[500],
@@ -165,6 +171,79 @@ class ProfilePage extends StatelessWidget {
           onTap: () {},
         ),
       ],
+    );
+  }
+
+  /// 显示语言选择器
+  void _showLanguageSelector(BuildContext context, bool isDark) {
+    final languageController = Get.find<LanguageController>();
+    final l10n = AppLocalizations.of(context)!;
+    final cardColor = isDark ? Colors.grey[900] : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                l10n.language,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...LanguageController.supportedLanguages.map((lang) => Obx(() {
+                final isSelected = languageController.currentLanguageCode.value == lang.code;
+                return ListTile(
+                  leading: Icon(
+                    isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                    color: isSelected ? AppTheme.darkPrimary : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                  ),
+                  title: Text(
+                    lang.nativeName,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                  subtitle: Text(
+                    lang.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey[500] : Colors.grey[600],
+                    ),
+                  ),
+                  onTap: () {
+                    languageController.changeLanguage(lang.code);
+                    Navigator.pop(context);
+                  },
+                );
+              })),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

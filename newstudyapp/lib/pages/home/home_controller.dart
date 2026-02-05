@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:newstudyapp/services/http_service.dart';
 import 'package:newstudyapp/models/note_models.dart';
 import 'package:newstudyapp/pages/study_center/study_center_state.dart';
@@ -9,6 +10,17 @@ import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.d
 /// 首页控制器
 class HomeController extends GetxController {
   final HttpService _httpService = HttpService();
+  
+  /// 获取 AppLocalizations 实例
+  AppLocalizations? get _l10n {
+    try {
+      final context = Get.context;
+      if (context != null) {
+        return AppLocalizations.of(context);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   // 笔记列表
   final RxList<NoteListItem> notes = <NoteListItem>[].obs;
@@ -54,8 +66,8 @@ class HomeController extends GetxController {
       totalNotes.value = response.total;
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '加载笔记列表失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.loadDataFailed(e.toString()) ?? 'Failed to load data: $e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
@@ -137,8 +149,8 @@ class HomeController extends GetxController {
 
       if (flashCards.isEmpty) {
         Get.snackbar(
-          '提示',
-          '暂无闪词可学习',
+          _l10n?.hint ?? 'Hint',
+          _l10n?.noFlashCardsToLearn ?? 'No flash cards to learn',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
@@ -156,7 +168,7 @@ class HomeController extends GetxController {
         },
         arguments: {
           'flashCards': flashCards,
-          'topic': '今日需要复习',
+          'topic': _l10n?.todayReviewTitle ?? 'Today\'s Review',
           'pageType': StudyCenterPageType.todayReview.name, // 保存页面类型，用于后续加载更多
           'statusFilter': null, // 今日复习不需要状态筛选
           'currentSkip': initialLimit, // 当前已加载的数量
@@ -166,8 +178,8 @@ class HomeController extends GetxController {
       );
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '加载闪词失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.loadFlashCardsFailed(e.toString()) ?? 'Failed to load flash cards: $e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );

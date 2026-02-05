@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/create_note_from_image/create_note_from_image_controller.dart';
 
@@ -59,7 +60,7 @@ class CreateNoteFromImagePage extends GetView<CreateNoteFromImageController> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      '从图片创建笔记',
+                      AppLocalizations.of(context)!.createNoteFromImage,
                       style: TextStyle(
                         color: textColor,
                         fontSize: 17,
@@ -126,7 +127,7 @@ class CreateNoteFromImagePage extends GetView<CreateNoteFromImageController> {
                           textColor: textColor,
                           borderColor: borderColor,
                           icon: Icons.camera_alt,
-                          label: '拍照',
+                          label: AppLocalizations.of(context)!.takePhotoLabel,
                           onTap: () => controller.pickImageFromCamera(),
                         ),
                       ),
@@ -137,7 +138,7 @@ class CreateNoteFromImagePage extends GetView<CreateNoteFromImageController> {
                           textColor: textColor,
                           borderColor: borderColor,
                           icon: Icons.photo_library,
-                          label: '相册',
+                          label: AppLocalizations.of(context)!.albumLabel,
                           onTap: () => controller.pickImageFromGallery(),
                         ),
                       ),
@@ -155,7 +156,7 @@ class CreateNoteFromImagePage extends GetView<CreateNoteFromImageController> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '已选择图片',
+                          AppLocalizations.of(context)!.imageSelected,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -196,7 +197,7 @@ class CreateNoteFromImagePage extends GetView<CreateNoteFromImageController> {
                           onPressed: () => controller.selectedImage.value = null,
                           icon: Icon(Icons.refresh, color: AppTheme.darkPrimary),
                           label: Text(
-                            '重新选择',
+                            AppLocalizations.of(context)!.reselect,
                             style: TextStyle(color: AppTheme.darkPrimary),
                           ),
                         ),
@@ -247,10 +248,10 @@ class CreateNoteFromImagePage extends GetView<CreateNoteFromImageController> {
                         ),
                         child: Text(
                           isLoading
-                              ? '处理中...'
+                              ? AppLocalizations.of(context)!.processing
                               : hasImage
-                                  ? '创建笔记'
-                                  : '请先选择图片',
+                                  ? AppLocalizations.of(context)!.createNote
+                                  : AppLocalizations.of(context)!.pleaseSelectImage,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,

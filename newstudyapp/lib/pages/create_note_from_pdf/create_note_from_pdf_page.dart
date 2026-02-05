@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'create_note_from_pdf_controller.dart';
 
 /// 从PDF创建笔记页面
@@ -240,7 +241,7 @@ class CreateNoteFromPdfPage extends GetView<CreateNoteFromPdfController> {
                                 ),
                               ),
                               child: Text(
-                                '重新选择',
+                                AppLocalizations.of(context)!.reselect,
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 14,
@@ -274,7 +275,7 @@ class CreateNoteFromPdfPage extends GetView<CreateNoteFromPdfController> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '处理说明',
+                              AppLocalizations.of(context)!.processingInstructions,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -325,7 +326,7 @@ class CreateNoteFromPdfPage extends GetView<CreateNoteFromPdfController> {
                               const SizedBox(width: 8),
                             ],
                             Text(
-                              hasFile ? '创建笔记' : '请先选择PDF文件',
+                              hasFile ? AppLocalizations.of(context)!.createNote : AppLocalizations.of(context)!.pleaseSelectPdfFirst,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,

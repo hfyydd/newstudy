@@ -15,6 +15,7 @@ import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/models/note_models.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:newstudyapp/services/toast_service.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -150,11 +151,12 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildHeader(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _getGreeting(),
+          _getGreeting(l10n),
           style: TextStyle(
             fontSize: 16,
             color: isDark ? Colors.grey[500] : Colors.grey[600],
@@ -163,7 +165,7 @@ class _HomePageState extends State<HomePage>
         ),
         const SizedBox(height: 8),
         Text(
-          '准备好学习了吗？',
+          l10n.readyToStudy,
           style: TextStyle(
             fontSize: 36,
             fontWeight: FontWeight.bold,
@@ -175,18 +177,19 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  String _getGreeting() {
+  String _getGreeting(AppLocalizations l10n) {
     final hour = DateTime.now().hour;
     if (hour < 12) {
-      return '早上好';
+      return l10n.goodMorning;
     } else if (hour < 18) {
-      return '下午好';
+      return l10n.goodAfternoon;
     } else {
-      return '晚上好';
+      return l10n.goodEvening;
     }
   }
 
   Widget _buildTodayReviewCard(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: () {
         // 直接跳转到费曼学习页面
@@ -227,14 +230,14 @@ class _HomePageState extends State<HomePage>
                         color: Colors.white.withOpacity(0.25),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.local_fire_department,
+                          const Icon(Icons.local_fire_department,
                               color: Colors.white, size: 16),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Text(
-                            '今日需要复习',
-                            style: TextStyle(
+                            l10n.todayReview,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -287,21 +290,21 @@ class _HomePageState extends State<HomePage>
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '个闪词',
-                            style: TextStyle(
+                            l10n.flashCards,
+                            style: const TextStyle(
                                 fontSize: 18,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w400),
                           ),
                           Text(
-                            '需要复习',
+                            l10n.needReview,
                             style:
-                                TextStyle(fontSize: 14, color: Colors.white70),
+                                const TextStyle(fontSize: 14, color: Colors.white70),
                           ),
                         ],
                       ),
@@ -312,12 +315,12 @@ class _HomePageState extends State<HomePage>
             Obx(() => Row(
                   children: [
                     _buildQuickStat(
-                        '需巩固',
+                        l10n.needsConsolidation,
                         '${_homeController.needsReviewCount.value}',
                         AppTheme.statusNeedsReview),
                     const SizedBox(width: 12),
                     _buildQuickStat(
-                        '需改进',
+                        l10n.needsImprovement,
                         '${_homeController.needsImproveCount.value}',
                         AppTheme.statusNeedsImprove),
                   ],
@@ -329,27 +332,33 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildQuickStat(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '$label $value',
-            style: const TextStyle(
-                color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-          ),
-        ],
+    return Flexible(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '$label $value',
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -360,6 +369,7 @@ class _HomePageState extends State<HomePage>
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
+    final l10n = AppLocalizations.of(context)!;
 
     showDialog(
       context: context,
@@ -391,7 +401,7 @@ class _HomePageState extends State<HomePage>
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      '今日需要复习',
+                      l10n.todayReview,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -407,7 +417,7 @@ class _HomePageState extends State<HomePage>
               ),
               const SizedBox(height: 16),
               Text(
-                '基于艾宾浩斯遗忘曲线，系统会根据闪词状态和上次学习时间，智能计算今日需要复习的闪词。',
+                l10n.todayReviewExplanation,
                 style: TextStyle(
                   fontSize: 14,
                   color: textColor,
@@ -425,7 +435,7 @@ class _HomePageState extends State<HomePage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '间隔复习规则：',
+                      l10n.spacedReviewRules,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -434,40 +444,40 @@ class _HomePageState extends State<HomePage>
                     ),
                     const SizedBox(height: 12),
                     _buildIntervalItem(
-                      status: '未掌握',
-                      score: '0-49分',
-                      interval: '4小时后',
-                      reason: '遗忘最快，需快速强化',
+                      status: l10n.notMasteredRule,
+                      score: l10n.notMasteredScore,
+                      interval: l10n.notMasteredInterval,
+                      reason: l10n.notMasteredReason,
                       color: AppTheme.statusNotMastered,
                       textColor: textColor,
                       secondaryColor: secondaryColor,
                     ),
                     const SizedBox(height: 10),
                     _buildIntervalItem(
-                      status: '需改进',
-                      score: '50-69分',
-                      interval: '3天后',
-                      reason: '有一定理解，给予消化时间',
+                      status: l10n.needsImproveRule,
+                      score: l10n.needsImproveScore,
+                      interval: l10n.needsImproveInterval,
+                      reason: l10n.needsImproveReason,
                       color: AppTheme.statusNeedsImprove,
                       textColor: textColor,
                       secondaryColor: secondaryColor,
                     ),
                     const SizedBox(height: 10),
                     _buildIntervalItem(
-                      status: '需巩固',
-                      score: '70-89分',
-                      interval: '1天后',
-                      reason: '基本掌握，在遗忘临界点前巩固',
+                      status: l10n.needsConsolidationRule,
+                      score: l10n.needsConsolidationScore,
+                      interval: l10n.needsConsolidationInterval,
+                      reason: l10n.needsConsolidationReason,
                       color: AppTheme.statusNeedsReview,
                       textColor: textColor,
                       secondaryColor: secondaryColor,
                     ),
                     const SizedBox(height: 10),
                     _buildIntervalItem(
-                      status: '已掌握',
-                      score: '90-100分',
-                      interval: '7天后',
-                      reason: '已形成长期记忆，延长间隔巩固',
+                      status: l10n.masteredRule,
+                      score: l10n.masteredScore,
+                      interval: l10n.masteredInterval,
+                      reason: l10n.masteredReason,
                       color: AppTheme.statusMastered,
                       textColor: textColor,
                       secondaryColor: secondaryColor,
@@ -477,7 +487,7 @@ class _HomePageState extends State<HomePage>
               ),
               const SizedBox(height: 16),
               Text(
-                '💡 下方显示的"需巩固"等数量是当前状态的闪词总数，而非今日需复习数量。',
+                l10n.reviewTip,
                 style: TextStyle(
                   fontSize: 12,
                   color: secondaryColor,
@@ -496,9 +506,9 @@ class _HomePageState extends State<HomePage>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    '知道了',
-                    style: TextStyle(
+                  child: Text(
+                    l10n.gotIt,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -592,6 +602,7 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildNotesSection(bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -600,12 +611,12 @@ class _HomePageState extends State<HomePage>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '我的笔记',
+              l10n.myNotes,
               style: TextStyle(
                   fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
             ),
             Obx(() => Text(
-                  '共 ${_homeController.totalNotes.value} 条',
+                  l10n.totalNotes(_homeController.totalNotes.value),
                   style: TextStyle(
                       fontSize: 14,
                       color: isDark ? Colors.grey[500] : Colors.grey[600]),
@@ -660,6 +671,7 @@ class _HomePageState extends State<HomePage>
   Widget _buildViewMoreButton(bool isDark) {
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
     final cardColor = isDark ? Colors.grey[900] : Colors.white;
+    final l10n = AppLocalizations.of(context)!;
 
     return GestureDetector(
       onTap: () {
@@ -676,7 +688,7 @@ class _HomePageState extends State<HomePage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '查看更多',
+              l10n.viewMore,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -699,6 +711,7 @@ class _HomePageState extends State<HomePage>
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
     final borderColor = isDark ? Colors.grey[800] : Colors.grey[300];
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       padding: const EdgeInsets.all(40),
@@ -716,7 +729,7 @@ class _HomePageState extends State<HomePage>
           ),
           const SizedBox(height: 16),
           Text(
-            '还没有笔记',
+            l10n.noNotesYet,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -725,7 +738,7 @@ class _HomePageState extends State<HomePage>
           ),
           const SizedBox(height: 8),
           Text(
-            '创建你的第一条笔记开始学习吧',
+            l10n.createFirstNote,
             style: TextStyle(
               fontSize: 14,
               color: secondaryColor,
@@ -779,54 +792,61 @@ class _HomePageState extends State<HomePage>
                   ),
                 ),
                 // 显示优先级最高的状态标签（未掌握 > 需改进 > 需巩固）
-                if (note.notMasteredCount > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.statusNotMastered.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${note.notMasteredCount} 未掌握',
-                      style: TextStyle(
-                          color: AppTheme.statusNotMastered,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  )
-                else if (note.needsImproveCount > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.statusNeedsImprove.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${note.needsImproveCount} 需改进',
-                      style: TextStyle(
-                          color: AppTheme.statusNeedsImprove,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  )
-                else if (note.needsReviewCount > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.statusNeedsReview.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${note.needsReviewCount} 需巩固',
-                      style: TextStyle(
-                          color: AppTheme.statusNeedsReview,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
+                Builder(
+                  builder: (context) {
+                    final l10n = AppLocalizations.of(context)!;
+                    if (note.notMasteredCount > 0) {
+                      return Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.statusNotMastered.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${note.notMasteredCount} ${l10n.notMastered}',
+                          style: TextStyle(
+                              color: AppTheme.statusNotMastered,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      );
+                    } else if (note.needsImproveCount > 0) {
+                      return Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.statusNeedsImprove.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${note.needsImproveCount} ${l10n.needsImprovement}',
+                          style: TextStyle(
+                              color: AppTheme.statusNeedsImprove,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      );
+                    } else if (note.needsReviewCount > 0) {
+                      return Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.statusNeedsReview.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${note.needsReviewCount} ${l10n.needsConsolidation}',
+                          style: TextStyle(
+                              color: AppTheme.statusNeedsReview,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -853,9 +873,12 @@ class _HomePageState extends State<HomePage>
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text('已掌握',
-                          style:
-                              TextStyle(fontSize: 12, color: secondaryColor)),
+                      Builder(builder: (context) {
+                        final l10n = AppLocalizations.of(context)!;
+                        return Text(l10n.mastered,
+                            style:
+                                TextStyle(fontSize: 12, color: secondaryColor));
+                      }),
                     ],
                   ),
                 ),
@@ -902,6 +925,7 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildStatsSection(bool isDark) {
     final textColor = isDark ? Colors.white : Colors.black;
+    final l10n = AppLocalizations.of(context)!;
 
     return Obx(() {
       final streak = _homeController.streakDays.value;
@@ -912,7 +936,7 @@ class _HomePageState extends State<HomePage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '学习统计',
+            l10n.learningStats,
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -927,9 +951,9 @@ class _HomePageState extends State<HomePage>
                 child: _buildMetricCard(
                   isDark: isDark,
                   icon: Icons.local_fire_department_rounded,
-                  title: '连续学习',
-                  value: '${streak}天',
-                  subtitle: '保持学习习惯',
+                  title: l10n.consecutiveLearning,
+                  value: l10n.consecutiveDays(streak),
+                  subtitle: l10n.keepLearningHabit,
                   color: const Color(0xFFFF6B6B),
                 ),
               ),
@@ -938,9 +962,9 @@ class _HomePageState extends State<HomePage>
                 child: _buildMetricCard(
                   isDark: isDark,
                   icon: Icons.event_available_outlined,
-                  title: '近7天活跃',
-                  value: '$active7d天',
-                  subtitle: '最近一周学习天数',
+                  title: l10n.last7DaysActive,
+                  value: l10n.consecutiveDays(active7d),
+                  subtitle: l10n.recentWeekLearningDays,
                   color: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary,
                 ),
               ),
@@ -1087,6 +1111,7 @@ class _HomePageState extends State<HomePage>
     final safeMax = maxCount == 0 ? 1 : maxCount;
     const double chartHeight = 96;
     const double barMaxHeight = 60;
+    final l10n = AppLocalizations.of(context)!;
 
     // 计算纵轴刻度值（显示3-4个刻度点）
     List<int> yAxisTicks = [];
@@ -1132,7 +1157,7 @@ class _HomePageState extends State<HomePage>
           Row(
             children: [
               Text(
-                '近7天学习趋势',
+                l10n.last7DaysTrend,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -1141,7 +1166,7 @@ class _HomePageState extends State<HomePage>
               ),
               const Spacer(),
               Text(
-                '学习次数',
+                l10n.studyTimes,
                 style: TextStyle(fontSize: 12, color: secondaryColor),
               ),
             ],
@@ -1247,6 +1272,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
     final textColor =
         isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
     final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -1291,7 +1317,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '创建笔记',
+                    l10n.createNote,
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -1302,7 +1328,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '选择创建方式',
+                l10n.selectCreationMethod,
                 style: TextStyle(fontSize: 14, color: secondaryColor),
               ),
               const SizedBox(height: 28),
@@ -1318,38 +1344,45 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                 children: [
                   _SourceItem(
                       icon: Icons.picture_as_pdf,
-                    label: 'PDF',
+                    label: l10n.pdf,
                     color: const Color(0xFFE74C3C),
+                    type: _SourceType.pdf,
                   ),
                   _SourceItem(
                       icon: Icons.audiotrack,
-                    label: '音频',
+                    label: l10n.audio,
                     color: const Color(0xFFF39C12),
+                    type: _SourceType.audio,
               ),
                   _SourceItem(
                 icon: Icons.image_outlined,
-                    label: '图片',
+                    label: l10n.image,
                     color: const Color(0xFF9B59B6),
+                    type: _SourceType.image,
                   ),
                   _SourceItem(
                     icon: Icons.language,
-                    label: '网站',
+                    label: l10n.website,
                     color: const Color(0xFF3498DB),
+                    type: _SourceType.website,
               ),
                   _SourceItem(
                     icon: Icons.play_circle_outline,
-                    label: 'Youtube',
+                    label: l10n.youtube,
                     color: const Color(0xFFFF0000),
+                    type: _SourceType.youtube,
               ),
                   _SourceItem(
                     icon: Icons.play_circle_filled,
-                    label: 'Bilibili',
+                    label: l10n.bilibili,
                     color: const Color(0xFFFF6699),
+                    type: _SourceType.bilibili,
               ),
                   _SourceItem(
                       icon: Icons.text_fields,
-                      label: '自定义文本',
+                      label: l10n.customText,
                     color: const Color(0xFF1ABC9C),
+                    type: _SourceType.customText,
                   ),
                 ]
                     .map((item) => _buildSourceButton(isDark, textColor, item, context))
@@ -1368,6 +1401,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
   Widget _buildSourceButton(bool isDark, Color textColor, _SourceItem item, BuildContext context) {
     final cardColor =
         isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5);
+    final l10n = AppLocalizations.of(context)!;
 
     return GestureDetector(
       onTap: () async {
@@ -1375,103 +1409,114 @@ class _CreateNoteBottomSheet extends StatelessWidget {
         Get.back();
 
         // 根据不同的创建源打开对应的页面
-        if (item.label == '自定义文本') {
-          // 在打开 BottomSheet 前注入控制器
-          Get.put(CreateNoteController());
+        switch (item.type) {
+          case _SourceType.customText:
+            // 在打开 BottomSheet 前注入控制器
+            Get.put(CreateNoteController());
 
-          await Get.bottomSheet(
-            const CreateNotePage(),
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            enableDrag: true,
-          );
+            await Get.bottomSheet(
+              const CreateNotePage(),
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              enableDrag: true,
+            );
+            break;
 
-          // 注意：CreateNotePage 内部已经处理了跳转和关闭
-        } else if (item.label == '网站') {
-          // 删除旧的控制器（如果存在），确保每次打开都是新实例
-          if (Get.isRegistered<CreateNoteFromUrlController>()) {
-            Get.delete<CreateNoteFromUrlController>();
-          }
-          
-          // 在打开 BottomSheet 前注入新的控制器
-          Get.put(CreateNoteFromUrlController());
-
-          await Get.bottomSheet(
-            const CreateNoteFromUrlPage(),
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            enableDrag: true,
-          );
-
-          // BottomSheet 关闭后，延迟删除控制器，确保 UI 完全关闭
-          // 延迟删除以避免在 BottomSheet 关闭动画期间访问已删除的控制器
-          Future.delayed(const Duration(milliseconds: 300), () {
+          case _SourceType.website:
+            // 删除旧的控制器（如果存在），确保每次打开都是新实例
             if (Get.isRegistered<CreateNoteFromUrlController>()) {
               Get.delete<CreateNoteFromUrlController>();
             }
-          });
-        } else if (item.label == '图片') {
-          // 直接弹出拍照/相册选择框
-          _showImageSourceBottomSheet(context, isDark);
-        } else if (item.label == 'Youtube') {
-          // 删除旧的控制器（如果存在），确保每次打开都是新实例
-          if (Get.isRegistered<CreateNoteFromYoutubeController>()) {
-            Get.delete<CreateNoteFromYoutubeController>();
-          }
-          
-          // 在打开 BottomSheet 前注入新的控制器
-          Get.put(CreateNoteFromYoutubeController());
+            
+            // 在打开 BottomSheet 前注入新的控制器
+            Get.put(CreateNoteFromUrlController());
 
-          await Get.bottomSheet(
-            const CreateNoteFromYoutubePage(),
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            enableDrag: true,
-          );
+            await Get.bottomSheet(
+              const CreateNoteFromUrlPage(),
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              enableDrag: true,
+            );
 
-          // BottomSheet 关闭后，延迟删除控制器，确保 UI 完全关闭
-          Future.delayed(const Duration(milliseconds: 300), () {
+            // BottomSheet 关闭后，延迟删除控制器
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (Get.isRegistered<CreateNoteFromUrlController>()) {
+                Get.delete<CreateNoteFromUrlController>();
+              }
+            });
+            break;
+
+          case _SourceType.image:
+            // 直接弹出拍照/相册选择框
+            _showImageSourceBottomSheet(context, isDark);
+            break;
+
+          case _SourceType.youtube:
+            // 删除旧的控制器（如果存在），确保每次打开都是新实例
             if (Get.isRegistered<CreateNoteFromYoutubeController>()) {
               Get.delete<CreateNoteFromYoutubeController>();
             }
-          });
-        } else if (item.label == 'Bilibili') {
-          // 删除旧的控制器（如果存在），确保每次打开都是新实例
-          if (Get.isRegistered<CreateNoteFromBilibiliController>()) {
-            Get.delete<CreateNoteFromBilibiliController>();
-          }
-          
-          // 在打开 BottomSheet 前注入新的控制器
-          Get.put(CreateNoteFromBilibiliController());
+            
+            // 在打开 BottomSheet 前注入新的控制器
+            Get.put(CreateNoteFromYoutubeController());
 
-          await Get.bottomSheet(
-            const CreateNoteFromBilibiliPage(),
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            enableDrag: true,
-          );
+            await Get.bottomSheet(
+              const CreateNoteFromYoutubePage(),
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              enableDrag: true,
+            );
 
-          // BottomSheet 关闭后，延迟删除控制器，确保 UI 完全关闭
-          Future.delayed(const Duration(milliseconds: 300), () {
+            // BottomSheet 关闭后，延迟删除控制器
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (Get.isRegistered<CreateNoteFromYoutubeController>()) {
+                Get.delete<CreateNoteFromYoutubeController>();
+              }
+            });
+            break;
+
+          case _SourceType.bilibili:
+            // 删除旧的控制器（如果存在），确保每次打开都是新实例
             if (Get.isRegistered<CreateNoteFromBilibiliController>()) {
               Get.delete<CreateNoteFromBilibiliController>();
             }
-          });
-        } else if (item.label == 'PDF') {
-          // 直接打开文件选择器
-          _pickPdfFileAndCreateNote();
-        } else {
-          // 其他功能显示提示
-          Get.snackbar(
-            '提示',
-            '${item.label}功能开发中',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: item.color,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 2),
-            margin: const EdgeInsets.all(16),
-            borderRadius: 12,
-          );
+            
+            // 在打开 BottomSheet 前注入新的控制器
+            Get.put(CreateNoteFromBilibiliController());
+
+            await Get.bottomSheet(
+              const CreateNoteFromBilibiliPage(),
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              enableDrag: true,
+            );
+
+            // BottomSheet 关闭后，延迟删除控制器
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (Get.isRegistered<CreateNoteFromBilibiliController>()) {
+                Get.delete<CreateNoteFromBilibiliController>();
+              }
+            });
+            break;
+
+          case _SourceType.pdf:
+            // 直接打开文件选择器
+            _pickPdfFileAndCreateNote();
+            break;
+
+          case _SourceType.audio:
+            // 其他功能显示提示
+            Get.snackbar(
+              l10n.hint,
+              l10n.featureInDevelopment(item.label),
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: item.color,
+              colorText: Colors.white,
+              duration: const Duration(seconds: 2),
+              margin: const EdgeInsets.all(16),
+              borderRadius: 12,
+            );
+            break;
         }
       },
       child: Container(
@@ -1526,6 +1571,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
     final borderColor =
         isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final l10n = AppLocalizations.of(context)!;
 
     // 创建控制器（临时使用，选择后立即创建笔记）
     final controller = CreateNoteFromImageController();
@@ -1560,7 +1606,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Text(
-                '选择图片',
+                l10n.selectImage,
                 style: TextStyle(
                   color: textColor,
                   fontSize: 18,
@@ -1580,7 +1626,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                       textColor: textColor,
                       borderColor: borderColor,
                       icon: Icons.camera_alt,
-                      label: '拍照',
+                      label: l10n.takePhoto,
                       onTap: () async {
                         Get.back(); // 关闭选择框
                         await controller.pickImageFromCamera();
@@ -1604,7 +1650,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                       textColor: textColor,
                       borderColor: borderColor,
                       icon: Icons.photo_library,
-                      label: '相册',
+                      label: l10n.chooseFromAlbum,
                       onTap: () async {
                         Get.back(); // 关闭选择框
                         await controller.pickImageFromGallery();
@@ -1647,7 +1693,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    '取消',
+                    l10n.cancel,
                     style: TextStyle(
                       color: textColor,
                       fontSize: 16,
@@ -1712,6 +1758,7 @@ class _CreateNoteBottomSheet extends StatelessWidget {
 
   /// 直接选择PDF文件并创建笔记
   Future<void> _pickPdfFileAndCreateNote() async {
+    final l10n = AppLocalizations.of(Get.context!)!;
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -1726,13 +1773,13 @@ class _CreateNoteBottomSheet extends StatelessWidget {
 
       final file = result.files.first;
       if (file.path == null) {
-        ToastService.showError('无法获取文件路径，请重试');
+        ToastService.showError(l10n.unknownError);
         return;
       }
 
       // 检查文件大小（限制为 50MB）
       if (file.size > 50 * 1024 * 1024) {
-        ToastService.showError('PDF文件过大，请选择小于 50MB 的文件');
+        ToastService.showError(l10n.fileTooLarge(50));
         return;
       }
 
@@ -1747,11 +1794,22 @@ class _CreateNoteBottomSheet extends StatelessWidget {
         },
       );
     } catch (e) {
-      ToastService.showError('选择PDF文件失败: $e');
+      ToastService.showError('${l10n.failed}: $e');
       debugPrint('选择PDF文件失败: $e');
     }
   }
 
+}
+
+// 创建源类型枚举
+enum _SourceType {
+  pdf,
+  audio,
+  image,
+  website,
+  youtube,
+  bilibili,
+  customText,
 }
 
 // 创建源项数据类
@@ -1759,10 +1817,12 @@ class _SourceItem {
   final IconData icon;
   final String label;
   final Color color;
+  final _SourceType type;
 
   const _SourceItem({
     required this.icon,
     required this.label,
     required this.color,
+    required this.type,
   });
 }

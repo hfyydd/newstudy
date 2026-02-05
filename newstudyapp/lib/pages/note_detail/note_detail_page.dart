@@ -4,6 +4,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/main/main_controller.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'note_detail_controller.dart';
 import 'note_detail_state.dart';
 
@@ -75,7 +76,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
         ),
         body: Obx(() {
           if (controller.state.isLoading.value) {
-            return _buildLoadingState(isDark, textColor, secondaryColor);
+            return _buildLoadingState(context, isDark, textColor, secondaryColor);
           }
 
           return Column(
@@ -89,7 +90,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 闪词学习区域（放在顶部）
-                      _buildFlashCardSection(isDark, textColor, secondaryColor,
+                      _buildFlashCardSection(context, isDark, textColor, secondaryColor,
                           cardColor, borderColor),
                       const SizedBox(height: 24),
 
@@ -98,11 +99,11 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                       const SizedBox(height: 20),
 
                       // 笔记元信息
-                      _buildMetaInfo(secondaryColor),
+                      _buildMetaInfo(context, secondaryColor),
                       const SizedBox(height: 16),
 
                       // 笔记内容（Markdown渲染）
-                      _buildNoteContent(isDark, textColor, secondaryColor),
+                      _buildNoteContent(context, isDark, textColor, secondaryColor),
                     ],
                   ),
                 ),
@@ -116,7 +117,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 构建加载状态
   Widget _buildLoadingState(
-      bool isDark, Color textColor, Color? secondaryColor) {
+      BuildContext context, bool isDark, Color textColor, Color? secondaryColor) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -144,7 +146,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           Obx(() => Text(
                 controller.state.generatingStatus.value.isNotEmpty
                     ? controller.state.generatingStatus.value
-                    : 'AI 正在生成笔记...',
+                    : l10n.aiGeneratingNote,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -153,7 +155,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
               )),
           const SizedBox(height: 8),
           Text(
-            '正在分析内容并提取核心概念',
+            l10n.analyzingContent,
             style: TextStyle(
               fontSize: 14,
               color: secondaryColor,
@@ -165,7 +167,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   }
 
   /// 构建笔记元信息
-  Widget _buildMetaInfo(Color? secondaryColor) {
+  Widget _buildMetaInfo(BuildContext context, Color? secondaryColor) {
+    final l10n = AppLocalizations.of(context)!;
     return Obx(() {
       final note = controller.state.note.value;
       if (note == null) return const SizedBox.shrink();
@@ -175,14 +178,14 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           Icon(Icons.access_time, size: 14, color: secondaryColor),
           const SizedBox(width: 4),
           Text(
-            '创建于 ${controller.formatDate(note.createdAt)}',
+            l10n.createdAt(controller.formatDate(note.createdAt)),
             style: TextStyle(fontSize: 12, color: secondaryColor),
           ),
           const SizedBox(width: 16),
           Icon(Icons.edit_outlined, size: 14, color: secondaryColor),
           const SizedBox(width: 4),
           Text(
-            '更新于 ${controller.formatDate(note.updatedAt)}',
+            l10n.updatedAt(controller.formatDate(note.updatedAt)),
             style: TextStyle(fontSize: 12, color: secondaryColor),
           ),
         ],
@@ -192,7 +195,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 构建笔记内容（Markdown渲染）
   Widget _buildNoteContent(
-      bool isDark, Color textColor, Color? secondaryColor) {
+      BuildContext context, bool isDark, Color textColor, Color? secondaryColor) {
+    final l10n = AppLocalizations.of(context)!;
     return Obx(() {
       final markdownContent = controller.state.markdownContent;
       final content = controller.state.noteContent;
@@ -210,7 +214,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       if (content.isEmpty) {
         return Center(
           child: Text(
-            '暂无内容',
+            l10n.noContent,
             style: TextStyle(color: secondaryColor, fontSize: 14),
           ),
         );
@@ -303,6 +307,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 构建闪词学习区域
   Widget _buildFlashCardSection(
+    BuildContext context,
     bool isDark,
     Color textColor,
     Color? secondaryColor,
@@ -321,21 +326,22 @@ class NoteDetailPage extends GetView<NoteDetailController> {
       }
 
       if (isGenerating) {
-        return _buildGeneratingCard(isDark, cardColor, borderColor);
+        return _buildGeneratingCard(context, isDark, cardColor, borderColor);
       }
 
       if (!hasFlashCards) {
         return _buildNoFlashCardsCard(
-            isDark, textColor, secondaryColor, cardColor, borderColor);
+            context, isDark, textColor, secondaryColor, cardColor, borderColor);
       }
 
       return _buildProgressCard(
-          isDark, textColor, secondaryColor, cardColor, borderColor, progress!);
+          context, isDark, textColor, secondaryColor, cardColor, borderColor, progress!);
     });
   }
 
   /// 构建"正在生成"卡片
-  Widget _buildGeneratingCard(bool isDark, Color cardColor, Color borderColor) {
+  Widget _buildGeneratingCard(BuildContext context, bool isDark, Color cardColor, Color borderColor) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -368,9 +374,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'AI 正在分析笔记内容...',
-            style: TextStyle(
+          Text(
+            l10n.aiAnalyzingNote,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -378,7 +384,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           ),
           const SizedBox(height: 8),
           Text(
-            '正在提取核心概念和关键词',
+            l10n.extractingConcepts,
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
@@ -391,12 +397,14 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 构建"尚未生成闪词"卡片
   Widget _buildNoFlashCardsCard(
+    BuildContext context,
     bool isDark,
     Color textColor,
     Color? secondaryColor,
     Color cardColor,
     Color borderColor,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -433,9 +441,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            '此笔记尚未生成闪词卡片',
-            style: TextStyle(
+          Text(
+            l10n.noFlashCardsYet,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -443,7 +451,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           ),
           const SizedBox(height: 8),
           Text(
-            'AI 将从笔记中提取核心概念，帮助你更好地记忆',
+            l10n.aiWillExtract,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -457,9 +465,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             child: ElevatedButton.icon(
               onPressed: controller.generateFlashCards,
               icon: const Icon(Icons.auto_awesome, size: 20),
-              label: const Text(
-                '生成闪词卡片',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              label: Text(
+                l10n.generateFlashCards,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -478,6 +486,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 构建学习进度卡片
   Widget _buildProgressCard(
+    BuildContext context,
     bool isDark,
     Color textColor,
     Color? secondaryColor,
@@ -485,6 +494,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
     Color borderColor,
     FlashCardProgress progress,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -514,9 +524,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             children: [
               const Icon(Icons.school_outlined, size: 20, color: Colors.white),
               const SizedBox(width: 8),
-              const Text(
-                '闪词学习进度',
-                style: TextStyle(
+              Text(
+                l10n.flashCardProgress,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -527,11 +537,11 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           const SizedBox(height: 16),
 
           // 进度条
-          _buildProgressBar(progress, isDark),
+          _buildProgressBar(context, progress, isDark),
           const SizedBox(height: 20),
 
           // 统计数据
-          _buildProgressStats(progress, isDark, textColor, secondaryColor),
+          _buildProgressStats(context, progress, isDark, textColor, secondaryColor),
           const SizedBox(height: 20),
 
           // 主要操作按钮：开始学习
@@ -541,9 +551,9 @@ class NoteDetailPage extends GetView<NoteDetailController> {
             child: ElevatedButton.icon(
               onPressed: controller.startFeynmanLearning,
               icon: const Icon(Icons.school, size: 20),
-              label: const Text(
-                '开始学习',
-                style: TextStyle(
+              label: Text(
+                l10n.startLearning,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -566,7 +576,8 @@ class NoteDetailPage extends GetView<NoteDetailController> {
   }
 
   /// 构建进度条
-  Widget _buildProgressBar(FlashCardProgress progress, bool isDark) {
+  Widget _buildProgressBar(BuildContext context, FlashCardProgress progress, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final masteredPercent = progress.masteredPercent;
     final reviewPercent = progress.needsReview / progress.total;
     final improvePercent = progress.needsImprove / progress.total;
@@ -612,14 +623,14 @@ class NoteDetailPage extends GetView<NoteDetailController> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '${(progress.progressPercent * 100).round()}% 已学习',
+              l10n.percentLearned((progress.progressPercent * 100).round()),
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.white.withOpacity(0.8),
               ),
             ),
             Text(
-              '${progress.mastered}/${progress.total} 已掌握',
+              l10n.masteredOf(progress.mastered, progress.total),
               style: TextStyle(
                 fontSize: 13,
                 color: AppTheme.statusMastered,
@@ -634,22 +645,24 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 构建进度统计
   Widget _buildProgressStats(
+    BuildContext context,
     FlashCardProgress progress,
     bool isDark,
     Color textColor,
     Color? secondaryColor,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
         _buildStatItem(
-            '已掌握', progress.mastered, AppTheme.statusMastered, 'MASTERED'),
-        _buildStatItem('需巩固', progress.needsReview, AppTheme.statusNeedsReview,
+            l10n.mastered, progress.mastered, AppTheme.statusMastered, 'MASTERED'),
+        _buildStatItem(l10n.needsConsolidation, progress.needsReview, AppTheme.statusNeedsReview,
             'NEEDS_REVIEW'),
-        _buildStatItem('需改进', progress.needsImprove,
+        _buildStatItem(l10n.needsImprovement, progress.needsImprove,
             AppTheme.statusNeedsImprove, 'NEEDS_IMPROVE'),
-        _buildStatItem('未掌握', progress.notMastered, AppTheme.statusNotMastered,
+        _buildStatItem(l10n.notMastered, progress.notMastered, AppTheme.statusNotMastered,
             'NOT_MASTERED'),
-        _buildStatItem('未学习', progress.notStarted, AppTheme.statusNotStarted,
+        _buildStatItem(l10n.notStarted, progress.notStarted, AppTheme.statusNotStarted,
             'NOT_STARTED'),
       ],
     );
@@ -707,6 +720,7 @@ class NoteDetailPage extends GetView<NoteDetailController> {
 
   /// 显示更多选项
   void _showMoreOptions(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -729,23 +743,23 @@ class NoteDetailPage extends GetView<NoteDetailController> {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildOptionItem(Icons.refresh, '重新生成', isDark, () {
+              _buildOptionItem(Icons.refresh, l10n.regenerate, isDark, () {
                 Get.back();
                 controller.regenerateFlashCards();
               }),
-              _buildOptionItem(Icons.edit_outlined, '编辑笔记', isDark, () {
+              _buildOptionItem(Icons.edit_outlined, l10n.editNote, isDark, () {
                 Get.back();
-                Get.snackbar('提示', '编辑功能开发中',
+                Get.snackbar(l10n.hint, l10n.featureInDev,
                     snackPosition: SnackPosition.BOTTOM);
               }),
-              _buildOptionItem(Icons.share_outlined, '分享笔记', isDark, () {
+              _buildOptionItem(Icons.share_outlined, l10n.shareNote, isDark, () {
                 Get.back();
-                Get.snackbar('提示', '分享功能开发中',
+                Get.snackbar(l10n.hint, l10n.featureInDev,
                     snackPosition: SnackPosition.BOTTOM);
               }),
-              _buildOptionItem(Icons.delete_outline, '删除笔记', isDark, () {
+              _buildOptionItem(Icons.delete_outline, l10n.deleteNote, isDark, () {
                 Get.back();
-                Get.snackbar('提示', '删除功能开发中',
+                Get.snackbar(l10n.hint, l10n.featureInDev,
                     snackPosition: SnackPosition.BOTTOM);
               }, isDestructive: true),
               const SizedBox(height: 8),

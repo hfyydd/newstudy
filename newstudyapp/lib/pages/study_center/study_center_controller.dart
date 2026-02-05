@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:newstudyapp/pages/study_center/study_center_state.dart';
 import 'package:newstudyapp/services/http_service.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
@@ -12,6 +13,17 @@ import 'package:newstudyapp/models/note_models.dart';
 class StudyCenterController extends GetxController {
   final StudyCenterState state = StudyCenterState();
   final HttpService _httpService = HttpService();
+  
+  /// 获取 AppLocalizations 实例
+  AppLocalizations? get _l10n {
+    try {
+      final context = Get.context;
+      if (context != null) {
+        return AppLocalizations.of(context);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   @override
   void onInit() {
@@ -37,8 +49,8 @@ class StudyCenterController extends GetxController {
       state.totalCardsCount.value = statistics.totalCardsCount;
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '加载统计数据失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.loadStatsFailed(e.toString()) ?? 'Failed to load stats: $e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
@@ -102,7 +114,7 @@ class StudyCenterController extends GetxController {
             skip: 0,
             limit: initialLimit,
           );
-          pageTitle = '今日需要复习';
+          pageTitle = _l10n?.todayReviewTitle ?? 'Today\'s Review';
           break;
         case StudyCenterPageType.weakCards:
           response = await _httpService.getWeakCards(
@@ -112,13 +124,13 @@ class StudyCenterController extends GetxController {
           );
           // 根据状态筛选设置标题
           if (statusFilter == 'NEEDS_REVIEW') {
-            pageTitle = '需巩固闪词';
+            pageTitle = _l10n?.needsConsolidationCards ?? 'Needs Consolidation';
           } else if (statusFilter == 'NEEDS_IMPROVE') {
-            pageTitle = '需改进闪词';
+            pageTitle = _l10n?.needsImprovementCards ?? 'Needs Improvement';
           } else if (statusFilter == 'NOT_MASTERED') {
-            pageTitle = '未掌握闪词';
+            pageTitle = _l10n?.notMasteredCards ?? 'Not Mastered';
           } else {
-            pageTitle = '薄弱闪词';
+            pageTitle = _l10n?.weakFlashCards ?? 'Weak Flash Cards';
           }
           break;
         case StudyCenterPageType.masteredCards:
@@ -126,14 +138,14 @@ class StudyCenterController extends GetxController {
             skip: 0,
             limit: initialLimit,
           );
-          pageTitle = '已掌握闪词';
+          pageTitle = _l10n?.masteredFlashCards ?? 'Mastered Flash Cards';
           break;
         case StudyCenterPageType.allCards:
           response = await _httpService.getAllCards(
             skip: 0,
             limit: initialLimit,
           );
-          pageTitle = '全部闪词';
+          pageTitle = _l10n?.allFlashCards ?? 'All Flash Cards';
           break;
         default:
           // 其他类型不支持直接跳转
@@ -155,8 +167,8 @@ class StudyCenterController extends GetxController {
 
       if (flashCards.isEmpty) {
         Get.snackbar(
-          '提示',
-          '暂无闪词可学习',
+          _l10n?.hint ?? 'Hint',
+          _l10n?.noFlashCardsToLearn ?? 'No flash cards to learn',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
@@ -185,8 +197,8 @@ class StudyCenterController extends GetxController {
       );
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '加载闪词失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.loadFlashCardsFailed(e.toString()) ?? 'Failed to load flash cards: $e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
@@ -233,8 +245,8 @@ class StudyCenterController extends GetxController {
       }
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '加载数据失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.loadDataFailed(e.toString()) ?? 'Failed to load data: $e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
@@ -382,14 +394,15 @@ class StudyCenterController extends GetxController {
           'autoStartLearning': true, // 标记需要自动开始学习
           'flashCards': flashCards, // 传递闪词卡片数据
           'defaultRole': defaultRole, // 传递默认角色
+          'topic': noteTitle, // 传递笔记标题作为费曼学习页面的标题
         },
         transition: Transition.noTransition, // 无动画跳转
       );
     } catch (e) {
       // 如果获取失败，降级到笔记详情页
       Get.snackbar(
-        '提示',
-        '加载笔记数据失败，已跳转到笔记详情页',
+        _l10n?.hint ?? 'Hint',
+        _l10n?.loadNoteDataFailed ?? 'Failed to load note data, redirected to detail page',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class NotesPage extends StatelessWidget {
   const NotesPage({super.key});
@@ -8,6 +9,7 @@ class NotesPage extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[700] : Colors.grey[400];
+    final l10n = AppLocalizations.of(context)!;
     
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -19,7 +21,7 @@ class NotesPage extends StatelessWidget {
             children: [
               const SizedBox(height: 20),
               Text(
-                '我的成就',
+                l10n.myAchievements,
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
@@ -37,7 +39,7 @@ class NotesPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '功能开发中',
+                      l10n.featureInDev,
                       style: TextStyle(
                         fontSize: 16,
                         color: secondaryColor,

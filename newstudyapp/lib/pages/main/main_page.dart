@@ -3,8 +3,9 @@ import 'package:get/get.dart';
 import 'package:newstudyapp/pages/main/main_controller.dart';
 import 'package:newstudyapp/pages/home/home_page.dart';
 import 'package:newstudyapp/pages/review/review_page.dart';
-import 'package:newstudyapp/pages/notes/notes_page.dart';
+// import 'package:newstudyapp/pages/notes/notes_page.dart'; // 成就tab已隐藏，暂时不需要
 import 'package:newstudyapp/pages/profile/profile_page.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class MainPage extends StatelessWidget {
   const MainPage({super.key});
@@ -27,9 +28,7 @@ class MainPage extends StatelessWidget {
       case 1:
         return const ReviewPage();
       case 2:
-        return const NotesPage();
-      case 3:
-        return const ProfilePage();
+        return const ProfilePage(); // 成就tab已隐藏，"我的"从index 3变为index 2
       default:
         return const HomePage();
     }
@@ -59,39 +58,45 @@ class MainPage extends StatelessWidget {
                   ),
                 ],
               ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildModernNavItem(
-                controller: controller,
-                index: 0,
-                icon: Icons.explore_outlined,
-                activeIcon: Icons.explore,
-                label: '发现',
-              ),
-              _buildModernNavItem(
-                controller: controller,
-                index: 1,
-                icon: Icons.auto_stories_outlined,
-                activeIcon: Icons.auto_stories,
-                label: '学习',
-                badge: 8,
-              ),
-              _buildModernNavItem(
-                controller: controller,
-                index: 2,
-                icon: Icons.emoji_events_outlined,
-                activeIcon: Icons.emoji_events,
-                label: '成就',
-              ),
-              _buildModernNavItem(
-                controller: controller,
-                index: 3,
-                icon: Icons.person_outline_rounded,
-                activeIcon: Icons.person_rounded,
-                label: '我的',
-              ),
-            ],
+          child: Builder(
+            builder: (context) {
+              final l10n = AppLocalizations.of(context)!;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildModernNavItem(
+                    controller: controller,
+                    index: 0,
+                    icon: Icons.explore_outlined,
+                    activeIcon: Icons.explore,
+                    label: l10n.navHome,
+                  ),
+                  _buildModernNavItem(
+                    controller: controller,
+                    index: 1,
+                    icon: Icons.auto_stories_outlined,
+                    activeIcon: Icons.auto_stories,
+                    label: l10n.navStudy,
+                    badge: 8,
+                  ),
+                  // 成就tab已隐藏，待后续开发
+                  // _buildModernNavItem(
+                  //   controller: controller,
+                  //   index: 2,
+                  //   icon: Icons.emoji_events_outlined,
+                  //   activeIcon: Icons.emoji_events,
+                  //   label: l10n.navAchievements,
+                  // ),
+                  _buildModernNavItem(
+                    controller: controller,
+                    index: 2, // 从index 3改为index 2
+                    icon: Icons.person_outline_rounded,
+                    activeIcon: Icons.person_rounded,
+                    label: l10n.navProfile,
+                  ),
+                ],
+              );
+            },
               ),
             ),
           ),

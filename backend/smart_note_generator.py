@@ -2,6 +2,7 @@
 智能笔记生成器
 
 调用 LLM 根据用户输入内容生成结构化的笔记（Markdown格式）和闪词列表。
+支持多语言：根据 language 参数自动切换提示词语言。
 """
 
 from __future__ import annotations
@@ -15,45 +16,16 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 try:
     from .llm import get_default_llm
+    from .localized_prompts import get_smart_note_prompt, normalize_language_code
 except ImportError:  # pragma: no cover
     from llm import get_default_llm
+    from localized_prompts import get_smart_note_prompt, normalize_language_code
 
 logger = logging.getLogger(__name__)
 
 
-SMART_NOTE_SYSTEM_PROMPT = """你是一位专业的学习助理，擅长将用户的学习内容整理成结构化的笔记。
-
-## 你的任务
-根据用户输入的内容，生成：
-1. 一份结构化的 Markdown 格式笔记（清晰、易读、便于学习）
-2. 一份从内容中提取的核心词语/概念列表（闪词列表，用于后续的卡片式学习）
-
-## 笔记生成要求
-1. 使用 Markdown 格式，包含标题、列表、表格等元素
-2. 结构清晰，分点阐述
-3. 如果内容涉及定义、概念，要给出清晰的解释
-4. 如果内容涉及分类或对比，使用表格呈现
-5. 保持专业性和准确性
-6. 内容要比用户输入更丰富、更有条理
-
-## 闪词列表要求
-1. 提取 10-30 个核心词语或概念
-2. 优先选择专业术语、重要概念、关键词
-3. 词语应尽量保持原文用词
-4. 去重、按重要性排序
-5. 每个词语 2-12 个字
-
-## 输出格式（严格遵守）
-只输出纯 JSON，不要任何额外文字：
-```json
-{
-  "note_content": "# 标题\\n\\n笔记的 Markdown 内容...",
-  "terms": ["词语1", "词语2", "词语3", ...]
-}
-```
-
-注意：note_content 中的换行用 \\n 表示。
-"""
+# 默认中文提示词（向后兼容）
+SMART_NOTE_SYSTEM_PROMPT = get_smart_note_prompt("zh")
 
 
 _JSON_BLOCK_RE = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
@@ -118,13 +90,14 @@ def _generate_fallback_note(user_input: str) -> tuple[str, List[str]]:
     return note_content, terms
 
 
-def generate_smart_note(user_input: str, max_terms: int = 30) -> tuple[str, List[str]]:
+def generate_smart_note(user_input: str, max_terms: int = 30, language: str = "zh") -> tuple[str, List[str]]:
     """
     根据用户输入生成智能笔记和闪词列表
     
     Args:
         user_input: 用户输入的学习内容
         max_terms: 最多返回的词语数量
+        language: 语言代码 (zh, en, es)
         
     Returns:
         tuple[str, List[str]]: (Markdown格式的笔记内容, 闪词列表)
@@ -134,7 +107,20 @@ def generate_smart_note(user_input: str, max_terms: int = 30) -> tuple[str, List
         logger.warning("用户输入为空，返回空结果")
         return "", []
     
-    logger.info(f"📖 开始调用 LLM 生成智能笔记...")
+    # 标准化语言代码并获取对应的提示词
+    lang = normalize_language_code(language)
+    system_prompt = get_smart_note_prompt(lang)
+    
+    logger.info(f"📖 开始调用 LLM 生成智能笔记 (语言: {lang})...")
+    
+    # 根据语言选择提示词模板
+    user_prompts = {
+        "auto": f"请根据以下内容生成结构化笔记和闪词列表。注意：请自动检测下面内容的语言，并使用相同的语言生成笔记和闪词。\n\n用户输入：\n{text}\n\n闪词列表最多返回 {max_terms} 个词语。",
+        "zh": f"请根据以下内容生成结构化笔记和闪词列表。\n\n用户输入：\n{text}\n\n闪词列表最多返回 {max_terms} 个词语。",
+        "en": f"Please generate structured notes and a flash card term list based on the following content.\n\nUser input:\n{text}\n\nReturn at most {max_terms} terms.",
+        "es": f"Por favor genera notas estructuradas y una lista de términos flash basándote en el siguiente contenido.\n\nEntrada del usuario:\n{text}\n\nDevuelve máximo {max_terms} términos."
+    }
+    user_prompt = user_prompts.get(lang, user_prompts["auto"])
     
     # 1) 尝试使用 LLM 生成
     try:
@@ -142,14 +128,8 @@ def generate_smart_note(user_input: str, max_terms: int = 30) -> tuple[str, List
         logger.info("✅ LLM 实例获取成功")
         
         messages = [
-            SystemMessage(content=SMART_NOTE_SYSTEM_PROMPT),
-            HumanMessage(
-                content=(
-                    f"请根据以下内容生成结构化笔记和闪词列表。\n\n"
-                    f"用户输入：\n{text}\n\n"
-                    f"闪词列表最多返回 {max_terms} 个词语。"
-                )
-            ),
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
         ]
         
         logger.info("🤖 正在调用 LLM API...")
@@ -192,13 +172,14 @@ def generate_smart_note(user_input: str, max_terms: int = 30) -> tuple[str, List
     return _generate_fallback_note(text)
 
 
-def generate_smart_note_from_image(image_base64: str, max_terms: int = 30) -> tuple[str, List[str]]:
+def generate_smart_note_from_image(image_base64: str, max_terms: int = 30, language: str = "zh") -> tuple[str, List[str]]:
     """
     根据图片生成智能笔记和闪词列表（使用多模态 LLM）
     
     Args:
         image_base64: 图片的 Base64 编码字符串（不包含 data:image/... 前缀）
         max_terms: 最多返回的词语数量
+        language: 语言代码 (zh, en, es)
         
     Returns:
         tuple[str, List[str]]: (Markdown格式的笔记内容, 闪词列表)
@@ -207,7 +188,20 @@ def generate_smart_note_from_image(image_base64: str, max_terms: int = 30) -> tu
         logger.warning("图片数据为空，返回空结果")
         return "", []
     
-    logger.info(f"📖 开始调用多模态 LLM 从图片生成智能笔记...")
+    # 标准化语言代码并获取对应的提示词
+    lang = normalize_language_code(language)
+    system_prompt = get_smart_note_prompt(lang)
+    
+    logger.info(f"📖 开始调用多模态 LLM 从图片生成智能笔记 (语言: {lang})...")
+    
+    # 根据语言选择提示词模板
+    image_prompts = {
+        "auto": f"请分析这张图片中的内容，生成结构化笔记和闪词列表。\n\n注意：请自动检测图片内容的语言，并使用相同的语言生成笔记和闪词。\n\n如果图片中包含文字，请提取并整理；如果包含图表、表格等，请描述其内容。\n\n闪词列表最多返回 {max_terms} 个词语。",
+        "zh": f"请分析这张图片中的内容，生成结构化笔记和闪词列表。\n\n如果图片中包含文字，请提取并整理；如果包含图表、表格等，请描述其内容。\n\n闪词列表最多返回 {max_terms} 个词语。",
+        "en": f"Please analyze the content in this image and generate structured notes and a flash card term list.\n\nIf the image contains text, please extract and organize it; if it contains charts, tables, etc., please describe their content.\n\nReturn at most {max_terms} terms.",
+        "es": f"Por favor analiza el contenido de esta imagen y genera notas estructuradas y una lista de términos flash.\n\nSi la imagen contiene texto, extráelo y organízalo; si contiene gráficos, tablas, etc., describe su contenido.\n\nDevuelve máximo {max_terms} términos."
+    }
+    image_prompt = image_prompts.get(lang, image_prompts["auto"])
     
     # 1) 尝试使用 LLM 生成
     try:
@@ -220,16 +214,12 @@ def generate_smart_note_from_image(image_base64: str, max_terms: int = 30) -> tu
         
         # 使用多模态消息格式
         messages = [
-            SystemMessage(content=SMART_NOTE_SYSTEM_PROMPT),
+            SystemMessage(content=system_prompt),
             HumanMessage(
                 content=[
                     {
                         "type": "text",
-                        "text": (
-                            f"请分析这张图片中的内容，生成结构化笔记和闪词列表。\n\n"
-                            f"如果图片中包含文字，请提取并整理；如果包含图表、表格等，请描述其内容。\n\n"
-                            f"闪词列表最多返回 {max_terms} 个词语。"
-                        )
+                        "text": image_prompt
                     },
                     {
                         "type": "image_url",

@@ -4,18 +4,21 @@
 """
 import json
 import re
-from typing import Tuple
+from typing import Tuple, Dict, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 try:
     from .llm import get_default_llm
+    from .localized_prompts import normalize_language_code
 except ImportError:
     from llm import get_default_llm
+    from localized_prompts import normalize_language_code
 
 
-# 评估系统提示词
-EVALUATOR_SYSTEM_PROMPT = """你是一位专业的学习评估专家，负责评估用户对某个概念/词条的解释。
+# 多语言评估系统提示词
+EVALUATOR_SYSTEM_PROMPTS = {
+    "zh": """你是一位专业的学习评估专家，负责评估用户对某个概念/词条的解释。
 
 ## 你的任务
 用户会尝试用自己的话解释一个概念，你需要：
@@ -55,13 +58,111 @@ EVALUATOR_SYSTEM_PROMPT = """你是一位专业的学习评估专家，负责评
 2. 先肯定做得好的地方
 3. 温和地指出可以改进的地方
 4. 给出具体的学习建议
+
+重要：请使用中文回复。
+""",
+
+    "en": """You are a professional learning assessment expert responsible for evaluating users' explanations of concepts/terms.
+
+## Your Task
+Users will try to explain a concept in their own words. You need to:
+1. Evaluate the accuracy and completeness of the explanation
+2. Give a score from 0-100
+3. Provide friendly, encouraging feedback
+4. Determine learning status based on the score
+
+## Scoring Criteria
+- 90-100 points (mastered): Accurate, complete explanation that clearly conveys the core concept in simple terms
+- 70-89 points (needs_review): Basically correct understanding, but some details are inaccurate or missing
+- 50-69 points (needs_improve): Some understanding, but with obvious errors or missing important content
+- 0-49 points (not_mastered): Serious misunderstanding or no basic understanding
+
+## Role Adaptation
+Users will choose a role to explain to. Adjust your scoring standards accordingly:
+- For "5-year-old child": Using the simplest, most vivid language, storytelling-like explanations can get high scores
+- For "Elementary student": Using simple, easy-to-understand language with life examples can get high scores
+- For "Middle school student": Using basic concepts to explain, can appropriately use professional vocabulary
+- For "College student": Needs professional but easy-to-understand explanations, can involve related concepts
+- For "Graduate student": Needs precise professional terminology and theoretical frameworks, higher requirements for accuracy and depth
+
+## Output Format
+Must strictly follow this JSON format, do not include other content:
+```json
+{
+  "score": 85,
+  "status": "needs_review",
+  "feedback": "Your explanation...",
+  "highlights": ["Good point 1", "Good point 2"],
+  "suggestions": ["Improvement suggestion 1"]
+}
+```
+
+## Feedback Principles
+1. Always be encouraging and constructive
+2. First affirm what was done well
+3. Gently point out areas for improvement
+4. Give specific learning suggestions
+
+Important: Please respond in English.
+""",
+
+    "es": """Eres un experto profesional en evaluación de aprendizaje responsable de evaluar las explicaciones de los usuarios sobre conceptos/términos.
+
+## Tu Tarea
+Los usuarios intentarán explicar un concepto con sus propias palabras. Necesitas:
+1. Evaluar la precisión y completitud de la explicación
+2. Dar una puntuación de 0-100
+3. Proporcionar retroalimentación amigable y alentadora
+4. Determinar el estado de aprendizaje basándote en la puntuación
+
+## Criterios de Puntuación
+- 90-100 puntos (mastered/dominado): Explicación precisa y completa que transmite claramente el concepto central en términos simples
+- 70-89 puntos (needs_review/necesita repaso): Comprensión básicamente correcta, pero algunos detalles son inexactos o faltan
+- 50-69 puntos (needs_improve/necesita mejorar): Algo de comprensión, pero con errores obvios o faltando contenido importante
+- 0-49 puntos (not_mastered/no dominado): Malentendido grave o sin comprensión básica
+
+## Adaptación de Roles
+Los usuarios elegirán un rol para explicar. Ajusta tus estándares de puntuación en consecuencia:
+- Para "niño de 5 años": Usar el lenguaje más simple y vívido, las explicaciones tipo cuento pueden obtener puntuaciones altas
+- Para "estudiante de primaria": Usar lenguaje simple y fácil de entender con ejemplos de la vida puede obtener puntuaciones altas
+- Para "estudiante de secundaria": Usar conceptos básicos para explicar, puede usar apropiadamente vocabulario profesional
+- Para "estudiante universitario": Necesita explicaciones profesionales pero fáciles de entender, puede involucrar conceptos relacionados
+- Para "estudiante de posgrado": Necesita terminología profesional precisa y marcos teóricos, mayores requisitos de precisión y profundidad
+
+## Formato de Salida
+Debe seguir estrictamente este formato JSON, no incluir otro contenido:
+```json
+{
+  "score": 85,
+  "status": "needs_review",
+  "feedback": "Tu explicación...",
+  "highlights": ["Buen punto 1", "Buen punto 2"],
+  "suggestions": ["Sugerencia de mejora 1"]
+}
+```
+
+## Principios de Retroalimentación
+1. Siempre ser alentador y constructivo
+2. Primero afirmar lo que se hizo bien
+3. Señalar gentilmente las áreas de mejora
+4. Dar sugerencias de aprendizaje específicas
+
+Importante: Por favor responde en español.
 """
+}
+
+
+def _get_evaluator_prompt(language: str = "zh") -> str:
+    """获取评估系统提示词（根据语言）"""
+    lang_code = normalize_language_code(language)
+    return EVALUATOR_SYSTEM_PROMPTS.get(lang_code, EVALUATOR_SYSTEM_PROMPTS["en"])
 
 
 def evaluate_explanation(
     term: str,
     user_explanation: str,
     selected_role: str,
+    language: str = "zh",
 ) -> Tuple[int, str, str]:
     """
     评估用户对词条的解释
@@ -70,6 +171,7 @@ def evaluate_explanation(
         term: 词条/概念名称
         user_explanation: 用户的解释内容
         selected_role: 选择的角色（如"5岁孩子"、"同事"等）
+        language: AI反馈语言 (zh/en/es)，默认中文
     
     Returns:
         Tuple[score, status, ai_feedback]:
@@ -78,6 +180,9 @@ def evaluate_explanation(
         - ai_feedback: AI反馈内容（JSON格式）
     """
     llm = get_default_llm()
+    
+    # 获取对应语言的系统提示词
+    system_prompt = _get_evaluator_prompt(language)
     
     # 构建用户消息
     user_message = f"""
@@ -95,7 +200,7 @@ def evaluate_explanation(
     
     # 调用 LLM
     messages = [
-        SystemMessage(content=EVALUATOR_SYSTEM_PROMPT.strip()),
+        SystemMessage(content=system_prompt.strip()),
         HumanMessage(content=user_message.strip()),
     ]
     
@@ -181,19 +286,46 @@ def _score_to_status(score: int) -> str:
         return 'not_mastered'
 
 
-# 角色列表
-LEARNING_ROLES = [
-    {"id": "child_5", "name": "5岁孩子", "description": "用最简单的话解释，像讲故事一样"},
-    {"id": "elementary", "name": "小学生", "description": "用简单易懂的语言，结合生活例子"},
-    {"id": "middle_school", "name": "中学生", "description": "用基础概念解释，可以适当使用专业词汇"},
-    {"id": "college", "name": "大学生", "description": "用专业但易懂的方式解释，可以涉及相关概念"},
-    {"id": "master", "name": "研究生", "description": "用精确的专业术语和理论框架解释"},
-]
+# 多语言角色列表
+LEARNING_ROLES: Dict[str, List[Dict[str, str]]] = {
+    "zh": [
+        {"id": "child_5", "name": "5岁孩子", "description": "用最简单的话解释，像讲故事一样"},
+        {"id": "elementary", "name": "小学生", "description": "用简单易懂的语言，结合生活例子"},
+        {"id": "middle_school", "name": "中学生", "description": "用基础概念解释，可以适当使用专业词汇"},
+        {"id": "college", "name": "大学生", "description": "用专业但易懂的方式解释，可以涉及相关概念"},
+        {"id": "master", "name": "研究生", "description": "用精确的专业术语和理论框架解释"},
+    ],
+    "en": [
+        {"id": "child_5", "name": "5-Year-Old Child", "description": "Use the simplest words, like telling a story"},
+        {"id": "elementary", "name": "Elementary Student", "description": "Use simple language with daily examples"},
+        {"id": "middle_school", "name": "Middle School Student", "description": "Use basic concepts, can use some technical terms"},
+        {"id": "college", "name": "College Student", "description": "Use professional but understandable explanations"},
+        {"id": "master", "name": "Graduate Student", "description": "Use precise terminology and theoretical frameworks"},
+    ],
+    "es": [
+        {"id": "child_5", "name": "Niño de 5 Años", "description": "Usa las palabras más simples, como contar un cuento"},
+        {"id": "elementary", "name": "Estudiante Primaria", "description": "Usa lenguaje simple con ejemplos cotidianos"},
+        {"id": "middle_school", "name": "Estudiante Secundaria", "description": "Usa conceptos básicos, puede usar términos técnicos"},
+        {"id": "college", "name": "Universitario", "description": "Usa explicaciones profesionales pero comprensibles"},
+        {"id": "master", "name": "Posgrado", "description": "Usa terminología precisa y marcos teóricos"},
+    ],
+}
 
 
-def get_available_roles():
-    """获取可用的角色列表"""
-    return LEARNING_ROLES
+def get_available_roles(language: str = "zh") -> List[Dict[str, str]]:
+    """
+    获取可用的角色列表
+    
+    Args:
+        language: 语言代码 ('zh', 'en', 'es')，默认为 'zh'
+    
+    Returns:
+        对应语言的角色列表
+    """
+    # 如果语言不支持，默认返回中文
+    if language not in LEARNING_ROLES:
+        language = "zh"
+    return LEARNING_ROLES[language]
 
 
 __all__ = ["evaluate_explanation", "get_available_roles", "LEARNING_ROLES"]

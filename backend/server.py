@@ -3,7 +3,7 @@ import sys
 from typing import List
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, HTTPException, Query, Request, Depends
+from fastapi import FastAPI, HTTPException, Query, Request, Depends, Form
 from fastapi import File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -110,6 +110,7 @@ class CreateNoteRequest(BaseModel):
     """创建笔记请求"""
     user_input: str = Field(..., min_length=1, description="用户输入的学习内容")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+    language: str = Field(default="zh", description="语言代码 (zh, en, es)")
 
 
 class CreateNoteFromUrlRequest(BaseModel):
@@ -117,12 +118,14 @@ class CreateNoteFromUrlRequest(BaseModel):
     url: str = Field(..., min_length=1, description="网页URL")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
     max_text_length: int = Field(default=50000, ge=1000, le=100000, description="最大文本长度")
+    language: str = Field(default="zh", description="语言代码 (zh, en, es)")
 
 
 class CreateNoteFromImageRequest(BaseModel):
     """从图片创建笔记请求"""
     image_base64: str = Field(..., min_length=1, description="图片的 Base64 编码（不包含 data:image/... 前缀）")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
+    language: str = Field(default="zh", description="语言代码 (zh, en, es)")
 
 
 class CreateNoteFromYoutubeRequest(BaseModel):
@@ -130,6 +133,7 @@ class CreateNoteFromYoutubeRequest(BaseModel):
     youtube_url: str = Field(..., min_length=1, description="YouTube视频URL")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
     max_text_length: int = Field(default=50000, ge=1000, le=100000, description="最大文本长度")
+    language: str = Field(default="zh", description="语言代码 (zh, en, es)")
 
 
 class CreateNoteFromBilibiliRequest(BaseModel):
@@ -137,6 +141,7 @@ class CreateNoteFromBilibiliRequest(BaseModel):
     bilibili_url: str = Field(..., min_length=1, description="Bilibili视频URL")
     max_terms: int = Field(default=30, ge=5, le=60, description="最多返回词语数量")
     max_text_length: int = Field(default=50000, ge=1000, le=100000, description="最大文本长度")
+    language: str = Field(default="zh", description="语言代码 (zh, en, es)")
 
 
 class CreateNoteResponse(BaseModel):
@@ -408,7 +413,8 @@ def create_note(
         # 生成智能笔记和闪词
         note_content, terms = generate_smart_note(
             payload.user_input,
-            max_terms=payload.max_terms
+            max_terms=payload.max_terms,
+            language=payload.language
         )
         
         # 从Markdown内容中提取标题（取第一行，移除#号）
@@ -513,7 +519,8 @@ def create_note_from_image(
         # 3. 使用多模态 LLM 生成智能笔记和闪词
         note_content, terms = generate_smart_note_from_image(
             payload.image_base64,
-            max_terms=payload.max_terms
+            max_terms=payload.max_terms,
+            language=payload.language
         )
         
         if not note_content:
@@ -523,7 +530,7 @@ def create_note_from_image(
             )
         
         # 4. 从Markdown内容中提取标题
-        title = "图片笔记"
+        title = "图片笔记" if payload.language == "zh" else "Image Notes"
         for line in note_content.split('\n'):
             line = line.strip()
             if line:
@@ -627,7 +634,8 @@ def create_note_from_youtube(
         # 5. 使用 LLM 生成智能笔记和闪词
         note_content, terms = generate_smart_note(
             transcript_text,
-            max_terms=payload.max_terms
+            max_terms=payload.max_terms,
+            language=payload.language
         )
         
         if not note_content:
@@ -637,7 +645,7 @@ def create_note_from_youtube(
             )
         
         # 6. 从Markdown内容中提取标题
-        title = "YouTube视频笔记"
+        title = "YouTube视频笔记" if payload.language == "zh" else "YouTube Video Notes"
         for line in note_content.split('\n'):
             line = line.strip()
             if line:
@@ -742,7 +750,8 @@ def create_note_from_bilibili(
         # 5. 使用 LLM 生成智能笔记和闪词
         note_content, terms = generate_smart_note(
             transcript_text,
-            max_terms=payload.max_terms
+            max_terms=payload.max_terms,
+            language=payload.language
         )
         
         if not note_content:
@@ -752,7 +761,7 @@ def create_note_from_bilibili(
             )
         
         # 6. 从Markdown内容中提取标题
-        title = "Bilibili视频笔记"
+        title = "Bilibili视频笔记" if payload.language == "zh" else "Bilibili Video Notes"
         for line in note_content.split('\n'):
             line = line.strip()
             if line:
@@ -817,9 +826,10 @@ def create_note_from_bilibili(
 @app.post("/notes/create-from-pdf", response_model=CreateNoteResponse)
 def create_note_from_pdf(
     pdf_file: UploadFile = File(...),
-    max_terms: int = Query(default=30, ge=5, le=60),
-    max_pages: int = Query(default=50, ge=1, le=200),
-    max_chars: int = Query(default=50000, ge=1000, le=100000),
+    max_terms: int = Form(default=30, ge=5, le=60),
+    max_pages: int = Form(default=50, ge=1, le=200),
+    max_chars: int = Form(default=50000, ge=1000, le=100000),
+    language: str = Form(default="auto", description="语言代码 (auto, zh, en, es)，auto 表示自动检测"),
     cur = Depends(get_db_cursor)
 ) -> CreateNoteResponse:
     """
@@ -834,7 +844,7 @@ def create_note_from_pdf(
     - 默认最多 50000 字符
     - 可以通过参数调整限制
     """
-    logger.info(f"📄 开始从PDF创建笔记: {pdf_file.filename}")
+    logger.info(f"📄 开始从PDF创建笔记: {pdf_file.filename}, 语言设置: {language}")
     
     try:
         # 1. 读取PDF文件
@@ -874,7 +884,8 @@ def create_note_from_pdf(
         # 6. 使用 LLM 生成智能笔记和闪词
         note_content, terms = generate_smart_note(
             text,
-            max_terms=max_terms
+            max_terms=max_terms,
+            language=language
         )
         
         if not note_content:
@@ -884,7 +895,7 @@ def create_note_from_pdf(
             )
         
         # 7. 从Markdown内容中提取标题
-        title = pdf_file.filename or "PDF笔记"
+        title = pdf_file.filename or ("PDF笔记" if language == "zh" else "PDF Notes")
         if title.endswith('.pdf'):
             title = title[:-4]  # 移除 .pdf 扩展名
         
@@ -990,11 +1001,12 @@ def create_note_from_url(
         # 3. 生成智能笔记和闪词
         note_content, terms = generate_smart_note(
             text,
-            max_terms=payload.max_terms
+            max_terms=payload.max_terms,
+            language=payload.language
         )
         
         # 4. 从Markdown内容中提取标题
-        title = "网页笔记"
+        title = "网页笔记" if payload.language == "zh" else "Web Notes"
         for line in note_content.split('\n'):
             line = line.strip()
             if line:
@@ -1151,6 +1163,7 @@ class EvaluateRequest(BaseModel):
     note_id: int = Field(..., description="笔记ID")
     selected_role: str = Field(..., min_length=1, description="选择的角色ID")
     user_explanation: str = Field(..., min_length=1, description="用户的解释")
+    language: str = Field(default="zh", description="AI反馈语言 (zh/en/es)")
 
 
 class EvaluateResponse(BaseModel):
@@ -1328,11 +1341,23 @@ def get_note_detail(
 # ========== 学习相关 API ==========
 
 @app.get("/learning/roles", response_model=RolesResponse)
-def get_learning_roles() -> RolesResponse:
+def get_learning_roles(
+    language: str = Query(default="zh", description="语言代码 (zh/en/es)，默认为 zh")
+) -> RolesResponse:
     """
     获取可用的学习角色列表
+    
+    Args:
+        language: 语言代码，支持 'zh' (中文)、'en' (英语)、'es' (西班牙语)
+    
+    Returns:
+        对应语言的角色列表
     """
-    roles = get_available_roles()
+    # 规范化语言代码
+    if language not in ["zh", "en", "es"]:
+        language = "zh"
+    
+    roles = get_available_roles(language=language)
     return RolesResponse(
         roles=[LearningRole(**role) for role in roles]
     )
@@ -1372,19 +1397,20 @@ def evaluate_user_explanation(
         term = card['term']
         current_review_count = card['review_count'] or 0
         
-        # 2. 获取角色名称（用于AI评估）
-        roles = get_available_roles()
+        # 2. 获取角色名称（用于AI评估，使用与AI反馈相同的语言）
+        roles = get_available_roles(language=payload.language)
         role_name = payload.selected_role
         for role in roles:
             if role['id'] == payload.selected_role:
                 role_name = role['name']
                 break
         
-        # 3. 调用 AI 评估
+        # 3. 调用 AI 评估（使用用户指定的反馈语言）
         score, status, ai_feedback = evaluate_explanation(
             term=term,
             user_explanation=payload.user_explanation,
             selected_role=role_name,
+            language=payload.language,  # AI 反馈语言由 App 语言决定
         )
         
         logger.info(f"✅ AI评估完成: 分数={score}, 状态={status}")

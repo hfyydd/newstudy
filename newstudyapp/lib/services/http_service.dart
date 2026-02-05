@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:dio/dio.dart' show MultipartFile, FormData;
+import 'package:get/get.dart' hide MultipartFile, FormData;
 import 'package:newstudyapp/config/api_config.dart';
+import 'package:newstudyapp/config/language_controller.dart';
 import 'package:newstudyapp/models/agent_models.dart';
 import 'package:newstudyapp/models/note_models.dart';
 import 'package:newstudyapp/services/toast_service.dart';
@@ -109,6 +111,20 @@ class HttpService {
 
   /// 获取 Dio 实例（用于特殊场景）
   Dio get dio => _dio;
+
+  /// 获取当前 App UI 语言代码（用于需要指定语言的 API 请求，如 AI 反馈等）
+  String get _currentAppLanguage {
+    try {
+      if (Get.isRegistered<LanguageController>()) {
+        return Get.find<LanguageController>().getLanguageCodeForApi();
+      }
+    } catch (_) {}
+    return 'zh'; // 默认中文
+  }
+  
+  /// 笔记内容语言标识（'auto' 表示让 AI 根据输入内容自动检测语言）
+  /// 这确保了笔记和闪词的语言与用户输入内容一致，而非 App 设置的语言
+  static const String _contentLanguageAuto = 'auto';
 
   // ==================== Agent 相关接口 ====================
 
@@ -228,9 +244,11 @@ class HttpService {
   }
 
   /// 创建笔记（生成并保存到数据库）
+  /// language 默认为 'auto'，表示根据输入内容自动检测语言
   Future<CreateNoteResponse> createNote({
     required String userInput,
     int maxTerms = 30,
+    String? language,
   }) async {
     try {
       final response = await _dio.post(
@@ -238,6 +256,7 @@ class HttpService {
         data: {
           'user_input': userInput,
           'max_terms': maxTerms,
+          'language': language ?? _contentLanguageAuto,
         },
         options: Options(
           // 创建笔记可能需要较长时间（AI生成+数据库保存）
@@ -252,10 +271,12 @@ class HttpService {
   }
 
   /// 从URL创建笔记（抓取网页并生成笔记）
+  /// language 默认为 'auto'，表示根据网页内容自动检测语言
   Future<CreateNoteResponse> createNoteFromUrl({
     required String url,
     int maxTerms = 30,
     int maxTextLength = 50000,
+    String? language,
   }) async {
     try {
       final response = await _dio.post(
@@ -264,6 +285,7 @@ class HttpService {
           'url': url,
           'max_terms': maxTerms,
           'max_text_length': maxTextLength,
+          'language': language ?? _contentLanguageAuto,
         },
         options: Options(
           // 网页抓取+AI生成可能需要较长时间
@@ -278,9 +300,11 @@ class HttpService {
   }
 
   /// 从图片创建笔记
+  /// language 默认为 'auto'，表示根据图片内容自动检测语言
   Future<CreateNoteResponse> createNoteFromImage({
     required String imageBase64,
     int maxTerms = 30,
+    String? language,
   }) async {
     try {
       final response = await _dio.post(
@@ -288,6 +312,7 @@ class HttpService {
         data: {
           'image_base64': imageBase64,
           'max_terms': maxTerms,
+          'language': language ?? _contentLanguageAuto,
         },
         options: Options(
           // 图片识别+AI生成可能需要较长时间
@@ -302,10 +327,12 @@ class HttpService {
   }
 
   /// 从YouTube视频创建笔记
+  /// language 默认为 'auto'，表示根据视频字幕自动检测语言
   Future<CreateNoteResponse> createNoteFromYoutube({
     required String youtubeUrl,
     int maxTerms = 30,
     int maxTextLength = 50000,
+    String? language,
   }) async {
     try {
       final response = await _dio.post(
@@ -314,6 +341,7 @@ class HttpService {
           'youtube_url': youtubeUrl,
           'max_terms': maxTerms,
           'max_text_length': maxTextLength,
+          'language': language ?? _contentLanguageAuto,
         },
         options: Options(
           // YouTube字幕获取+AI生成可能需要较长时间
@@ -328,10 +356,12 @@ class HttpService {
   }
 
   /// 从Bilibili视频创建笔记
+  /// language 默认为 'auto'，表示根据视频字幕自动检测语言
   Future<CreateNoteResponse> createNoteFromBilibili({
     required String bilibiliUrl,
     int maxTerms = 30,
     int maxTextLength = 50000,
+    String? language,
   }) async {
     try {
       final response = await _dio.post(
@@ -340,6 +370,7 @@ class HttpService {
           'bilibili_url': bilibiliUrl,
           'max_terms': maxTerms,
           'max_text_length': maxTextLength,
+          'language': language ?? _contentLanguageAuto,
         },
         options: Options(
           // Bilibili字幕获取+AI生成可能需要较长时间
@@ -354,11 +385,13 @@ class HttpService {
   }
 
   /// 从PDF文件创建笔记
+  /// language 默认为 'auto'，表示根据 PDF 内容自动检测语言
   Future<CreateNoteResponse> createNoteFromPdf({
     required String pdfFilePath,
     int maxTerms = 30,
     int maxPages = 50,
     int maxChars = 50000,
+    String? language,
   }) async {
     try {
       final fileName = pdfFilePath.split('/').last;
@@ -372,6 +405,7 @@ class HttpService {
         'max_terms': maxTerms,
         'max_pages': maxPages,
         'max_chars': maxChars,
+        'language': language ?? _contentLanguageAuto,
       });
       
       final response = await _dio.post(
@@ -437,9 +471,16 @@ class HttpService {
   // ==================== 学习相关接口 ====================
 
   /// 获取学习角色列表
-  Future<RolesResponse> getLearningRoles() async {
+  /// [language] 语言代码 (zh/en/es)，如果不提供则使用当前 App 语言
+  Future<RolesResponse> getLearningRoles({String? language}) async {
     try {
-      final response = await _dio.get(ApiConfig.learningRoles);
+      final lang = language ?? _currentAppLanguage;
+      final response = await _dio.get(
+        ApiConfig.learningRoles,
+        queryParameters: {
+          'language': lang,
+        },
+      );
       return RolesResponse.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
@@ -447,11 +488,13 @@ class HttpService {
   }
 
   /// 评估用户解释
+  /// language 参数用于指定 AI 反馈的语言，默认使用 App 的 UI 语言
   Future<EvaluateResponse> evaluateExplanation({
     required int cardId,
     required int noteId,
     required String selectedRole,
     required String userExplanation,
+    String? language,
   }) async {
     try {
       final response = await _dio.post(
@@ -461,6 +504,7 @@ class HttpService {
           'note_id': noteId,
           'selected_role': selectedRole,
           'user_explanation': userExplanation,
+          'language': language ?? _currentAppLanguage, // AI 反馈语言由 App 语言决定
         },
         options: Options(
           // AI 评估可能需要较长时间

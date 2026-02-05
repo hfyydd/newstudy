@@ -1,0 +1,608 @@
+{
+  "@@locale": "en",
+  
+  "appTitle": "FlashStudy",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+
+  "goodMorning": "Good morning",
+  "goodAfternoon": "Good afternoon",
+  "goodEvening": "Good evening",
+  "readyToStudy": "Ready to study?",
+
+  "navHome": "Home",
+  "navStudy": "Study",
+  "navAchievements": "Achievements",
+  "navProfile": "Profile",
+
+  "todayReview": "Today's Review",
+  "todayReviewTitle": "Today's Review",
+  "flashCards": "flash cards",
+  "flashCardsUnit": "flash cards",
+  "needReview": "need review",
+  "needsConsolidation": "Needs Consolidation",
+  "needsImprovement": "Needs Improvement",
+  "notMastered": "Not Mastered",
+  "mastered": "Mastered",
+  "allFlashCards": "All Flash Cards",
+
+  "myNotes": "My Notes",
+  "totalNotes": "{count} notes total",
+  "@totalNotes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noNotesYet": "No notes yet",
+  "createFirstNote": "Create your first note to start learning",
+  "viewMore": "View More",
+
+  "learningStats": "Learning Statistics",
+  "consecutiveLearning": "Streak",
+  "consecutiveDays": "{count} days",
+  "@consecutiveDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "keepLearningHabit": "Keep up the habit",
+  "last7DaysActive": "7-Day Activity",
+  "recentWeekLearningDays": "Learning days this week",
+  "last7DaysTrend": "7-Day Learning Trend",
+  "studyTimes": "Study sessions",
+
+  "createNote": "Create Note",
+  "enterContentHint": "Enter what you want to learn...\n\nIt can be any knowledge, concept or information, AI will generate notes and flash cards for you.",
+  "selectCreationMethod": "Select creation method",
+  "pdf": "PDF",
+  "audio": "Audio",
+  "image": "Image",
+  "website": "Website",
+  "youtube": "YouTube",
+  "bilibili": "Bilibili",
+  "customText": "Custom Text",
+
+  "selectImage": "Select Image",
+  "takePhoto": "Take Photo",
+  "chooseFromAlbum": "Choose from Album",
+  "cancel": "Cancel",
+
+  "enterUrl": "Enter URL",
+  "pasteOrEnterUrl": "Paste or enter webpage URL",
+  "enterYoutubeUrl": "Enter YouTube URL",
+  "pasteYoutubeLink": "Paste YouTube video link",
+  "enterBilibiliUrl": "Enter Bilibili URL",
+  "pasteBilibiliLink": "Paste Bilibili video link",
+  "startCreating": "Create Note",
+
+  "studyCenter": "Study Center",
+  "flashCardCategory": "Flash Card Category",
+  "noteCategory": "Note Category",
+  "switchToNote": "Switch to Notes",
+  "switchToFlashCard": "Switch to Flash Cards",
+  "noNotes": "No notes",
+  "createNoteToSeeFlashCards": "Flash cards will appear here after you create notes",
+  "noFlashCards": "No flash cards",
+  "countFlashCards": "{count} flash cards",
+  "@countFlashCards": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "flashCardsCount": "{count} flash cards",
+  "@flashCardsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notesCount": "{count} notes",
+  "@notesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "spacedReviewRules": "Spaced Review Rules:",
+  "notMasteredRule": "Not Mastered",
+  "notMasteredScore": "0-49 points",
+  "notMasteredInterval": "After 4 hours",
+  "notMasteredReason": "Fastest forgetting, needs quick reinforcement",
+  "needsImproveRule": "Needs Improvement",
+  "needsImproveScore": "50-69 points",
+  "needsImproveInterval": "After 3 days",
+  "needsImproveReason": "Some understanding, allow time to absorb",
+  "needsConsolidationRule": "Needs Consolidation",
+  "needsConsolidationScore": "70-89 points",
+  "needsConsolidationInterval": "After 1 day",
+  "needsConsolidationReason": "Basically mastered, reinforce before forgetting",
+  "masteredRule": "Mastered",
+  "masteredScore": "90-100 points",
+  "masteredInterval": "After 7 days",
+  "masteredReason": "Long-term memory formed, extended interval review",
+  "todayReviewExplanation": "Based on the Ebbinghaus Forgetting Curve, the system intelligently calculates today's flash cards to review based on their status and last study time.",
+  "reviewTip": "💡 The counts below show total flash cards in each status, not today's review count.",
+  "gotIt": "Got it",
+
+  "weakFlashCards": "Weak Flash Cards",
+  "weakFlashCardsDesc": "Cards needing improvement or not mastered",
+  "needsConsolidationCards": "Needs Consolidation",
+  "needsConsolidationCardsDesc": "Cards needing consolidation (70-89 points)",
+  "needsImprovementCards": "Needs Improvement",
+  "needsImprovementCardsDesc": "Cards needing improvement (60-69 points)",
+  "notMasteredCards": "Not Mastered",
+  "notMasteredCardsDesc": "Cards not mastered (0-59 points)",
+  "masteredCards": "Mastered Cards",
+  "masteredFlashCards": "Mastered Flash Cards",
+  "byNoteCategory": "By Note",
+  "back": "Back",
+  "hint": "Hint",
+  "notStudied": "Not Studied",
+  "clickFlashCard": "Click flash card: {term}",
+  "@clickFlashCard": {
+    "placeholders": {
+      "term": {
+        "type": "String"
+      }
+    }
+  },
+  "clickNote": "Click note: {title}",
+  "@clickNote": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "bestScore": "Best: {score}",
+  "@bestScore": {
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "studyCount": "Studied {count} times",
+  "@studyCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "feynmanLearning": "Feynman Learning",
+  "explainInYourWords": "Explain this concept in your own words",
+  "yourExplanation": "Your explanation...",
+  "submitExplanation": "Submit",
+  "score": "Score",
+  "feedback": "Feedback",
+  "nextCard": "Next Card",
+  "noMoreCards": "No more cards to review!",
+  "allReviewed": "Great job! You've reviewed all cards.",
+  "backToHome": "Back to Home",
+  "progress": "Progress: {current}/{total}",
+  "@progress": {
+    "placeholders": {
+      "current": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "tapToStartLearning": "Tap to start learning",
+  "selectRole": "Select Role",
+  "selectRoleHint": "Choose a role and explain in a way they can understand",
+  "explainFlashCard": "Explain Flash Card",
+  "explainTo": "Explain to \"{role}\"",
+  "@explainTo": {
+    "placeholders": {
+      "role": {"type": "String"}
+    }
+  },
+  "enterExplanationHint": "Enter your explanation...\n\nFor example: {description}",
+  "@enterExplanationHint": {
+    "placeholders": {
+      "description": {"type": "String"}
+    }
+  },
+  "pleaseEnterExplanation": "Please enter your explanation",
+  "submitExplanationBtn": "Submit Explanation",
+  "aiEvaluating": "AI is evaluating your explanation...",
+  "mayTakeSeconds": "This may take a few seconds",
+  "learningRecord": "Learning Record",
+  "evaluationResult": "Evaluation Result",
+  "aiFeedback": "AI Feedback",
+  "wellDone": "Well Done",
+  "canImprove": "Can Improve",
+  "relearn": "Relearn",
+  "loadFailed": "Load Failed",
+  "unknownError": "Unknown error",
+  "goBack": "Go Back",
+  "selectLearningTopic": "Please select a learning topic first",
+  "startLearningFailed": "Failed to start learning: {error}",
+  "@startLearningFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "operationFailed": "Operation failed: {error}",
+  "@operationFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "recognizing": "Recognizing: {text}",
+  "@recognizing": {
+    "placeholders": {
+      "text": {"type": "String"}
+    }
+  },
+  "listening": "Listening...",
+  "recognized": "Recognized: {text}",
+  "@recognized": {
+    "placeholders": {
+      "text": {"type": "String"}
+    }
+  },
+  "points": "points",
+  "thisIsYourPreviousRecord": "This is your previous learning record",
+  "learningRole": "Learning role: {role}",
+  "@learningRole": {
+    "placeholders": {
+      "role": {"type": "String"}
+    }
+  },
+
+  "noteDetail": "Note Detail",
+  "flashCardsSection": "Flash Cards",
+  "noFlashCardsGenerated": "No flash cards generated for this note yet",
+  "startLearning": "Start Learning",
+  "deleteNote": "Delete Note",
+  "confirmDeleteNote": "Are you sure you want to delete this note?",
+  "deleteNoteWarning": "This action cannot be undone. All flash cards associated with this note will also be deleted.",
+  "delete": "Delete",
+  "aiGeneratingNote": "AI is generating note...",
+  "analyzingContent": "Analyzing content and extracting core concepts",
+  "createdAt": "Created on {date}",
+  "@createdAt": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "updatedAt": "Updated on {date}",
+  "@updatedAt": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "noContent": "No content",
+  "aiAnalyzingNote": "AI is analyzing note content...",
+  "extractingConcepts": "Extracting core concepts and keywords",
+  "noFlashCardsYet": "This note has no flash cards yet",
+  "aiWillExtract": "AI will extract core concepts from the note to help you memorize better",
+  "generateFlashCards": "Generate Flash Cards",
+  "flashCardProgress": "Flash Card Progress",
+  "learned": "learned",
+  "masteredOf": "{mastered}/{total} mastered",
+  "@masteredOf": {
+    "placeholders": {
+      "mastered": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "regenerate": "Regenerate",
+  "editNote": "Edit Note",
+  "shareNote": "Share Note",
+  "featureInDev": "Feature under development",
+
+  "profile": "Profile",
+  "settings": "Settings",
+  "language": "Language",
+  "themeMode": "Theme Mode",
+  "darkMode": "Dark Mode",
+  "lightMode": "Light Mode",
+  "notifications": "Notifications",
+  "manageNotifications": "Manage push notifications",
+  "about": "About",
+  "version": "Version {version}",
+  "@version": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "logout": "Log Out",
+  "studying": "Studying...",
+
+  "loading": "Loading...",
+  "error": "Error",
+  "retry": "Retry",
+  "success": "Success",
+  "failed": "Failed",
+  "networkError": "Network error, please check your connection",
+  "serverError": "Server error, please try again later",
+  "unknownError": "Unknown error occurred",
+  "requestTimeout": "Request timeout, please check your network",
+  "creatingNote": "Creating note...",
+  "noteCreated": "Note created successfully",
+  "noteCreateFailed": "Failed to create note",
+  "featureInDevelopment": "{feature} is under development",
+  "@featureInDevelopment": {
+    "placeholders": {
+      "feature": {
+        "type": "String"
+      }
+    }
+  },
+  "invalidUrl": "Please enter a valid URL",
+  "fileTooLarge": "File is too large, please select a file smaller than {size}MB",
+  "@fileTooLarge": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionDenied": "Permission denied",
+  "cameraPermissionRequired": "Camera permission is required to take photos",
+  "photoLibraryPermissionRequired": "Photo library permission is required to select images",
+
+  "notStarted": "Not Started",
+  "percentLearned": "{percent}% learned",
+  "@percentLearned": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "speechRecognitionError": "Speech recognition error",
+  "speechNotAvailable": "Speech recognition not available, please check device permissions",
+  "permissionErrorTitle": "Permission Error",
+  "micPermissionRequired": "Microphone permission is required for voice input",
+  "startSpeechFailed": "Failed to start speech recognition: {error}",
+  "@startSpeechFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "fetchTermsFailed": "Failed to fetch terms: {error}",
+  "@fetchTermsFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "parseVocabFailed": "Failed to parse vocabulary from response, please retry",
+  "fetchVocabFailed": "Failed to fetch vocabulary: {error}",
+  "@fetchVocabFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "noMoreVocab": "No more new vocabulary to add",
+  "addVocabFailed": "Failed to add vocabulary: {error}",
+  "@addVocabFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "getExplanationFailed": "Failed to get explanation: {error}",
+  "@getExplanationFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "thankYouForExplanation": "Thank you for your explanation!",
+  "flashCardDataNotLoaded": "Flash card data not loaded, please try again later",
+  "flashCardInfoInvalid": "Flash card info invalid",
+  "cardInfoNotFound": "Card info not found",
+  "findCardFailed": "Failed to find card info",
+  "cardIdMissing": "Card ID missing",
+  "missingRequiredInfo": "Missing required info",
+  "cardIdNotExist": "Card ID does not exist",
+  "evaluateFailed": "Evaluation failed: {error}",
+  "@evaluateFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "markedAsMastered": "Marked as mastered",
+  "markFailed": "Mark failed: {error}",
+  "@markFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "defaultNoteTopic": "My Notes",
+  "smartNote": "Smart Note",
+  "loadStatsFailed": "Failed to load stats: {error}",
+  "@loadStatsFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "loadDataFailed": "Failed to load data: {error}",
+  "@loadDataFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "loadFlashCardsFailed": "Failed to load flash cards: {error}",
+  "@loadFlashCardsFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "noFlashCardsToLearn": "No flash cards to learn",
+  "loadNoteDataFailed": "Failed to load note data, redirected to detail page",
+  "generationFailed": "Generation Failed",
+  "generateSmartNoteFailed": "Failed to generate smart note: {error}",
+  "@generateSmartNoteFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "loadNoteFailed": "Failed to load note: {error}",
+  "@loadNoteFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "generatedFlashCardsCount": "Generated {count} flash cards",
+  "@generatedFlashCardsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "generateFlashCardsFailed": "Failed to generate flash cards: {error}",
+  "@generateFlashCardsFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "noFlashCardsInStatus": "No flash cards in this status",
+  "regenerateFlashCardsTitle": "⚠️ Regenerate Flash Cards",
+  "regenerateFlashCardsInfo": "This will:",
+  "regenerateKeepRecords": "✓ Keep all existing learning records",
+  "regenerateAddNew": "✓ Add newly extracted flash cards",
+  "regenerateDeduplicate": "✓ Auto-deduplicate and merge",
+  "confirmRegenerate": "Confirm Regeneration",
+  "learningRecordInDev": "Learning record feature is under development",
+  "yesterday": "Yesterday",
+  "minutesAgo": "{count} minutes ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "hoursAgo": "{count} hours ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "daysAgo": "{count} days ago",
+  "@daysAgo": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "reselect": "Reselect",
+  "processingInstructions": "Processing Instructions",
+  "processing": "Processing...",
+  "pleaseSelectPdfFirst": "Please select PDF first",
+  "unableToGetFilePath": "Unable to get file path",
+  "pleaseEnterContent": "Please enter content or record audio",
+  "needMicPermission": "Microphone permission required for recording",
+
+  "createNoteFromImage": "Create Note from Image",
+  "imageSelected": "Image Selected",
+  "takePhotoLabel": "Camera",
+  "albumLabel": "Album",
+  "pleaseSelectImage": "Please select an image",
+  "takePhotoFailed": "Failed to take photo: {error}",
+  "@takePhotoFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "selectImageFailed": "Failed to select image: {error}",
+  "@selectImageFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "createNoteFromUrl": "Create Note from Website",
+  "webAddress": "Web Address",
+  "pleaseEnterUrl": "Please enter web address",
+  "pleaseEnterValidUrl": "Please enter a valid web address",
+
+  "myNotesTitle": "My Notes",
+  "myAchievements": "My Achievements",
+
+  "analyzeContent": "AI is analyzing content...",
+  "recognizeImage": "Recognizing image content...",
+  "fetchWebContent": "Fetching web page content...",
+  "fetchVideoSubtitle": "Fetching video subtitles...",
+  "extractPdfContent": "Extracting PDF content...",
+  "extractNoteTerms": "Extracting core concepts...",
+
+  "roleChild5": "5-Year-Old Child",
+  "roleChild5Desc": "Use the simplest words, like telling a story",
+  "roleElementary": "Elementary Student",
+  "roleElementaryDesc": "Use simple language with daily examples",
+  "roleMiddleSchool": "Middle School Student",
+  "roleMiddleSchoolDesc": "Use basic concepts, can use some technical terms",
+  "roleCollege": "College Student",
+  "roleCollegeDesc": "Use professional but understandable explanations",
+  "roleMaster": "Graduate Student",
+  "roleMasterDesc": "Use precise terminology and theoretical frameworks",
+
+  "categoryEconomics": "Economics",
+  "categoryFinance": "Finance",
+  "categoryTechnology": "Technology",
+  "categoryMedicine": "Medicine",
+  "categoryLaw": "Law",
+  "categoryPsychology": "Psychology",
+  "categoryPhilosophy": "Philosophy",
+  "categoryHistory": "History",
+
+  "selectLearningTopicTitle": "Select Learning Topic",
+  "customTopicLabel": "Custom Topic",
+  "popularTopics": "Popular Topics",
+  "pleaseSelectOrEnterTopic": "Please select a topic or enter custom topic",
+  "loadTopicFailed": "Failed to load topic: {error}",
+  "@loadTopicFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "feynmanLearningSteps": "Feynman Learning Steps",
+  "feynmanStep1": "Choose Concept",
+  "feynmanStep1Desc": "Select a concept you want to learn or understand",
+  "feynmanStep2": "Teach It",
+  "feynmanStep2Desc": "Explain the concept to others in simple language",
+  "feynmanStep3": "Find Gaps",
+  "feynmanStep3Desc": "Identify areas you don't understand or can't explain clearly",
+  "feynmanStep4": "Review and Simplify",
+  "feynmanStep4Desc": "Go back to study materials, then re-explain in simpler terms",
+  "detailedExplanation": "Detailed Explanation",
+  "collectFeature": "Collect",
+
+  "createNoteTitle": "Create Note",
+  "selectFile": "Select File",
+  "uploadAndParse": "Upload and Parse",
+  "noteContent": "Note Content",
+  "parseAndExtract": "Parse and Extract Terms",
+  "editTermList": "Edit Term List",
+  "addTerm": "Add",
+  "deleteTerm": "Delete",
+  "noTermsInList": "No terms in list yet",
+  "pleaseAddTermsFirst": "Please add terms first",
+  "termsExtracted": "Extracted {count} terms",
+  "@termsExtracted": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "parseContentFailed": "Failed to parse content: {error}",
+  "@parseContentFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "askAIInDev": "Ask AI feature is under development"
+}

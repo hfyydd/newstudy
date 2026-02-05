@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'create_note_from_url_controller.dart';
 
@@ -58,7 +59,7 @@ class CreateNoteFromUrlPage extends GetView<CreateNoteFromUrlController> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      '从网站创建笔记',
+                      AppLocalizations.of(context)!.createNoteFromUrl,
                       style: TextStyle(
                         color: textColor,
                         fontSize: 17,
@@ -118,7 +119,7 @@ class CreateNoteFromUrlPage extends GetView<CreateNoteFromUrlController> {
 
                   // URL输入框
                   Text(
-                    '网页地址',
+                    AppLocalizations.of(context)!.webAddress,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -210,7 +211,7 @@ class CreateNoteFromUrlPage extends GetView<CreateNoteFromUrlController> {
                           ),
                         ),
                         child: Text(
-                          isLoading ? '处理中...' : '创建笔记',
+                          isLoading ? AppLocalizations.of(context)!.processing : AppLocalizations.of(context)!.createNote,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,

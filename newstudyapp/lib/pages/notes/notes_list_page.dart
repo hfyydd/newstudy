@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
@@ -32,7 +33,7 @@ class NotesListPage extends StatelessWidget {
           onPressed: () => Get.back(),
         ),
         title: Text(
-          '我的笔记',
+          AppLocalizations.of(context)!.myNotesTitle,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -53,7 +54,7 @@ class NotesListPage extends StatelessWidget {
           }
 
           if (notes.isEmpty) {
-            return _buildEmptyNotes(isDark, textColor, secondaryColor, borderColor);
+            return _buildEmptyNotes(context, isDark, textColor, secondaryColor, borderColor);
           }
 
           return RefreshIndicator(
@@ -69,6 +70,7 @@ class NotesListPage extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildNoteCard(
+                    context: context,
                     isDark: isDark,
                     note: note,
                     cardColor: cardColor,
@@ -86,6 +88,7 @@ class NotesListPage extends StatelessWidget {
   }
 
   Widget _buildNoteCard({
+    required BuildContext context,
     required bool isDark,
     required note,
     required Color cardColor,
@@ -93,6 +96,7 @@ class NotesListPage extends StatelessWidget {
     required Color textColor,
     required Color secondaryColor,
   }) {
+    final l10n = AppLocalizations.of(context)!;
     final percentage = note.flashCardCount > 0
         ? (note.masteredCount / note.flashCardCount * 100).toInt()
         : 0;
@@ -137,7 +141,7 @@ class NotesListPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${note.notMasteredCount} 未掌握',
+                      '${note.notMasteredCount} ${l10n.notMastered}',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -153,7 +157,7 @@ class NotesListPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${note.needsImproveCount} 需改进',
+                      '${note.needsImproveCount} ${l10n.needsImprovement}',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -169,7 +173,7 @@ class NotesListPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${note.needsReviewCount} 需巩固',
+                      '${note.needsReviewCount} ${l10n.needsConsolidation}',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -207,7 +211,7 @@ class NotesListPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '已掌握',
+                        l10n.mastered,
                         style: TextStyle(
                           fontSize: 12,
                           color: secondaryColor,
@@ -259,11 +263,13 @@ class NotesListPage extends StatelessWidget {
   }
 
   Widget _buildEmptyNotes(
+    BuildContext context,
     bool isDark,
     Color textColor,
     Color secondaryColor,
     Color borderColor,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(40),
       margin: const EdgeInsets.all(24),
@@ -282,7 +288,7 @@ class NotesListPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '还没有笔记',
+            l10n.noNotesYet,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -291,7 +297,7 @@ class NotesListPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '创建你的第一条笔记开始学习吧',
+            l10n.createFirstNote,
             style: TextStyle(
               fontSize: 14,
               color: secondaryColor,

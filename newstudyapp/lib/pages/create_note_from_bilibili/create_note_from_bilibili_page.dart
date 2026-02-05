@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'create_note_from_bilibili_controller.dart';
 
 /// 从Bilibili创建笔记页面
@@ -257,7 +258,7 @@ class CreateNoteFromBilibiliPage extends GetView<CreateNoteFromBilibiliControlle
                               const SizedBox(width: 8),
                             ],
                             Text(
-                              isLoading ? '处理中...' : '创建笔记',
+                              isLoading ? AppLocalizations.of(context)!.processing : AppLocalizations.of(context)!.createNote,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,

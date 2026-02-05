@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +12,17 @@ import 'create_note_state.dart';
 /// 创建笔记控制器
 class CreateNoteController extends GetxController {
   final CreateNoteState state = CreateNoteState();
+  
+  /// 获取 AppLocalizations 实例
+  AppLocalizations? get _l10n {
+    try {
+      final context = Get.context;
+      if (context != null) {
+        return AppLocalizations.of(context);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   /// 内容输入控制器
   final TextEditingController contentController = TextEditingController();
@@ -90,8 +102,8 @@ class CreateNoteController extends GetxController {
       final status = await Permission.microphone.request();
       if (!status.isGranted) {
         Get.snackbar(
-          '权限错误',
-          '需要麦克风权限才能录音',
+          _l10n?.permissionErrorTitle ?? 'Permission Error',
+          _l10n?.needMicPermission ?? 'Microphone permission required',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: const Color(0xFFFF6B6B),
           colorText: Colors.white,
@@ -125,8 +137,8 @@ class CreateNoteController extends GetxController {
       });
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '录音启动失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.operationFailed(e.toString()) ?? 'Operation failed: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -147,8 +159,8 @@ class CreateNoteController extends GetxController {
 
       if (state.audioPath.value.isNotEmpty) {
         Get.snackbar(
-          '成功',
-          '录音已保存（${state.recordDuration.value}秒）',
+          _l10n?.success ?? 'Success',
+          '${state.recordDuration.value}s',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: const Color(0xFF4ECDC4),
           colorText: Colors.white,
@@ -159,8 +171,8 @@ class CreateNoteController extends GetxController {
       }
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '录音停止失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.operationFailed(e.toString()) ?? 'Operation failed: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -181,8 +193,8 @@ class CreateNoteController extends GetxController {
   Future<void> saveNote() async {
     if (!state.isFormValid) {
       Get.snackbar(
-        '提示',
-        '请输入内容或录制音频',
+        _l10n?.hint ?? 'Hint',
+        _l10n?.pleaseEnterContent ?? 'Please enter content or record audio',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,

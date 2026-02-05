@@ -9,12 +9,38 @@ import 'package:newstudyapp/models/note_models.dart';
 import 'package:newstudyapp/pages/note_detail/note_detail_controller.dart';
 import 'package:newstudyapp/pages/home/home_controller.dart';
 import 'package:newstudyapp/config/app_theme.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class FeynmanLearningController extends GetxController {
   // 使用 HttpService 单例
   final httpService = HttpService();
   late final FeynmanLearningState state;
-  
+
+  /// 获取本地化字符串的辅助方法
+  String _getLocalizedString(String Function(AppLocalizations) getter) {
+    try {
+      final context = Get.context;
+      if (context != null) {
+        final l10n = AppLocalizations.of(context);
+        if (l10n != null) {
+          return getter(l10n);
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  /// 获取 AppLocalizations 实例（可能为空）
+  AppLocalizations? get _l10n {
+    try {
+      final context = Get.context;
+      if (context != null) {
+        return AppLocalizations.of(context);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // 语音转文字
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isSpeechAvailable = false;
@@ -23,54 +49,58 @@ class FeynmanLearningController extends GetxController {
   void onInit() {
     super.onInit();
     state = FeynmanLearningState();
-    
+
     // 监听输入文本变化
     state.textInputController.addListener(() {
       state.inputText.value = state.textInputController.text;
     });
-    
+
     // 初始化语音识别
     _initializeSpeech();
-    
+
     // 从路由参数获取主题信息
     final arguments = Get.arguments as Map<String, dynamic>?;
     if (arguments != null) {
       // 保存笔记ID和默认角色
       state.currentNoteId.value = arguments['noteId'] as int?;
       state.noteDefaultRole.value = arguments['defaultRole'] as String?;
-      
+
       // 1) 如果携带闪词卡片列表（带ID），使用完整的卡片信息
       final flashCardsRaw = arguments['flashCards'];
       if (flashCardsRaw is List) {
         final cards = flashCardsRaw.whereType<Map<String, dynamic>>().toList();
         if (cards.isNotEmpty) {
-          state.topicName.value = arguments['topic'] as String? ?? '我的笔记';
+          state.topicName.value = arguments['topic'] as String? ??
+              _getLocalizedString((l10n) => l10n.defaultNoteTopic);
           state.topicId.value = null;
           state.activeCategory.value = 'note';
           state.isCustomDeck.value = true;
-          
+
           // 保存分页信息（用于后续加载更多）
           state.pageType.value = arguments['pageType'] as String?;
           state.statusFilter.value = arguments['statusFilter'] as String?;
-          state.currentSkip.value = arguments['currentSkip'] as int? ?? cards.length;
+          state.currentSkip.value =
+              arguments['currentSkip'] as int? ?? cards.length;
           state.totalCount.value = arguments['total'] as int? ?? cards.length;
-          
+
           // 从卡片信息中提取闪词列表（过滤掉无效数据）
           state.terms.value = cards
-              .where((c) => c['term'] != null && c['term'].toString().isNotEmpty)
+              .where(
+                  (c) => c['term'] != null && c['term'].toString().isNotEmpty)
               .map((c) => c['term'].toString())
               .toList();
           // 保存完整的卡片信息供后续使用（过滤掉无效数据）
-          _flashCardsData = cards
-              .where((c) => c['term'] != null && c['id'] != null)
-              .toList();
-          
+          _flashCardsData =
+              cards.where((c) => c['term'] != null && c['id'] != null).toList();
+
           // 打印每张卡片的状态，用于调试
           for (final card in _flashCardsData) {
-            debugPrint('[FeynmanLearningController] 卡片: ${card['term']}, 状态: ${card['status']}, 复习次数: ${card['review_count']}');
+            debugPrint(
+                '[FeynmanLearningController] 卡片: ${card['term']}, 状态: ${card['status']}, 复习次数: ${card['review_count']}');
           }
-          
-          debugPrint('[FeynmanLearningController] 加载了 ${_flashCardsData.length} 张卡片，总数: ${state.totalCount.value}');
+
+          debugPrint(
+              '[FeynmanLearningController] 加载了 ${_flashCardsData.length} 张卡片，总数: ${state.totalCount.value}');
           state.isLoading.value = false;
           state.errorMessage.value = null;
           // 加载角色列表
@@ -78,7 +108,7 @@ class FeynmanLearningController extends GetxController {
           return;
         }
       }
-      
+
       // 2) 如果携带自定义词表，直接使用，不再走后端 /topics/terms
       final termsRaw = arguments['terms'];
       if (termsRaw is List) {
@@ -88,7 +118,8 @@ class FeynmanLearningController extends GetxController {
             .where((e) => e.isNotEmpty)
             .toList(growable: false);
         if (terms.isNotEmpty) {
-          state.topicName.value = arguments['topic'] as String? ?? '我的笔记';
+          state.topicName.value = arguments['topic'] as String? ??
+              _getLocalizedString((l10n) => l10n.defaultNoteTopic);
           state.topicId.value = null;
           state.activeCategory.value = 'note';
           state.isCustomDeck.value = true;
@@ -101,9 +132,10 @@ class FeynmanLearningController extends GetxController {
 
       state.topicName.value = arguments['topic'] as String?;
       state.topicId.value = arguments['topicId'] as String?;
-      
+
       // 使用 topicId 作为 category 加载词汇
-      final category = state.topicId.value ?? FeynmanLearningState.defaultCategory;
+      final category =
+          state.topicId.value ?? FeynmanLearningState.defaultCategory;
       state.activeCategory.value = category;
       loadTerms(category: category);
     } else {
@@ -111,7 +143,7 @@ class FeynmanLearningController extends GetxController {
       loadTerms();
     }
   }
-  
+
   /// 闪词卡片完整数据（包含ID）
   List<Map<String, dynamic>> _flashCardsData = [];
 
@@ -125,14 +157,14 @@ class FeynmanLearningController extends GetxController {
     } catch (e) {
       debugPrint('[FeynmanLearningController] 停止语音识别失败: $e');
     }
-    
+
     // 页面关闭时不刷新数据，因为评估完成后已经刷新过了
     // 如果在这里刷新，evaluationResult 可能已经被清空
-    
+
     state.dispose();
     super.onClose();
   }
-  
+
   /// 初始化语音识别
   Future<void> _initializeSpeech() async {
     try {
@@ -147,7 +179,7 @@ class FeynmanLearningController extends GetxController {
           debugPrint('Speech recognition error: $error');
           state.isListening.value = false;
           Get.snackbar(
-            '语音识别错误',
+            _l10n?.speechRecognitionError ?? 'Speech Recognition Error',
             error.errorMsg,
             snackPosition: SnackPosition.BOTTOM,
             duration: const Duration(seconds: 2),
@@ -160,7 +192,7 @@ class FeynmanLearningController extends GetxController {
       _isSpeechAvailable = false;
     }
   }
-  
+
   /// 切换语音输入
   Future<void> toggleSpeechInput() async {
     if (state.isListening.value) {
@@ -169,25 +201,25 @@ class FeynmanLearningController extends GetxController {
       await _startListening();
     }
   }
-  
+
   /// 开始语音识别
   Future<void> _startListening() async {
     if (!_isSpeechAvailable) {
       Get.snackbar(
-        '提示',
-        '语音识别不可用，请检查设备权限',
+        _l10n?.hint ?? 'Hint',
+        _l10n?.speechNotAvailable ?? 'Speech recognition not available',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
       return;
     }
-    
+
     // 请求麦克风权限
     final status = await Permission.microphone.request();
     if (!status.isGranted) {
       Get.snackbar(
-        '权限错误',
-        '需要麦克风权限才能使用语音输入',
+        _l10n?.permissionErrorTitle ?? 'Permission Error',
+        _l10n?.micPermissionRequired ?? 'Microphone permission is required',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -197,11 +229,11 @@ class FeynmanLearningController extends GetxController {
       );
       return;
     }
-    
+
     try {
       state.isListening.value = true;
       state.speechText.value = '';
-      
+
       await _speech.listen(
         onResult: (result) {
           if (result.finalResult) {
@@ -234,14 +266,15 @@ class FeynmanLearningController extends GetxController {
       debugPrint('Failed to start listening: $e');
       state.isListening.value = false;
       Get.snackbar(
-        '错误',
-        '启动语音识别失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.startSpeechFailed(e.toString()) ??
+            'Failed to start speech recognition: $e',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
     }
   }
-  
+
   /// 停止语音识别
   Future<void> _stopListening() async {
     try {
@@ -278,7 +311,8 @@ class FeynmanLearningController extends GetxController {
       state.activeCategory.value = response.category;
       state.isLoading.value = false;
     } catch (error) {
-      state.errorMessage.value = '获取术语失败：$error';
+      state.errorMessage.value = _l10n?.fetchTermsFailed(error.toString()) ??
+          'Failed to fetch terms: $error';
       state.isLoading.value = false;
     }
   }
@@ -303,9 +337,9 @@ class FeynmanLearningController extends GetxController {
     final totalCards = state.terms.value?.length ?? 0;
     if (index >= 0 && index < totalCards) {
       state.currentCardIndex.value = index;
-      
+
       // 如果滑动到接近末尾（剩余3张卡片），且还有更多数据，自动加载更多
-      if (index >= totalCards - 3 && 
+      if (index >= totalCards - 3 &&
           state.currentSkip.value < state.totalCount.value &&
           !state.isLoadingMore.value &&
           state.pageType.value != null) {
@@ -313,24 +347,24 @@ class FeynmanLearningController extends GetxController {
       }
     }
   }
-  
+
   /// 加载更多闪词（分页加载）
   Future<void> _loadMoreCards() async {
-    if (state.isLoadingMore.value || 
+    if (state.isLoadingMore.value ||
         state.currentSkip.value >= state.totalCount.value ||
         state.pageType.value == null) {
       return;
     }
-    
+
     try {
       state.isLoadingMore.value = true;
       final pageType = state.pageType.value!;
       final statusFilter = state.statusFilter.value;
       final skip = state.currentSkip.value;
       const limit = 30; // 每次加载30条
-      
+
       FlashCardListResponse response;
-      
+
       // 根据页面类型加载数据
       switch (pageType) {
         case 'todayReview':
@@ -361,12 +395,12 @@ class FeynmanLearningController extends GetxController {
         default:
           return;
       }
-      
+
       if (response.cards.isEmpty) {
         // 没有更多数据了
         return;
       }
-      
+
       // 转换为费曼学习页面需要的格式
       final newFlashCards = response.cards
           .map((card) => {
@@ -378,27 +412,28 @@ class FeynmanLearningController extends GetxController {
                 'mastered_at': null,
               })
           .toList();
-      
+
       // 添加到现有数据中
       final newTerms = newFlashCards
           .where((c) => c['term'] != null && c['term'].toString().isNotEmpty)
           .map((c) => c['term'].toString())
           .toList();
-      
+
       // 更新闪词列表和卡片数据
       if (state.terms.value != null) {
         state.terms.value!.addAll(newTerms);
         state.terms.refresh();
       }
-      
+
       _flashCardsData.addAll(newFlashCards
           .where((c) => c['term'] != null && c['id'] != null)
           .toList());
-      
+
       // 更新分页信息
       state.currentSkip.value = skip + response.cards.length;
-      
-      debugPrint('[FeynmanLearningController] 加载了更多 ${newFlashCards.length} 张卡片，当前总数: ${state.terms.value?.length ?? 0}');
+
+      debugPrint(
+          '[FeynmanLearningController] 加载了更多 ${newFlashCards.length} 张卡片，当前总数: ${state.terms.value?.length ?? 0}');
     } catch (e) {
       debugPrint('[FeynmanLearningController] 加载更多失败: $e');
       // 不显示错误提示，避免打扰用户学习
@@ -412,7 +447,7 @@ class FeynmanLearningController extends GetxController {
     state.currentExplainingTerm.value = term;
     state.learningPhase.value = LearningPhase.explaining;
     state.explanationHistory.add(term);
-    
+
     // 切换到解释视图状态
     state.isExplanationViewVisible.value = true;
     state.inputMode.value = InputMode.voice;
@@ -425,11 +460,11 @@ class FeynmanLearningController extends GetxController {
     state.currentExplainingTerm.value = null;
     state.confusedWords.clear();
     state.explanationHistory.clear();
-    
+
     // 先更新状态
     state.isExplanationViewVisible.value = false;
     state.isExplanationViewVisible.refresh(); // 强制刷新
-    
+
     try {
       state.inputMode.value = InputMode.voice;
       state.textInputController.clear();
@@ -446,10 +481,10 @@ class FeynmanLearningController extends GetxController {
     }
 
     state.isSubmittingSuggestion.value = true;
-    
+
     // 保存用户输入的解释内容，用于页面显示
     state.userExplanation.value = trimmed;
-    
+
     // 保存到解释历史记录中（词汇 -> 解释内容）
     final currentTerm = state.currentExplainingTerm.value;
     if (currentTerm != null) {
@@ -475,8 +510,9 @@ class FeynmanLearningController extends GetxController {
           state.textInputController.clear();
         } else {
           Get.snackbar(
-            '提示',
-            '未从响应中解析到词汇，请重试',
+            _l10n?.hint ?? 'Hint',
+            _l10n?.parseVocabFailed ??
+                'Failed to parse vocabulary, please retry',
             snackPosition: SnackPosition.BOTTOM,
             duration: const Duration(milliseconds: 1500),
           );
@@ -488,11 +524,11 @@ class FeynmanLearningController extends GetxController {
       state.confusedWords.value = List.of(extracted);
       state.learningPhase.value = LearningPhase.reviewing;
       state.textInputController.clear();
-      
     } catch (error) {
       Get.snackbar(
-        '错误',
-        '获取词汇失败：$error',
+        _l10n?.error ?? 'Error',
+        _l10n?.fetchVocabFailed(error.toString()) ??
+            'Failed to fetch vocabulary: $error',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(milliseconds: 1800),
       );
@@ -598,25 +634,26 @@ class FeynmanLearningController extends GetxController {
     if (state.topicName.value != null) {
       return state.topicName.value!;
     }
-    
+
+    final l10n = _l10n;
     // 否则根据 category 返回显示名称
     switch (state.activeCategory.value) {
       case 'economics':
-        return '经济学';
+        return l10n?.categoryEconomics ?? 'Economics';
       case 'finance':
-        return '金融';
+        return l10n?.categoryFinance ?? 'Finance';
       case 'technology':
-        return '科技';
+        return l10n?.categoryTechnology ?? 'Technology';
       case 'medicine':
-        return '医学';
+        return l10n?.categoryMedicine ?? 'Medicine';
       case 'law':
-        return '法律';
+        return l10n?.categoryLaw ?? 'Law';
       case 'psychology':
-        return '心理学';
+        return l10n?.categoryPsychology ?? 'Psychology';
       case 'philosophy':
-        return '哲学';
+        return l10n?.categoryPhilosophy ?? 'Philosophy';
       case 'history':
-        return '历史';
+        return l10n?.categoryHistory ?? 'History';
       default:
         return state.activeCategory.value;
     }
@@ -659,16 +696,17 @@ class FeynmanLearningController extends GetxController {
         state.terms.refresh();
       } else {
         Get.snackbar(
-          '提示',
-          '暂无更多新的词汇可补充',
+          _l10n?.hint ?? 'Hint',
+          _l10n?.noMoreVocab ?? 'No more new vocabulary to add',
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(milliseconds: 1600),
         );
       }
     } catch (error) {
       Get.snackbar(
-        '错误',
-        '补充词汇失败：$error',
+        _l10n?.error ?? 'Error',
+        _l10n?.addVocabFailed(error.toString()) ??
+            'Failed to add vocabulary: $error',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(milliseconds: 1800),
       );
@@ -676,15 +714,15 @@ class FeynmanLearningController extends GetxController {
       state.isAppending.value = false;
     }
   }
-  
+
   // ========== 学习流程方法 ==========
-  
+
   /// 选择一个不清楚的词汇继续解释
   void selectConfusedWord(String word) {
     // 清除上一轮的解释内容
     state.userExplanation.value = null;
     state.confusedWords.clear();
-    
+
     // 设置新的解释词汇
     state.currentExplainingTerm.value = word;
     state.explanationHistory.add(word);
@@ -692,23 +730,25 @@ class FeynmanLearningController extends GetxController {
     state.inputMode.value = InputMode.voice;
     state.textInputController.clear();
   }
-  
+
   /// 获取词汇的辅助解释（可选功能）
   Future<void> getWordExplanation(String word) async {
     // 如果已经缓存了，直接返回
     if (state.wordExplanations.containsKey(word)) {
       return;
     }
-    
+
     state.isLoadingExplanation.value = true;
-    
+
     try {
       // 构造请求：包含词汇和上下文
-      final requestText = '{"words": ["<$word>"], "original_context": "${state.currentExplainingTerm.value ?? word}"}';
+      final requestText =
+          '{"words": ["<$word>"], "original_context": "${state.currentExplainingTerm.value ?? word}"}';
       final response = await httpService.runSimpleExplainer(requestText);
-      
-      debugPrint('[FeynmanLearningController] Explanation reply: ${response.reply}');
-      
+
+      debugPrint(
+          '[FeynmanLearningController] Explanation reply: ${response.reply}');
+
       // 解析响应
       final explanation = _parseExplanation(response.reply, word);
       if (explanation != null) {
@@ -716,8 +756,9 @@ class FeynmanLearningController extends GetxController {
       }
     } catch (error) {
       Get.snackbar(
-        '提示',
-        '获取解释失败：$error',
+        _l10n?.hint ?? 'Hint',
+        _l10n?.getExplanationFailed(error.toString()) ??
+            'Failed to get explanation: $error',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(milliseconds: 1500),
       );
@@ -725,13 +766,13 @@ class FeynmanLearningController extends GetxController {
       state.isLoadingExplanation.value = false;
     }
   }
-  
+
   /// 解析辅助解释响应
   WordExplanation? _parseExplanation(String reply, String word) {
     try {
       final jsonBlock = _extractJsonBlock(reply);
       if (jsonBlock == null) return null;
-      
+
       final decoded = jsonDecode(jsonBlock);
       if (decoded is Map<String, dynamic>) {
         final explanations = decoded['explanations'];
@@ -750,46 +791,46 @@ class FeynmanLearningController extends GetxController {
     }
     return null;
   }
-  
+
   /// 完成学习，返回卡片选择界面
   void finishLearning() {
     // 先保存要移除的词汇（在重置状态之前）
-    final originalTerm = state.explanationHistory.isNotEmpty 
-        ? state.explanationHistory.first 
+    final originalTerm = state.explanationHistory.isNotEmpty
+        ? state.explanationHistory.first
         : null;
-    
+
     // 从术语列表中移除已成功学习的词汇
     if (originalTerm != null && state.terms.value != null) {
       state.terms.value!.remove(originalTerm);
       state.terms.refresh();
     }
-    
+
     // 重置学习状态
     state.resetLearningState();
     state.isExplanationViewVisible.value = false;
     state.inputMode.value = InputMode.voice;
     state.textInputController.clear();
-    
+
     // 如果列表为空，补充新词汇
     maybeReplenishDeck();
   }
-  
+
   /// 中途退出学习
   void cancelLearning() {
     // 如果已经有评估结果，说明有学习记录，需要刷新
     final hasLearningRecord = state.evaluationResult.value != null;
-    
+
     state.resetLearningState();
     state.isExplanationViewVisible.value = false;
     state.inputMode.value = InputMode.voice;
     state.textInputController.clear();
-    
+
     // 如果有学习记录，刷新数据
     if (hasLearningRecord) {
       _refreshNoteData();
     }
   }
-  
+
   /// 刷新笔记详情页和首页的数据
   void _refreshNoteData() {
     final noteId = state.currentNoteId.value;
@@ -797,9 +838,9 @@ class FeynmanLearningController extends GetxController {
       debugPrint('[FeynmanLearningController] noteId 为空，跳过刷新');
       return;
     }
-    
+
     debugPrint('[FeynmanLearningController] 刷新笔记数据，noteId: $noteId');
-    
+
     // 刷新笔记详情页的数据
     try {
       if (Get.isRegistered<NoteDetailController>()) {
@@ -812,7 +853,7 @@ class FeynmanLearningController extends GetxController {
     } catch (e) {
       debugPrint('[FeynmanLearningController] ❌ 无法刷新笔记详情页: $e');
     }
-    
+
     // 刷新首页的数据
     try {
       if (Get.isRegistered<HomeController>()) {
@@ -826,37 +867,119 @@ class FeynmanLearningController extends GetxController {
       debugPrint('[FeynmanLearningController] ❌ 无法刷新首页: $e');
     }
   }
-  
+
   // ========== 新增：角色选择和评估相关方法 ==========
-  
+
+  /// 根据角色ID获取本地化的名称和描述
+  Map<String, String> _getLocalizedRoleInfo(String roleId) {
+    final l10n = _l10n;
+    switch (roleId) {
+      case 'child_5':
+        return {
+          'name': l10n?.roleChild5 ?? '5-Year-Old Child',
+          'description': l10n?.roleChild5Desc ??
+              'Use the simplest words, like telling a story',
+        };
+      case 'elementary':
+        return {
+          'name': l10n?.roleElementary ?? 'Elementary Student',
+          'description': l10n?.roleElementaryDesc ??
+              'Use simple language with daily examples',
+        };
+      case 'middle_school':
+        return {
+          'name': l10n?.roleMiddleSchool ?? 'Middle School Student',
+          'description': l10n?.roleMiddleSchoolDesc ??
+              'Use basic concepts, can use some technical terms',
+        };
+      case 'college':
+        return {
+          'name': l10n?.roleCollege ?? 'College Student',
+          'description': l10n?.roleCollegeDesc ??
+              'Use professional but understandable explanations',
+        };
+      case 'master':
+        return {
+          'name': l10n?.roleMaster ?? 'Graduate Student',
+          'description': l10n?.roleMasterDesc ??
+              'Use precise terminology and theoretical frameworks',
+        };
+      default:
+        // 如果角色ID未知，返回空字符串，使用原始值
+        return {'name': '', 'description': ''};
+    }
+  }
+
+  /// 本地化角色列表（根据角色ID替换名称和描述）
+  List<LearningRole> _localizeRoles(List<LearningRole> roles) {
+    return roles.map((role) {
+      final localized = _getLocalizedRoleInfo(role.id);
+      // 如果找到了本地化信息，使用本地化的；否则使用原始的
+      return LearningRole(
+        id: role.id,
+        name: localized['name']?.isNotEmpty == true
+            ? localized['name']!
+            : role.name,
+        description: localized['description']?.isNotEmpty == true
+            ? localized['description']!
+            : role.description,
+      );
+    }).toList();
+  }
+
   /// 加载学习角色列表
   Future<void> _loadRoles({bool force = false}) async {
     if (!force && state.roles.isNotEmpty) return;
-    
+
     state.isLoadingRoles.value = true;
     try {
+      // 从后端获取角色列表，后端会根据App语言返回对应的本地化角色
+      // 后端会自动使用当前App的语言（通过HttpService传递）
       final response = await httpService.getLearningRoles();
       state.roles.value = response.roles;
-      debugPrint('[FeynmanLearningController] 加载角色列表成功: ${state.roles.length}个');
+      debugPrint(
+          '[FeynmanLearningController] 加载角色列表成功: ${state.roles.length}个');
       for (final role in state.roles) {
         debugPrint('  - ${role.name} (${role.id})');
       }
     } catch (e) {
       debugPrint('[FeynmanLearningController] 加载角色列表失败: $e');
-      // 使用默认角色
+      // 使用默认角色（本地化）
+      final l10n = _l10n;
       state.roles.value = [
-        const LearningRole(id: 'child_5', name: '5岁孩子', description: '用最简单的话解释，像讲故事一样'),
-        const LearningRole(id: 'elementary', name: '小学生', description: '用简单易懂的语言，结合生活例子'),
-        const LearningRole(id: 'middle_school', name: '中学生', description: '用基础概念解释，可以适当使用专业词汇'),
-        const LearningRole(id: 'college', name: '大学生', description: '用专业但易懂的方式解释，可以涉及相关概念'),
-        const LearningRole(id: 'master', name: '研究生', description: '用精确的专业术语和理论框架解释'),
+        LearningRole(
+            id: 'child_5',
+            name: l10n?.roleChild5 ?? '5-Year-Old Child',
+            description: l10n?.roleChild5Desc ??
+                'Use the simplest words, like telling a story'),
+        LearningRole(
+            id: 'elementary',
+            name: l10n?.roleElementary ?? 'Elementary Student',
+            description: l10n?.roleElementaryDesc ??
+                'Use simple language with daily examples'),
+        LearningRole(
+            id: 'middle_school',
+            name: l10n?.roleMiddleSchool ?? 'Middle School Student',
+            description: l10n?.roleMiddleSchoolDesc ??
+                'Use basic concepts, can use some technical terms'),
+        LearningRole(
+            id: 'college',
+            name: l10n?.roleCollege ?? 'College Student',
+            description: l10n?.roleCollegeDesc ??
+                'Use professional but understandable explanations'),
+        LearningRole(
+            id: 'master',
+            name: l10n?.roleMaster ?? 'Graduate Student',
+            description: l10n?.roleMasterDesc ??
+                'Use precise terminology and theoretical frameworks'),
       ];
-      debugPrint('[FeynmanLearningController] 使用默认角色列表: ${state.roles.length}个');
+      debugPrint(
+          '[FeynmanLearningController] 使用默认角色列表: ${state.roles.length}个');
     } finally {
       state.isLoadingRoles.value = false;
     }
   }
-  
+
   /// 获取当前卡片信息
   Map<String, dynamic>? getCurrentCardData() {
     final index = state.currentCardIndex.value;
@@ -865,7 +988,7 @@ class FeynmanLearningController extends GetxController {
     }
     return null;
   }
-  
+
   /// 根据闪词获取卡片数据
   Map<String, dynamic>? getCardDataByTerm(String term) {
     try {
@@ -878,21 +1001,25 @@ class FeynmanLearningController extends GetxController {
       return null;
     }
   }
-  
+
   /// 开始学习当前卡片（根据卡片状态决定流程）
   Future<void> startLearningCard(String term) async {
     // 检查数据是否已加载
     if (_flashCardsData.isEmpty) {
-      Get.snackbar('提示', '闪词卡片数据未加载，请稍后再试', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.hint ?? 'Hint',
+          _l10n?.flashCardDataNotLoaded ?? 'Flash card data not loaded',
+          snackPosition: SnackPosition.BOTTOM);
       debugPrint('[FeynmanLearningController] _flashCardsData 为空');
       return;
     }
-    
+
     if (term.isEmpty) {
-      Get.snackbar('提示', '闪词信息无效', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.hint ?? 'Hint',
+          _l10n?.flashCardInfoInvalid ?? 'Flash card info invalid',
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    
+
     // 查找对应的卡片数据
     Map<String, dynamic> cardData;
     try {
@@ -902,92 +1029,108 @@ class FeynmanLearningController extends GetxController {
       );
     } catch (e) {
       debugPrint('[FeynmanLearningController] 查找卡片数据失败: $e');
-      Get.snackbar('提示', '查找卡片信息失败', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.hint ?? 'Hint',
+          _l10n?.findCardFailed ?? 'Failed to find card info',
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    
+
     if (cardData.isEmpty) {
-      Get.snackbar('提示', '未找到卡片信息', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.hint ?? 'Hint',
+          _l10n?.cardInfoNotFound ?? 'Card info not found',
+          snackPosition: SnackPosition.BOTTOM);
       debugPrint('[FeynmanLearningController] 未找到闪词: $term');
       return;
     }
-    
+
     // 检查必要的字段
     if (cardData['id'] == null) {
-      Get.snackbar('提示', '卡片ID缺失', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+          _l10n?.hint ?? 'Hint', _l10n?.cardIdMissing ?? 'Card ID missing',
+          snackPosition: SnackPosition.BOTTOM);
       debugPrint('[FeynmanLearningController] 卡片ID缺失: $cardData');
       return;
     }
-    
+
     state.currentCard.value = cardData;
     state.currentExplainingTerm.value = term;
     state.userExplanation.value = null;
     state.evaluationResult.value = null;
-    
+
     // 检查卡片状态
     final statusRaw = cardData['status'] as String? ?? 'NOT_STARTED';
     final status = statusRaw.toUpperCase();
     final reviewCount = cardData['review_count'] as int? ?? 0;
-    
+
     debugPrint('[FeynmanLearningController] 卡片状态: $status, 复习次数: $reviewCount');
-    
+
     // 如果已经学习过，加载学习历史
     if (reviewCount > 0) {
       await _loadCardLearningHistory(cardData['id'] as int);
-      debugPrint('[FeynmanLearningController] 学习历史加载完成，记录数: ${state.cardLearningHistory.length}');
+      debugPrint(
+          '[FeynmanLearningController] 学习历史加载完成，记录数: ${state.cardLearningHistory.length}');
     }
-    
+
     state.isExplanationViewVisible.value = true;
-    
+
     // 根据状态决定流程
     // 注意：status 已经是大写，直接使用
-    debugPrint('[FeynmanLearningController] 判断流程 - 状态: $status, 复习次数: $reviewCount, 历史记录数: ${state.cardLearningHistory.length}');
+    debugPrint(
+        '[FeynmanLearningController] 判断流程 - 状态: $status, 复习次数: $reviewCount, 历史记录数: ${state.cardLearningHistory.length}');
     debugPrint('[FeynmanLearningController] 卡片数据: ${cardData.toString()}');
-    
+
     // 如果已经学习过（有学习历史），直接显示最后一次的学习结果
     if (reviewCount > 0 && state.cardLearningHistory.isNotEmpty) {
       // 显示最后一次的学习记录
       final lastRecord = state.cardLearningHistory.first;
-      debugPrint('[FeynmanLearningController] ✅ 已学习的闪词，显示学习历史。分数: ${lastRecord.score}, 状态: ${lastRecord.status}');
-      debugPrint('[FeynmanLearningController] 学习记录中的角色ID: ${lastRecord.selectedRole}');
-      
+      debugPrint(
+          '[FeynmanLearningController] ✅ 已学习的闪词，显示学习历史。分数: ${lastRecord.score}, 状态: ${lastRecord.status}');
+      debugPrint(
+          '[FeynmanLearningController] 学习记录中的角色ID: ${lastRecord.selectedRole}');
+
       // 先确保角色列表已加载（无论是否有角色都需要加载，因为UI可能需要）
       // 如果角色列表为空或正在加载，等待加载完成
       if (state.roles.isEmpty) {
         debugPrint('[FeynmanLearningController] 角色列表为空，开始加载...');
         await _loadRoles(force: true);
-        debugPrint('[FeynmanLearningController] 角色列表加载完成，数量: ${state.roles.length}');
+        debugPrint(
+            '[FeynmanLearningController] 角色列表加载完成，数量: ${state.roles.length}');
       }
-      
+
       // 设置选择的角色（从学习记录中获取）
       // 兼容两种情况：1. 存储的是角色ID（如 "child_5"） 2. 存储的是角色名称（如 "5岁孩子"）
       if (lastRecord.selectedRole.isNotEmpty) {
         final roleValue = lastRecord.selectedRole;
-        debugPrint('[FeynmanLearningController] 查找角色: $roleValue, 当前角色列表数量: ${state.roles.length}');
-        debugPrint('[FeynmanLearningController] 当前角色列表: ${state.roles.map((r) => '${r.id}:${r.name}').join(', ')}');
-        
+        debugPrint(
+            '[FeynmanLearningController] 查找角色: $roleValue, 当前角色列表数量: ${state.roles.length}');
+        debugPrint(
+            '[FeynmanLearningController] 当前角色列表: ${state.roles.map((r) => '${r.id}:${r.name}').join(', ')}');
+
         // 先尝试按ID查找
         var role = state.roles.firstWhereOrNull((r) => r.id == roleValue);
-        
+
         // 如果按ID找不到，尝试按名称查找（兼容旧数据）
         if (role == null) {
           role = state.roles.firstWhereOrNull((r) => r.name == roleValue);
           if (role != null) {
-            debugPrint('[FeynmanLearningController] 通过名称找到角色: ${role.name} (${role.id})');
+            debugPrint(
+                '[FeynmanLearningController] 通过名称找到角色: ${role.name} (${role.id})');
           }
         }
-        
+
         if (role != null) {
           state.selectedRole.value = role;
-          debugPrint('[FeynmanLearningController] ✅ 设置角色成功: ${role.name} (${role.id})');
+          debugPrint(
+              '[FeynmanLearningController] ✅ 设置角色成功: ${role.name} (${role.id})');
         } else {
           debugPrint('[FeynmanLearningController] ❌ 未找到角色: $roleValue');
-          debugPrint('[FeynmanLearningController] 可用角色列表: ${state.roles.map((r) => '${r.id}:${r.name}').join(', ')}');
+          debugPrint(
+              '[FeynmanLearningController] 可用角色列表: ${state.roles.map((r) => '${r.id}:${r.name}').join(', ')}');
         }
       } else {
         debugPrint('[FeynmanLearningController] ⚠️ 学习记录中没有角色信息');
       }
-      
+
       // 显示最后一次的学习结果
       state.evaluationResult.value = EvaluateResponse(
         score: lastRecord.score,
@@ -1002,43 +1145,47 @@ class FeynmanLearningController extends GetxController {
       // 已学习的闪词直接显示结果
       return;
     }
-    
+
     // 未学习过的闪词：正常学习流程
     debugPrint('[FeynmanLearningController] 🆕 未学习的闪词，进入正常学习流程');
     state.selectedRole.value = null;
     state.learningPhase.value = LearningPhase.selectingRole;
-    
+
     // 加载角色列表
     _loadRoles(force: true);
   }
-  
+
   /// 加载卡片的学习历史
   Future<void> _loadCardLearningHistory(int cardId) async {
     try {
       final cardDetail = await httpService.getCardDetail(cardId);
       // 转换为可增长的列表，避免固定长度列表的问题
-      state.cardLearningHistory.value = List<LearningRecord>.from(cardDetail.learningHistory);
-      debugPrint('[FeynmanLearningController] 加载学习历史成功: ${state.cardLearningHistory.length}条记录');
+      state.cardLearningHistory.value =
+          List<LearningRecord>.from(cardDetail.learningHistory);
+      debugPrint(
+          '[FeynmanLearningController] 加载学习历史成功: ${state.cardLearningHistory.length}条记录');
     } catch (e) {
       debugPrint('[FeynmanLearningController] 加载学习历史失败: $e');
       // 使用赋值空列表而不是 clear()，避免固定长度列表的问题
       state.cardLearningHistory.value = <LearningRecord>[];
     }
   }
-  
+
   /// 从 JSON 字符串中解析反馈文本
   String _parseFeedbackFromJson(String aiFeedbackJson) {
     try {
       final feedbackData = jsonDecode(aiFeedbackJson);
       if (feedbackData is Map<String, dynamic>) {
-        return feedbackData['feedback'] as String? ?? '感谢你的解释！';
+        return feedbackData['feedback'] as String? ??
+            (_l10n?.thankYouForExplanation ??
+                'Thank you for your explanation!');
       }
     } catch (e) {
       debugPrint('[FeynmanLearningController] 解析反馈失败: $e');
     }
-    return '感谢你的解释！';
+    return _l10n?.thankYouForExplanation ?? 'Thank you for your explanation!';
   }
-  
+
   /// 重新学习当前卡片（清除历史，重新开始）
   void restartLearning() {
     state.userExplanation.value = null;
@@ -1048,7 +1195,7 @@ class FeynmanLearningController extends GetxController {
     state.textInputController.clear();
     _loadRoles(force: true);
   }
-  
+
   /// 选择学习角色
   void selectRole(LearningRole role) {
     state.selectedRole.value = role;
@@ -1056,88 +1203,97 @@ class FeynmanLearningController extends GetxController {
     state.learningPhase.value = LearningPhase.explaining;
     state.textInputController.clear();
   }
-  
+
   /// 提交解释并获取AI评估
   Future<void> submitExplanation(String explanation) async {
     if (explanation.trim().isEmpty) {
-      Get.snackbar('提示', '请输入你的解释', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.hint ?? 'Hint',
+          _l10n?.pleaseEnterExplanation ?? 'Please enter your explanation',
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    
+
     final cardData = state.currentCard.value;
     final selectedRole = state.selectedRole.value;
     final noteId = state.currentNoteId.value;
-    
+
     if (cardData == null || selectedRole == null || noteId == null) {
-      Get.snackbar('错误', '缺少必要信息', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.error ?? 'Error',
+          _l10n?.missingRequiredInfo ?? 'Missing required info',
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    
+
     final cardId = cardData['id'] as int?;
     if (cardId == null) {
-      Get.snackbar('错误', '卡片ID不存在', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.error ?? 'Error',
+          _l10n?.cardIdNotExist ?? 'Card ID does not exist',
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    
+
     state.userExplanation.value = explanation.trim();
     state.isEvaluating.value = true;
     state.learningPhase.value = LearningPhase.evaluating;
-    
+
     try {
-      debugPrint('[FeynmanLearningController] 提交评估: cardId=$cardId, noteId=$noteId, role=${selectedRole.id}');
-      
+      debugPrint(
+          '[FeynmanLearningController] 提交评估: cardId=$cardId, noteId=$noteId, role=${selectedRole.id}');
+
       final result = await httpService.evaluateExplanation(
         cardId: cardId,
         noteId: noteId,
         selectedRole: selectedRole.id,
         userExplanation: explanation.trim(),
       );
-      
+
       state.evaluationResult.value = result;
       state.learningPhase.value = LearningPhase.result;
-      
+
       // 更新本地卡片状态
       _updateLocalCardStatus(cardId, result.status.toUpperCase());
-      
-      debugPrint('[FeynmanLearningController] 评估完成: score=${result.score}, status=${result.status}');
-      
+
+      debugPrint(
+          '[FeynmanLearningController] 评估完成: score=${result.score}, status=${result.status}');
+
       // 评估完成后立即刷新笔记详情页和首页的数据
       _refreshNoteData();
-      
     } catch (e) {
       debugPrint('[FeynmanLearningController] 评估失败: $e');
-      Get.snackbar('错误', '评估失败：$e', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.error ?? 'Error',
+          _l10n?.evaluateFailed(e.toString()) ?? 'Evaluation failed: $e',
+          snackPosition: SnackPosition.BOTTOM);
       // 回到解释输入阶段
       state.learningPhase.value = LearningPhase.explaining;
     } finally {
       state.isEvaluating.value = false;
     }
   }
-  
+
   /// 更新本地卡片状态
   void _updateLocalCardStatus(int cardId, String newStatus) {
     final index = _flashCardsData.indexWhere((c) => c['id'] == cardId);
     if (index != -1) {
       _flashCardsData[index]['status'] = newStatus;
-      _flashCardsData[index]['review_count'] = 
+      _flashCardsData[index]['review_count'] =
           (_flashCardsData[index]['review_count'] as int? ?? 0) + 1;
     }
   }
-  
+
   /// 继续学习下一张卡片
   void continueToNextCard() {
     // 注意：不在这里刷新，因为评估完成后已经刷新过了
     // 如果在这里刷新，evaluationResult 已经被 resetLearningState() 清空
     state.resetLearningState();
     state.isExplanationViewVisible.value = false;
-    
+
     // 移动到下一张卡片
     final totalCards = state.terms.value?.length ?? 0;
     if (state.currentCardIndex.value < totalCards - 1) {
       state.currentCardIndex.value++;
     }
   }
-  
+
   /// 重新学习当前卡片
   void retryCurrentCard() {
     state.selectedRole.value = null;
@@ -1146,44 +1302,49 @@ class FeynmanLearningController extends GetxController {
     state.learningPhase.value = LearningPhase.selectingRole;
     state.textInputController.clear();
   }
-  
+
   /// 直接标记为已掌握
   Future<void> markAsMastered() async {
     final cardData = state.currentCard.value;
     if (cardData == null) return;
-    
+
     final cardId = cardData['id'] as int?;
     if (cardId == null) return;
-    
+
     try {
       await httpService.updateCardStatus(cardId: cardId, status: 'MASTERED');
       _updateLocalCardStatus(cardId, 'MASTERED');
-      
-      Get.snackbar('成功', '已标记为掌握', snackPosition: SnackPosition.BOTTOM);
+
+      Get.snackbar(_l10n?.success ?? 'Success',
+          _l10n?.markedAsMastered ?? 'Marked as mastered',
+          snackPosition: SnackPosition.BOTTOM);
       continueToNextCard();
     } catch (e) {
-      Get.snackbar('错误', '标记失败：$e', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(_l10n?.error ?? 'Error',
+          _l10n?.markFailed(e.toString()) ?? 'Mark failed: $e',
+          snackPosition: SnackPosition.BOTTOM);
     }
   }
-  
-  /// 获取状态的中文显示名称
-  String getStatusDisplayName(String status) {
+
+  /// 获取状态的显示名称（支持本地化）
+  String getStatusDisplayName(BuildContext context, String status) {
+    final l10n = AppLocalizations.of(context)!;
     switch (status.toUpperCase()) {
       case 'MASTERED':
-        return '已掌握';
+        return l10n.mastered;
       case 'NEEDS_REVIEW':
-        return '需巩固';
+        return l10n.needsConsolidation;
       case 'NEEDS_IMPROVE':
-        return '需改进';
+        return l10n.needsImprovement;
       case 'NOT_MASTERED':
-        return '未掌握';
+        return l10n.notMastered;
       case 'NOT_STARTED':
-        return '未开始';
+        return l10n.notStarted;
       default:
         return status;
     }
   }
-  
+
   /// 获取状态对应的颜色（使用全局配置）
   Color getStatusColor(String status) {
     return AppTheme.getStatusColor(status);
@@ -1199,4 +1360,3 @@ class _ExtractionResult {
   static _ExtractionResult empty() =>
       const _ExtractionResult(terms: <String>[], isClear: false);
 }
-

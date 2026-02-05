@@ -5,6 +5,7 @@ import 'package:newstudyapp/pages/feynman_learning/feynman_learning_controller.d
 import 'package:newstudyapp/pages/feynman_learning/feynman_learning_state.dart';
 import 'package:newstudyapp/config/app_theme.dart';
 import 'package:newstudyapp/models/note_models.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class FeynmanLearningPage extends StatelessWidget {
   const FeynmanLearningPage({super.key});
@@ -34,19 +35,19 @@ class FeynmanLearningPage extends StatelessWidget {
         }
 
         if (controller.state.errorMessage.value != null) {
-          return _buildErrorView(controller, isDark);
+          return _buildErrorView(context, controller, isDark);
         }
 
         final terms = controller.state.terms.value;
         if (terms == null || terms.isEmpty) {
-          return _buildEmptyView(controller, isDark);
+          return _buildEmptyView(context, controller, isDark);
         }
 
         return Column(
 
           children: [
             // 进度显示
-            _buildProgressBar(controller, terms.length, isDark),
+            _buildProgressBar(context, controller, terms.length, isDark),
             const SizedBox(height: 16),
 
             // 卡片区域
@@ -93,7 +94,8 @@ class FeynmanLearningPage extends StatelessWidget {
 
   /// 构建进度条
   Widget _buildProgressBar(
-      FeynmanLearningController controller, int total, bool isDark) {
+      BuildContext context, FeynmanLearningController controller, int total, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return Obx(() {
       final current = controller.state.currentCardIndex.value + 1;
       final progress = current / total;
@@ -108,7 +110,7 @@ class FeynmanLearningPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '进度：$current/$total',
+                  l10n.progress(current, total),
                   style: TextStyle(
                     fontSize: 14,
                     color: textColor,
@@ -248,7 +250,7 @@ class FeynmanLearningPage extends StatelessWidget {
             Positioned(
               top: 16,
               right: 16,
-              child: _buildStatusBadge(controller, term),
+              child: _buildStatusBadge(context, controller, term),
             ),
 
             // 卡片内容
@@ -308,7 +310,7 @@ class FeynmanLearningPage extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '点击开始学习',
+                            AppLocalizations.of(context)!.tapToStartLearning,
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white.withOpacity(0.9),
@@ -328,7 +330,7 @@ class FeynmanLearningPage extends StatelessWidget {
   }
 
   /// 构建状态标记
-  Widget _buildStatusBadge(FeynmanLearningController controller, String term) {
+  Widget _buildStatusBadge(BuildContext context, FeynmanLearningController controller, String term) {
     // 从控制器获取卡片数据
     final cardData = controller.getCardDataByTerm(term);
     if (cardData == null) {
@@ -344,7 +346,7 @@ class FeynmanLearningPage extends StatelessWidget {
     }
     
     final statusColor = controller.getStatusColor(status);
-    final statusName = controller.getStatusDisplayName(status);
+    final statusName = controller.getStatusDisplayName(context, status);
     final statusIcon = _getStatusIcon(status);
     
     return Container(
@@ -484,12 +486,13 @@ class FeynmanLearningPage extends StatelessWidget {
     String term,
     bool isDark,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     // 直接进入学习流程（异步方法，使用 unawaited 避免警告）
     // 添加错误处理，防止异常导致手势识别错误
     try {
       controller.startLearningCard(term).catchError((error, stackTrace) {
         developer.log(
-          '开始学习失败',
+          'Start learning failed',
           error: error,
           stackTrace: stackTrace,
           name: 'FeynmanLearningPage',
@@ -500,8 +503,8 @@ class FeynmanLearningPage extends StatelessWidget {
             Get.closeAllSnackbars();
           }
           Get.snackbar(
-            '错误',
-            '开始学习失败：${error.toString()}',
+            l10n.error,
+            l10n.startLearningFailed(error.toString()),
             snackPosition: SnackPosition.BOTTOM,
             duration: const Duration(seconds: 2),
           );
@@ -509,7 +512,7 @@ class FeynmanLearningPage extends StatelessWidget {
       });
     } catch (e, stackTrace) {
       developer.log(
-        '调用 startLearningCard 时发生异常',
+        'Exception when calling startLearningCard',
         error: e,
         stackTrace: stackTrace,
         name: 'FeynmanLearningPage',
@@ -519,8 +522,8 @@ class FeynmanLearningPage extends StatelessWidget {
           Get.closeAllSnackbars();
         }
         Get.snackbar(
-          '错误',
-          '操作失败：${e.toString()}',
+          l10n.error,
+          l10n.operationFailed(e.toString()),
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 2),
         );
@@ -541,13 +544,13 @@ class FeynmanLearningPage extends StatelessWidget {
 
         switch (phase) {
           case LearningPhase.selectingRole:
-            return _buildRoleSelectionView(controller, isDark);
+            return _buildRoleSelectionView(context, controller, isDark);
           case LearningPhase.explaining:
-            return _buildExplanationInputView(controller, isDark);
+            return _buildExplanationInputView(context, controller, isDark);
           case LearningPhase.evaluating:
-            return _buildEvaluatingView(controller, isDark);
+            return _buildEvaluatingView(context, controller, isDark);
           case LearningPhase.result:
-            return _buildResultView(controller, isDark);
+            return _buildResultView(context, controller, isDark);
           default:
             return const SizedBox.shrink();
         }
@@ -557,7 +560,8 @@ class FeynmanLearningPage extends StatelessWidget {
 
   /// 构建角色选择视图
   Widget _buildRoleSelectionView(
-      FeynmanLearningController controller, bool isDark) {
+      BuildContext context, FeynmanLearningController controller, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
     final textColor = isDark ? Colors.white : Colors.black;
@@ -580,7 +584,7 @@ class FeynmanLearningPage extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      '选择角色',
+                      l10n.selectRole,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -645,7 +649,7 @@ class FeynmanLearningPage extends StatelessWidget {
             const SizedBox(height: 24),
 
             Text(
-                            '选择一个角色，用TA能理解的方式来解释',
+                            l10n.selectRoleHint,
               style: TextStyle(
                               fontSize: 16,
                               color: secondaryColor,
@@ -712,7 +716,8 @@ class FeynmanLearningPage extends StatelessWidget {
 
   /// 构建解释输入视图
   Widget _buildExplanationInputView(
-      FeynmanLearningController controller, bool isDark) {
+      BuildContext context, FeynmanLearningController controller, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
@@ -742,7 +747,7 @@ class FeynmanLearningPage extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Text(
-                        '解释闪词',
+                        l10n.explainFlashCard,
                         style: TextStyle(
                 color: textColor,
                           fontSize: 17,
@@ -822,7 +827,7 @@ class FeynmanLearningPage extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
             Text(
-                          '向「${role?.name ?? ''}」解释',
+                          l10n.explainTo(role?.name ?? ''),
               style: TextStyle(
                 fontSize: 14,
                 color: secondaryColor,
@@ -853,7 +858,7 @@ class FeynmanLearningPage extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 80),
                     child: _buildInputArea(
-                        controller, isDark, textColor, secondaryColor, borderColor, inputBgColor, role),
+                        context, controller, isDark, textColor, secondaryColor, borderColor, inputBgColor, role),
                   ),
 
                   // 底部悬浮区域：语音输入按钮和状态
@@ -862,14 +867,14 @@ class FeynmanLearningPage extends StatelessWidget {
                     right: 0,
                     bottom: 0,
                     child: _buildFloatingBottom(
-                        controller, isDark, textColor, secondaryColor, borderColor),
+                        context, controller, isDark, textColor, secondaryColor, borderColor),
                   ),
                 ],
               ),
             ),
 
             // 底部提交按钮
-            _buildBottomActions(controller, isDark, bgColor, borderColor),
+            _buildBottomActions(context, controller, isDark, bgColor, borderColor),
           ],
         ),
       ),
@@ -878,6 +883,7 @@ class FeynmanLearningPage extends StatelessWidget {
 
   /// 构建输入区域
   Widget _buildInputArea(
+      BuildContext context,
       FeynmanLearningController controller,
       bool isDark,
       Color textColor,
@@ -885,6 +891,7 @@ class FeynmanLearningPage extends StatelessWidget {
       Color borderColor,
       Color inputBgColor,
       LearningRole? role) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       decoration: BoxDecoration(
         color: inputBgColor,
@@ -901,7 +908,7 @@ class FeynmanLearningPage extends StatelessWidget {
               height: 1.6,
             ),
             decoration: InputDecoration(
-              hintText: '输入你的解释...\n\n例如：${role?.description ?? ''}',
+              hintText: l10n.enterExplanationHint(role?.description ?? ''),
               hintStyle: TextStyle(
                 color: secondaryColor,
                 fontSize: 15,
@@ -952,11 +959,13 @@ class FeynmanLearningPage extends StatelessWidget {
 
   /// 构建底部悬浮区域
   Widget _buildFloatingBottom(
+      BuildContext context,
       FeynmanLearningController controller,
       bool isDark,
       Color textColor,
       Color? secondaryColor,
       Color borderColor) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
@@ -984,8 +993,8 @@ class FeynmanLearningPage extends StatelessWidget {
                     Expanded(
                       child: Text(
                         speechText.isNotEmpty
-                            ? '正在识别：$speechText'
-                            : '正在聆听...',
+                            ? l10n.recognizing(speechText)
+                            : l10n.listening,
                         style: TextStyle(
                           fontSize: 13,
                           color: secondaryColor,
@@ -1006,7 +1015,7 @@ class FeynmanLearningPage extends StatelessWidget {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        '已识别：$speechText',
+                        l10n.recognized(speechText),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF10B981),
@@ -1073,8 +1082,9 @@ class FeynmanLearningPage extends StatelessWidget {
   }
 
   /// 构建底部操作按钮
-  Widget _buildBottomActions(FeynmanLearningController controller, bool isDark,
+  Widget _buildBottomActions(BuildContext context, FeynmanLearningController controller, bool isDark,
       Color bgColor, Color borderColor) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: EdgeInsets.fromLTRB(
           20, 16, 20, 16 + MediaQuery.of(Get.context!).padding.bottom),
@@ -1092,8 +1102,8 @@ class FeynmanLearningPage extends StatelessWidget {
             final text = controller.state.textInputController.text.trim();
             if (text.isEmpty) {
                 Get.snackbar(
-                  '提示',
-                '请输入你的解释',
+                  l10n.hint,
+                l10n.pleaseEnterExplanation,
                   snackPosition: SnackPosition.BOTTOM,
                 duration: const Duration(seconds: 2),
               );
@@ -1109,14 +1119,14 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             elevation: 0,
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.send, size: 20),
-              SizedBox(width: 8),
+              const Icon(Icons.send, size: 20),
+              const SizedBox(width: 8),
               Text(
-                '提交解释',
-                style: TextStyle(
+                l10n.submitExplanationBtn,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1130,7 +1140,8 @@ class FeynmanLearningPage extends StatelessWidget {
 
   /// 构建评估中视图
   Widget _buildEvaluatingView(
-      FeynmanLearningController controller, bool isDark) {
+      BuildContext context, FeynmanLearningController controller, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
@@ -1151,7 +1162,7 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             Text(
-              'AI 正在评估你的解释...',
+              l10n.aiEvaluating,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -1160,7 +1171,7 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              '这可能需要几秒钟',
+              l10n.mayTakeSeconds,
               style: TextStyle(
                 fontSize: 14,
                 color: secondaryColor,
@@ -1173,7 +1184,8 @@ class FeynmanLearningPage extends StatelessWidget {
   }
 
   /// 构建结果视图
-  Widget _buildResultView(FeynmanLearningController controller, bool isDark) {
+  Widget _buildResultView(BuildContext context, FeynmanLearningController controller, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
@@ -1187,7 +1199,7 @@ class FeynmanLearningPage extends StatelessWidget {
     final score = result.score;
     final status = result.status;
     final statusColor = controller.getStatusColor(status);
-    final statusName = controller.getStatusDisplayName(status);
+    final statusName = controller.getStatusDisplayName(context, status);
 
     return Container(
       color: bgColor,
@@ -1208,7 +1220,7 @@ class FeynmanLearningPage extends StatelessWidget {
                       // 如果有学习历史，显示"学习记录"，否则显示"评估结果"
                       final hasHistory = controller.state.cardLearningHistory.isNotEmpty;
                       return Text(
-                        hasHistory ? '学习记录' : '评估结果',
+                        hasHistory ? l10n.learningRecord : l10n.evaluationResult,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -1281,7 +1293,7 @@ class FeynmanLearningPage extends StatelessWidget {
                                     Icon(Icons.history, size: 14, color: secondaryColor),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '这是你之前的学习记录',
+                                      l10n.thisIsYourPreviousRecord,
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: secondaryColor,
@@ -1302,10 +1314,10 @@ class FeynmanLearningPage extends StatelessWidget {
                                     mainAxisSize: MainAxisSize.min,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.person, size: 14, color: const Color(0xFF10B981)),
+                                      const Icon(Icons.person, size: 14, color: Color(0xFF10B981)),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '学习角色: ${selectedRole.name}',
+                                        l10n.learningRole(selectedRole.name),
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: Color(0xFF10B981),
@@ -1327,7 +1339,7 @@ class FeynmanLearningPage extends StatelessWidget {
                     // 分数圆环
                     Center(
                       child:
-                          _ScoreCircle(score: score, statusColor: statusColor),
+                          _ScoreCircle(score: score, statusColor: statusColor, pointsLabel: l10n.points),
                     ),
                     const SizedBox(height: 32),
 
@@ -1347,7 +1359,7 @@ class FeynmanLearningPage extends StatelessWidget {
                                   color: secondaryColor, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                'AI 反馈',
+                                l10n.aiFeedback,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -1384,14 +1396,14 @@ class FeynmanLearningPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.thumb_up,
+                                const Icon(Icons.thumb_up,
                                     color: Color(0xFF10B981), size: 20),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Text(
-                                  '做得好',
-                                  style: TextStyle(
+                                  l10n.wellDone,
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF10B981),
@@ -1442,14 +1454,14 @@ class FeynmanLearningPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.lightbulb,
+                                const Icon(Icons.lightbulb,
                                     color: Color(0xFFF59E0B), size: 20),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Text(
-                                  '可以改进',
-                                  style: TextStyle(
+                                  l10n.canImprove,
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFFF59E0B),
@@ -1502,7 +1514,7 @@ class FeynmanLearningPage extends StatelessWidget {
                               ),
                               side: BorderSide(color: secondaryColor!),
                             ),
-                            child: const Text('重新学习'),
+                            child: Text(l10n.relearn),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1518,15 +1530,15 @@ class FeynmanLearningPage extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('下一张',
-                                    style: TextStyle(
+                                Text(l10n.nextCard,
+                                    style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600)),
-                                SizedBox(width: 8),
-                                Icon(Icons.arrow_forward, size: 20),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward, size: 20),
                               ],
                             ),
                           ),
@@ -1544,7 +1556,8 @@ class FeynmanLearningPage extends StatelessWidget {
   }
 
   /// 构建错误视图
-  Widget _buildErrorView(FeynmanLearningController controller, bool isDark) {
+  Widget _buildErrorView(BuildContext context, FeynmanLearningController controller, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
 
@@ -1561,7 +1574,7 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              '加载失败',
+              l10n.loadFailed,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -1570,7 +1583,7 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Obx(() => Text(
-                  controller.state.errorMessage.value ?? '未知错误',
+                  controller.state.errorMessage.value ?? l10n.unknownError,
                   style: TextStyle(
                     fontSize: 14,
                     color: secondaryColor,
@@ -1588,7 +1601,7 @@ class FeynmanLearningPage extends StatelessWidget {
                   vertical: 16,
                 ),
               ),
-              child: const Text('返回'),
+              child: Text(l10n.goBack),
             ),
           ],
         ),
@@ -1597,7 +1610,8 @@ class FeynmanLearningPage extends StatelessWidget {
   }
 
   /// 构建空视图
-  Widget _buildEmptyView(FeynmanLearningController controller, bool isDark) {
+  Widget _buildEmptyView(BuildContext context, FeynmanLearningController controller, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final textColor = isDark ? Colors.white : Colors.black;
     final secondaryColor = isDark ? Colors.grey[400] : Colors.grey[600];
 
@@ -1614,7 +1628,7 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              '暂无闪词',
+              l10n.noFlashCards,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -1623,7 +1637,7 @@ class FeynmanLearningPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '请先选择学习主题',
+              l10n.selectLearningTopic,
               style: TextStyle(
                 fontSize: 14,
                 color: secondaryColor,
@@ -1640,7 +1654,7 @@ class FeynmanLearningPage extends StatelessWidget {
                   vertical: 16,
                 ),
               ),
-              child: const Text('返回'),
+              child: Text(l10n.goBack),
             ),
           ],
         ),
@@ -1911,10 +1925,12 @@ class _RoleCardState extends State<_RoleCard>
 class _ScoreCircle extends StatelessWidget {
   final int score;
   final Color statusColor;
+  final String pointsLabel;
 
   const _ScoreCircle({
     required this.score,
     required this.statusColor,
+    required this.pointsLabel,
   });
 
   @override
@@ -1961,7 +1977,7 @@ class _ScoreCircle extends StatelessWidget {
                 ),
               ),
               Text(
-                '分',
+                pointsLabel,
                 style: TextStyle(
                   fontSize: 16,
                   color: statusColor,

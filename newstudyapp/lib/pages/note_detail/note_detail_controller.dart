@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:newstudyapp/services/http_service.dart';
 import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
@@ -15,6 +16,17 @@ class NoteDetailController extends GetxController {
   
   /// 保存完整的闪词卡片数据（包含ID）
   List<Map<String, dynamic>> _flashCardsData = [];
+  
+  /// 获取 AppLocalizations 实例
+  AppLocalizations? get _l10n {
+    try {
+      final context = Get.context;
+      if (context != null) {
+        return AppLocalizations.of(context);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   /// 是否自动开始学习（从学习中心跳转时使用）- 使用可观察变量，确保返回时页面能重新构建
   final RxBool _autoStartLearning = false.obs;
@@ -38,7 +50,7 @@ class NoteDetailController extends GetxController {
         _autoStartLearningArgs = {
           'flashCards': args['flashCards'],
           'noteId': args['noteId'],
-          'topic': args['topic'] ?? '我的笔记',
+          'topic': args['topic'] ?? (_l10n?.defaultNoteTopic ?? 'My Notes'),
           'defaultRole': args['defaultRole'] ?? '',
         };
       }
@@ -109,7 +121,7 @@ class NoteDetailController extends GetxController {
     state.isLoading.value = true;
     state.isGenerating.value = true;
     state.hasError.value = false;
-    state.generatingStatus.value = 'AI 正在分析内容...';
+    state.generatingStatus.value = _l10n?.analyzeContent ?? 'AI is analyzing content...';
 
     try {
       // 调用后端API创建笔记（生成并保存到数据库）
@@ -132,8 +144,8 @@ class NoteDetailController extends GetxController {
 
       // 显示成功提示
       Get.snackbar(
-        '成功',
-        '笔记创建成功',
+        _l10n?.success ?? 'Success',
+        _l10n?.noteCreated ?? 'Note created successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF4ECDC4),
         colorText: Colors.white,
@@ -148,8 +160,8 @@ class NoteDetailController extends GetxController {
       // 创建失败，直接返回上一页
       Get.back();
       Get.snackbar(
-        '创建失败',
-        '笔记创建失败：$e',
+        _l10n?.noteCreateFailed ?? 'Creation Failed',
+        '${_l10n?.noteCreateFailed ?? "Note creation failed"}: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -169,7 +181,7 @@ class NoteDetailController extends GetxController {
     state.isLoading.value = true;
     state.isGenerating.value = true;
     state.hasError.value = false;
-    state.generatingStatus.value = '正在识别图片内容...';
+    state.generatingStatus.value = _l10n?.recognizeImage ?? 'Recognizing image content...';
 
     try {
       // 调用后端API创建笔记（生成并保存到数据库）
@@ -192,8 +204,8 @@ class NoteDetailController extends GetxController {
 
       // 显示成功提示
       Get.snackbar(
-        '成功',
-        '笔记创建成功',
+        _l10n?.success ?? 'Success',
+        _l10n?.noteCreated ?? 'Note created successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF4ECDC4),
         colorText: Colors.white,
@@ -208,8 +220,8 @@ class NoteDetailController extends GetxController {
       // 创建失败，直接返回上一页
       Get.back();
       Get.snackbar(
-        '创建失败',
-        '笔记创建失败：$e',
+        _l10n?.noteCreateFailed ?? 'Creation Failed',
+        '${_l10n?.noteCreateFailed ?? "Note creation failed"}: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -229,7 +241,7 @@ class NoteDetailController extends GetxController {
     state.isLoading.value = true;
     state.isGenerating.value = true;
     state.hasError.value = false;
-    state.generatingStatus.value = '正在抓取网页内容...';
+    state.generatingStatus.value = _l10n?.fetchWebContent ?? 'Fetching web page content...';
 
     try {
       // 调用后端API创建笔记（生成并保存到数据库）
@@ -252,8 +264,8 @@ class NoteDetailController extends GetxController {
 
       // 显示成功提示
       Get.snackbar(
-        '成功',
-        '笔记创建成功',
+        _l10n?.success ?? 'Success',
+        _l10n?.noteCreated ?? 'Note created successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF4ECDC4),
         colorText: Colors.white,
@@ -268,8 +280,8 @@ class NoteDetailController extends GetxController {
       // 创建失败，直接返回上一页
       Get.back();
       Get.snackbar(
-        '创建失败',
-        '笔记创建失败：$e',
+        _l10n?.noteCreateFailed ?? 'Creation Failed',
+        '${_l10n?.noteCreateFailed ?? "Note creation failed"}: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -289,7 +301,7 @@ class NoteDetailController extends GetxController {
     state.isLoading.value = true;
     state.isGenerating.value = true;
     state.hasError.value = false;
-    state.generatingStatus.value = '正在获取视频字幕...';
+    state.generatingStatus.value = _l10n?.fetchVideoSubtitle ?? 'Fetching video subtitles...';
 
     try {
       // 调用后端API创建笔记（生成并保存到数据库）
@@ -312,8 +324,8 @@ class NoteDetailController extends GetxController {
 
       // 显示成功提示
       Get.snackbar(
-        '成功',
-        '笔记创建成功',
+        _l10n?.success ?? 'Success',
+        _l10n?.noteCreated ?? 'Note created successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF4ECDC4),
         colorText: Colors.white,
@@ -328,8 +340,8 @@ class NoteDetailController extends GetxController {
       // 创建失败，直接返回上一页
       Get.back();
       Get.snackbar(
-        '创建失败',
-        '笔记创建失败：$e',
+        _l10n?.noteCreateFailed ?? 'Creation Failed',
+        '${_l10n?.noteCreateFailed ?? "Note creation failed"}: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -349,7 +361,7 @@ class NoteDetailController extends GetxController {
     state.isLoading.value = true;
     state.isGenerating.value = true;
     state.hasError.value = false;
-    state.generatingStatus.value = '正在获取视频字幕...';
+    state.generatingStatus.value = _l10n?.fetchVideoSubtitle ?? 'Fetching video subtitles...';
 
     try {
       // 调用后端API创建笔记（生成并保存到数据库）
@@ -372,8 +384,8 @@ class NoteDetailController extends GetxController {
 
       // 显示成功提示
       Get.snackbar(
-        '成功',
-        '笔记创建成功',
+        _l10n?.success ?? 'Success',
+        _l10n?.noteCreated ?? 'Note created successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF4ECDC4),
         colorText: Colors.white,
@@ -388,8 +400,8 @@ class NoteDetailController extends GetxController {
       // 创建失败，直接返回上一页
       Get.back();
       Get.snackbar(
-        '创建失败',
-        '笔记创建失败：$e',
+        _l10n?.noteCreateFailed ?? 'Creation Failed',
+        '${_l10n?.noteCreateFailed ?? "Note creation failed"}: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -409,7 +421,7 @@ class NoteDetailController extends GetxController {
     state.isLoading.value = true;
     state.isGenerating.value = true;
     state.hasError.value = false;
-    state.generatingStatus.value = '正在提取PDF内容...';
+    state.generatingStatus.value = _l10n?.extractPdfContent ?? 'Extracting PDF content...';
 
     try {
       // 调用后端API创建笔记（生成并保存到数据库）
@@ -434,8 +446,8 @@ class NoteDetailController extends GetxController {
 
       // 显示成功提示
       Get.snackbar(
-        '成功',
-        '笔记创建成功',
+        _l10n?.success ?? 'Success',
+        _l10n?.noteCreated ?? 'Note created successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF4ECDC4),
         colorText: Colors.white,
@@ -450,8 +462,8 @@ class NoteDetailController extends GetxController {
       // 创建失败，直接返回上一页
       Get.back();
       Get.snackbar(
-        '创建失败',
-        '笔记创建失败：$e',
+        _l10n?.noteCreateFailed ?? 'Creation Failed',
+        '${_l10n?.noteCreateFailed ?? "Note creation failed"}: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -470,7 +482,7 @@ class NoteDetailController extends GetxController {
   Future<void> _generateSmartNote(String userInput) async {
     state.isLoading.value = true;
     state.isGenerating.value = true;
-    state.generatingStatus.value = 'AI 正在分析内容...';
+    state.generatingStatus.value = _l10n?.analyzeContent ?? 'AI is analyzing content...';
 
     try {
       // 调用后端API生成智能笔记
@@ -480,7 +492,7 @@ class NoteDetailController extends GetxController {
       );
 
       // 从内容中提取标题（取第一行或前20个字符）
-      String title = '智能笔记';
+      String title = _l10n?.smartNote ?? 'Smart Note';
       final lines = response.noteContent.split('\n');
       for (final line in lines) {
         final trimmed = line.trim();
@@ -518,8 +530,8 @@ class NoteDetailController extends GetxController {
 
     } catch (e) {
       Get.snackbar(
-        '生成失败',
-        '智能笔记生成失败：$e',
+        _l10n?.generationFailed ?? 'Generation Failed',
+        _l10n?.generateSmartNoteFailed(e.toString()) ?? 'Failed to generate smart note: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFFFF6B6B),
         colorText: Colors.white,
@@ -655,8 +667,8 @@ class NoteDetailController extends GetxController {
       }
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '加载笔记失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.loadNoteFailed(e.toString()) ?? 'Failed to load note: $e',
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
@@ -688,8 +700,8 @@ class NoteDetailController extends GetxController {
       }
 
       Get.snackbar(
-        '成功',
-        '已生成 ${state.terms.length} 个闪词卡片',
+        _l10n?.success ?? 'Success',
+        _l10n?.generatedFlashCardsCount(state.terms.length) ?? 'Generated ${state.terms.length} flash cards',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF4ECDC4),
         colorText: Colors.white,
@@ -699,8 +711,8 @@ class NoteDetailController extends GetxController {
       );
     } catch (e) {
       Get.snackbar(
-        '错误',
-        '生成闪词失败：$e',
+        _l10n?.error ?? 'Error',
+        _l10n?.generateFlashCardsFailed(e.toString()) ?? 'Failed to generate flash cards: $e',
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
@@ -713,8 +725,8 @@ class NoteDetailController extends GetxController {
   void continueLearning() {
     if (state.terms.isEmpty || _flashCardsData.isEmpty) {
       Get.snackbar(
-        '提示',
-        '暂无闪词可学习',
+        _l10n?.hint ?? 'Hint',
+        _l10n?.noFlashCardsToLearn ?? 'No flash cards to learn',
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -734,7 +746,7 @@ class NoteDetailController extends GetxController {
         'flashCards': _flashCardsData,  // 完整的卡片数据，包含ID
         'terms': state.terms,  // 保留兼容
         'noteId': noteId,
-        'topic': state.note.value?.title ?? '我的笔记',
+        'topic': state.note.value?.title ?? (_l10n?.defaultNoteTopic ?? 'My Notes'),
         'defaultRole': state.defaultRole.value,  // 笔记的默认角色
       },
     );
@@ -743,8 +755,8 @@ class NoteDetailController extends GetxController {
   /// Ask AI（与AI对话）
   void askAI() {
     Get.snackbar(
-      '提示',
-      'Ask AI 功能开发中',
+      _l10n?.hint ?? 'Hint',
+      _l10n?.askAIInDev ?? 'Ask AI feature is under development',
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: const Color(0xFF5B8DEF),
       colorText: Colors.white,
@@ -763,8 +775,8 @@ class NoteDetailController extends GetxController {
   void startLearningByStatus(String status) {
     if (_flashCardsData.isEmpty) {
       Get.snackbar(
-        '提示',
-        '暂无闪词可学习',
+        _l10n?.hint ?? 'Hint',
+        _l10n?.noFlashCardsToLearn ?? 'No flash cards to learn',
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -778,8 +790,8 @@ class NoteDetailController extends GetxController {
 
     if (filteredCards.isEmpty) {
       Get.snackbar(
-        '提示',
-        '该状态下暂无闪词可学习',
+        _l10n?.hint ?? 'Hint',
+        _l10n?.noFlashCardsInStatus ?? 'No flash cards in this status',
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -792,15 +804,8 @@ class NoteDetailController extends GetxController {
       noteId = int.tryParse(noteIdStr);
     }
 
-    // 状态名称映射
-    final statusNames = {
-      'MASTERED': '已掌握',
-      'NEEDS_REVIEW': '需巩固',
-      'NEEDS_IMPROVE': '需改进',
-      'NOT_MASTERED': '未掌握',
-      'NOT_STARTED': '未学习',
-    };
-    final statusName = statusNames[status] ?? status;
+    // 获取本地化状态名称
+    final statusName = _getStatusName(status);
 
     // 跳转到费曼学习页面，传递筛选后的闪词
     Get.toNamed(
@@ -808,10 +813,28 @@ class NoteDetailController extends GetxController {
       arguments: {
         'flashCards': filteredCards,
         'noteId': noteId,
-        'topic': '${state.note.value?.title ?? "我的笔记"} - $statusName',
+        'topic': '${state.note.value?.title ?? (_l10n?.defaultNoteTopic ?? "My Notes")} - $statusName',
         'defaultRole': state.defaultRole.value,
       },
     );
+  }
+  
+  /// 获取状态的本地化名称
+  String _getStatusName(String status) {
+    switch (status) {
+      case 'MASTERED':
+        return _l10n?.mastered ?? 'Mastered';
+      case 'NEEDS_REVIEW':
+        return _l10n?.needsConsolidation ?? 'Needs Consolidation';
+      case 'NEEDS_IMPROVE':
+        return _l10n?.needsImprovement ?? 'Needs Improvement';
+      case 'NOT_MASTERED':
+        return _l10n?.notMastered ?? 'Not Mastered';
+      case 'NOT_STARTED':
+        return _l10n?.notStarted ?? 'Not Started';
+      default:
+        return status;
+    }
   }
 
   /// 检查是否是自动开始学习模式（用于页面显示判断）
@@ -856,7 +879,7 @@ class NoteDetailController extends GetxController {
       arguments: {
         'flashCards': flashCardsFormatted,
         'noteId': _autoStartLearningArgs!['noteId'],
-        'topic': _autoStartLearningArgs!['topic'] ?? state.note.value?.title ?? '我的笔记',
+        'topic': _autoStartLearningArgs!['topic'] ?? state.note.value?.title ?? (_l10n?.defaultNoteTopic ?? 'My Notes'),
         'defaultRole': _autoStartLearningArgs!['defaultRole'] ?? state.defaultRole.value,
       },
       transition: Transition.noTransition, // 无动画跳转
@@ -881,26 +904,26 @@ class NoteDetailController extends GetxController {
   /// 构建确认对话框
   Widget _buildConfirmDialog() {
     return AlertDialog(
-      title: const Text('⚠️ 重新生成闪词卡片'),
-      content: const Column(
+      title: Text(_l10n?.regenerateFlashCardsTitle ?? '⚠️ Regenerate Flash Cards'),
+      content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('将会：'),
-          SizedBox(height: 8),
-          Text('✓ 保留所有已有闪词的学习记录'),
-          Text('✓ 添加新提取的闪词到学习列表'),
-          Text('✓ 新旧闪词自动去重合并'),
+          Text(_l10n?.regenerateFlashCardsInfo ?? 'This will:'),
+          const SizedBox(height: 8),
+          Text(_l10n?.regenerateKeepRecords ?? '✓ Keep all existing learning records'),
+          Text(_l10n?.regenerateAddNew ?? '✓ Add newly extracted flash cards'),
+          Text(_l10n?.regenerateDeduplicate ?? '✓ Auto-deduplicate and merge'),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Get.back(result: false),
-          child: const Text('取消'),
+          child: Text(_l10n?.cancel ?? 'Cancel'),
         ),
         TextButton(
           onPressed: () => Get.back(result: true),
-          child: const Text('确认重新生成'),
+          child: Text(_l10n?.confirmRegenerate ?? 'Confirm Regeneration'),
         ),
       ],
     );
@@ -909,8 +932,8 @@ class NoteDetailController extends GetxController {
   /// 查看学习记录
   void viewLearningRecords() {
     Get.snackbar(
-      '提示',
-      '学习记录功能开发中',
+      _l10n?.hint ?? 'Hint',
+      _l10n?.learningRecordInDev ?? 'Learning record feature is under development',
       snackPosition: SnackPosition.BOTTOM,
     );
   }
@@ -922,13 +945,13 @@ class NoteDetailController extends GetxController {
 
     if (diff.inDays == 0) {
       if (diff.inHours == 0) {
-        return '${diff.inMinutes} 分钟前';
+        return _l10n?.minutesAgo(diff.inMinutes) ?? '${diff.inMinutes} minutes ago';
       }
-      return '${diff.inHours} 小时前';
+      return _l10n?.hoursAgo(diff.inHours) ?? '${diff.inHours} hours ago';
     } else if (diff.inDays == 1) {
-      return '昨天';
+      return _l10n?.yesterday ?? 'Yesterday';
     } else if (diff.inDays < 7) {
-      return '${diff.inDays} 天前';
+      return _l10n?.daysAgo(diff.inDays) ?? '${diff.inDays} days ago';
     } else {
       return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     }

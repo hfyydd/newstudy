@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:newstudyapp/config/app_theme.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'create_note_controller.dart';
 
 /// 创建笔记页面
@@ -16,6 +17,7 @@ class CreateNotePage extends GetView<CreateNoteController> {
     final secondaryColor = isDark ? Colors.grey[500] : Colors.grey[600];
     final borderColor =
         isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5E5);
+    final l10n = AppLocalizations.of(context)!;
 
     // 计算 BottomSheet 的高度：屏幕高度 - 状态栏高度 - 一些顶部间距
     final screenHeight = MediaQuery.of(context).size.height;
@@ -58,7 +60,7 @@ class CreateNotePage extends GetView<CreateNoteController> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      '创建笔记',
+                      l10n.createNote,
                       style: TextStyle(
                         color: textColor,
                         fontSize: 17,
@@ -89,7 +91,7 @@ class CreateNotePage extends GetView<CreateNoteController> {
                       // 输入框
                       Expanded(
                         child: _buildInputArea(
-                            isDark, textColor, secondaryColor, borderColor),
+                            context, isDark, textColor, secondaryColor, borderColor),
                       ),
                     ],
                   ),
@@ -108,7 +110,7 @@ class CreateNotePage extends GetView<CreateNoteController> {
           ),
 
           // 底部保存按钮
-          _buildBottomActions(isDark, bgColor, borderColor),
+          _buildBottomActions(context, isDark, bgColor, borderColor),
         ],
       ),
     );
@@ -116,7 +118,8 @@ class CreateNotePage extends GetView<CreateNoteController> {
 
   /// 构建输入区域
   Widget _buildInputArea(
-      bool isDark, Color textColor, Color? secondaryColor, Color borderColor) {
+      BuildContext context, bool isDark, Color textColor, Color? secondaryColor, Color borderColor) {
+    final l10n = AppLocalizations.of(context)!;
     final inputBgColor =
         isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF8F8F8);
 
@@ -136,7 +139,7 @@ class CreateNotePage extends GetView<CreateNoteController> {
               height: 1.6,
             ),
             decoration: InputDecoration(
-              hintText: '输入您想要学习的内容...\n\n可以是任何知识、概念或信息，AI 将为您生成笔记和闪词卡片。',
+              hintText: l10n.enterContentHint,
               hintStyle: TextStyle(
                 color: secondaryColor,
                 fontSize: 15,
@@ -320,7 +323,8 @@ class CreateNotePage extends GetView<CreateNoteController> {
   }
 
   /// 构建底部操作按钮
-  Widget _buildBottomActions(bool isDark, Color bgColor, Color borderColor) {
+  Widget _buildBottomActions(BuildContext context, bool isDark, Color bgColor, Color borderColor) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: EdgeInsets.fromLTRB(
           20, 16, 20, 16 + MediaQuery.of(Get.context!).padding.bottom),
@@ -350,14 +354,14 @@ class CreateNotePage extends GetView<CreateNoteController> {
               ),
               elevation: 0,
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.auto_awesome, size: 20),
-                SizedBox(width: 8),
+                const Icon(Icons.auto_awesome, size: 20),
+                const SizedBox(width: 8),
                 Text(
-                  '开始学习',
-                  style: TextStyle(
+                  l10n.startLearning,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
