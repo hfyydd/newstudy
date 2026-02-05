@@ -13,17 +13,26 @@ import 'package:newstudyapp/pages/create_note/create_note_controller.dart';
 import 'package:newstudyapp/pages/note_detail/note_detail_page.dart';
 import 'package:newstudyapp/pages/note_detail/note_detail_controller.dart';
 import 'package:newstudyapp/pages/notes/notes_list_page.dart';
+import 'package:newstudyapp/pages/auth/login_page.dart';
+import 'package:newstudyapp/pages/auth/login_controller.dart';
 import 'package:newstudyapp/routes/app_routes.dart';
 
 /// GetX 页面路由配置
 class AppPages {
   AppPages._();
 
-  /// 初始路由
-  static const initial = AppRoutes.main;
+  /// 初始路由（改为登录页，由路由守卫决定跳转）
+  static const initial = AppRoutes.login;
 
   /// 所有路由页面配置
   static final routes = [
+    GetPage(
+      name: AppRoutes.login,
+      page: () => const LoginPage(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<LoginController>(() => LoginController());
+      }),
+    ),
     GetPage(
       name: AppRoutes.main,
       page: () => const MainPage(),

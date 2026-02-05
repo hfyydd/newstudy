@@ -1,5 +1,5 @@
 name: newstudyapp
-description: "A new Flutter project."
+description: "FlashMind - AI-Powered Learning App"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -45,6 +45,10 @@ dependencies:
   speech_to_text: ^7.0.0
   image_picker: ^1.0.7
 
+  # 认证相关
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.0
+  flutter_secure_storage: ^9.0.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

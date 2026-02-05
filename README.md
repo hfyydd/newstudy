@@ -1,4 +1,4 @@
-# NewStudy 项目
+# FlashMind 项目
 
 一个集成了 AI 智能学习助手的前后端分离应用。
 
@@ -7,7 +7,7 @@
 ```
 .
 ├── backend/          # Python FastAPI 后端服务
-└── newstudyapp/      # Flutter 前端应用
+└── newstudyapp/      # Flutter 前端应用（FlashMind）
 ```
 
 ## 技术栈

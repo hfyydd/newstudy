@@ -3,7 +3,9 @@ import 'package:dio/dio.dart' show MultipartFile, FormData;
 import 'package:get/get.dart' hide MultipartFile, FormData;
 import 'package:newstudyapp/config/api_config.dart';
 import 'package:newstudyapp/config/language_controller.dart';
+import 'package:newstudyapp/config/auth_controller.dart';
 import 'package:newstudyapp/models/agent_models.dart';
+import 'package:newstudyapp/models/auth_models.dart';
 import 'package:newstudyapp/models/note_models.dart';
 import 'package:newstudyapp/services/toast_service.dart';
 
@@ -62,6 +64,25 @@ class HttpService {
       ),
     );
 
+    // 添加 Token 拦截器（在错误处理之前）
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          // 自动添加 Access Token
+          _addAuthToken(options);
+          handler.next(options);
+        },
+        onError: (error, handler) {
+          // Token 过期，自动刷新
+          if (error.response?.statusCode == 401) {
+            _handleTokenExpired(error, handler);
+            return;
+          }
+          handler.next(error);
+        },
+      ),
+    );
+
     // 添加全局错误处理拦截器
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -73,6 +94,69 @@ class HttpService {
         },
       ),
     );
+  }
+
+  /// 自动添加认证 Token
+  void _addAuthToken(RequestOptions options) {
+    // 排除登录相关接口
+    if (options.path.contains('/auth/') && 
+        (options.path.contains('/login') || 
+         options.path.contains('/send-code') ||
+         options.path.contains('/refresh'))) {
+      return;
+    }
+
+    // 尝试获取 AuthController 并添加 Token
+    try {
+      if (Get.isRegistered<AuthController>()) {
+        final authController = Get.find<AuthController>();
+        final token = authController.accessToken.value;
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+      }
+    } catch (e) {
+      // 忽略错误，继续请求
+    }
+  }
+
+  /// 处理 Token 过期
+  Future<void> _handleTokenExpired(
+    DioException error,
+    ErrorInterceptorHandler handler,
+  ) async {
+    try {
+      if (Get.isRegistered<AuthController>()) {
+        final authController = Get.find<AuthController>();
+        final success = await authController.refreshAccessToken();
+        
+        if (success) {
+          // 刷新成功，重试原请求
+          final options = error.requestOptions;
+          final token = authController.accessToken.value;
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          
+          try {
+            final response = await _dio.fetch(options);
+            handler.resolve(response);
+            return;
+          } catch (e) {
+            // 重试失败，继续错误处理
+          }
+        } else {
+          // 刷新失败，清除认证信息并跳转登录页
+          await authController.clearAuth();
+          // 注意：这里不能直接跳转，应该在 UI 层处理
+        }
+      }
+    } catch (e) {
+      // 忽略错误
+    }
+    
+    // 继续错误处理流程
+    handler.next(error);
   }
 
   /// 显示错误 Toast（根据错误类型显示不同提示）
@@ -663,6 +747,99 @@ class HttpService {
       return HomeStatisticsResponse.fromJson(
         response.data as Map<String, dynamic>,
       );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== 认证相关接口 ====================
+
+  /// Google 登录
+  Future<LoginResponse> googleLogin(String idToken) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.googleLogin,
+        data: {'id_token': idToken},
+      );
+      return LoginResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Apple 登录
+  Future<LoginResponse> appleLogin(String idToken, {String? authorizationCode}) async {
+    try {
+      final data = <String, dynamic>{'id_token': idToken};
+      if (authorizationCode != null) {
+        data['authorization_code'] = authorizationCode;
+      }
+      final response = await _dio.post(
+        ApiConfig.appleLogin,
+        data: data,
+      );
+      return LoginResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 发送邮箱验证码
+  Future<SendCodeResponse> sendEmailCode(String email) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.sendEmailCode,
+        data: {'email': email},
+      );
+      return SendCodeResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 邮箱验证码登录
+  Future<LoginResponse> emailLogin(String email, String code) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.emailLogin,
+        data: {
+          'email': email,
+          'code': code,
+        },
+      );
+      return LoginResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 刷新 Token
+  Future<RefreshTokenResponse> refreshToken(String refreshToken) async {
+    try {
+      final response = await _dio.post(
+        ApiConfig.refreshToken,
+        data: {'refresh_token': refreshToken},
+      );
+      return RefreshTokenResponse.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 登出
+  Future<void> logout() async {
+    try {
+      await _dio.post(ApiConfig.logout);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 获取当前用户信息
+  Future<User> getCurrentUser() async {
+    try {
+      final response = await _dio.get(ApiConfig.getCurrentUser);
+      return User.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }

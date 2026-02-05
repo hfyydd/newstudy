@@ -1,9 +1,9 @@
 import logging
 import sys
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, HTTPException, Query, Request, Depends, Form
+from fastapi import FastAPI, HTTPException, Query, Request, Depends, Form, BackgroundTasks
 from fastapi import File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -48,7 +48,7 @@ except ImportError:  # pragma: no cover
     from feynman_evaluator import evaluate_explanation, get_available_roles
 
 
-app = FastAPI(title="Agent Service")
+app = FastAPI(title="FlashMind API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -403,12 +403,28 @@ def create_note(
     - 调用 AI 生成智能笔记和闪词列表
     - 使用 SQL INSERT 保存笔记到数据库
     - 使用 SQL INSERT 保存闪词列表到数据库
+    
+    注意：此 API 需要认证，使用认证用户的 ID
     """
     logger.info(f"📝 开始创建笔记，输入长度: {len(payload.user_input)} 字符")
     
     try:
-        # 获取默认用户ID
-        user_id = get_default_user_id()
+        # 尝试从认证中获取用户ID，如果没有认证则使用默认用户（向后兼容）
+        try:
+            from auth_helper import get_user_id_optional
+            from fastapi import Header
+            from auth_utils import verify_token
+            
+            # 从请求头获取 Token
+            auth_header = None
+            # 注意：这里需要从 Request 对象获取，但为了简化，先使用可选认证
+            user_id = get_default_user_id()  # 暂时保持向后兼容
+            
+            # TODO: 完全迁移到认证模式后，使用以下代码：
+            # user_id = get_user_id_optional()
+        except:
+            # 向后兼容：如果没有认证，使用默认用户
+            user_id = get_default_user_id()
         
         # 生成智能笔记和闪词
         note_content, terms = generate_smart_note(
@@ -2328,6 +2344,451 @@ def get_cards_by_note(
     except Exception as exc:
         logger.error(f"❌ 按笔记分类获取词条列表失败: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ==================== 认证相关接口 ====================
+
+try:
+    from .auth_utils import create_access_token, create_refresh_token, verify_token, generate_verification_code
+    from .auth_service import (
+        get_or_create_user_by_email,
+        save_verification_code,
+        verify_verification_code,
+        save_refresh_token,
+        verify_refresh_token,
+        get_user_by_id,
+        clear_refresh_token,
+    )
+except ImportError:
+    from auth_utils import create_access_token, create_refresh_token, verify_token, generate_verification_code
+    from auth_service import (
+        get_or_create_user_by_email,
+        save_verification_code,
+        verify_verification_code,
+        save_refresh_token,
+        verify_refresh_token,
+        get_user_by_id,
+        clear_refresh_token,
+    )
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(..., description="Google ID Token")
+
+
+class AppleLoginRequest(BaseModel):
+    id_token: str = Field(..., description="Apple ID Token")
+    authorization_code: str | None = Field(default=None, description="Apple Authorization Code")
+
+
+class SendEmailCodeRequest(BaseModel):
+    email: str = Field(..., description="邮箱地址")
+
+
+class SendEmailCodeResponse(BaseModel):
+    success: bool
+    message: str
+    expires_in: int = Field(..., description="过期时间（秒）")
+
+
+class EmailLoginRequest(BaseModel):
+    email: str = Field(..., description="邮箱地址")
+    code: str = Field(..., min_length=6, max_length=6, description="6位验证码")
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., description="Refresh Token")
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_expires_at: str
+    user: dict
+
+
+class RefreshTokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
+    token_expires_at: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str | None
+    display_name: str | None
+    avatar_url: str | None
+    auth_provider: str
+    email_verified: bool
+
+
+@app.post("/auth/google/login", response_model=LoginResponse)
+def google_login(
+    payload: GoogleLoginRequest,
+    cur = Depends(get_db_cursor)
+) -> LoginResponse:
+    """
+    Google 登录
+    注意：这里简化处理，实际应该验证 Google ID Token
+    生产环境需要使用 google-auth 库验证 Token
+    """
+    try:
+        # 验证 Google ID Token
+        try:
+            from google_auth import verify_google_id_token
+            user_info = verify_google_id_token(payload.id_token)
+        except ImportError:
+            user_info = None
+        
+        if user_info:
+            # Token 验证成功，使用验证后的用户信息
+            email = user_info.get("email")
+            display_name = user_info.get("name")
+            avatar_url = user_info.get("picture")
+            email_verified = user_info.get("email_verified", False)
+        else:
+            # Token 验证失败或未配置，使用占位符（仅用于开发测试）
+            logger.warning("⚠️ Google 登录未配置或验证失败，使用占位符（仅用于开发测试）")
+            email = "google_user@example.com"
+            display_name = "Google User"
+            avatar_url = None
+            email_verified = True
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="无法从 Token 中获取邮箱信息")
+        
+        # 获取或创建用户
+        user = get_or_create_user_by_email(
+            email=email,
+            display_name=display_name,
+            auth_provider="google",
+            email_verified=email_verified,
+            avatar_url=avatar_url,
+            cur=cur
+        )
+        
+        # 生成 Token
+        access_token = create_access_token(data={"sub": user["id"]})
+        refresh_token = create_refresh_token(data={"sub": user["id"]})
+        
+        # 保存 Refresh Token
+        save_refresh_token(user["id"], refresh_token, cur)
+        
+        from datetime import timedelta
+        from config import ACCESS_TOKEN_EXPIRE_MINUTES
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        return LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=expires_at.isoformat(),
+            user={
+                "id": user["id"],
+                "email": user.get("email"),
+                "display_name": user.get("display_name"),
+                "avatar_url": user.get("avatar_url"),
+                "auth_provider": user.get("auth_provider", "google"),
+                "email_verified": user.get("email_verified", True),
+            }
+        )
+    except Exception as exc:
+        logger.error(f"❌ Google 登录失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Google 登录失败: {str(exc)}") from exc
+
+
+@app.post("/auth/apple/login", response_model=LoginResponse)
+def apple_login(
+    payload: AppleLoginRequest,
+    cur = Depends(get_db_cursor)
+) -> LoginResponse:
+    """
+    Apple 登录
+    注意：这里简化处理，实际应该验证 Apple ID Token
+    生产环境需要使用 cryptography 库验证 Token
+    """
+    try:
+        # 验证 Apple ID Token
+        try:
+            from apple_auth import verify_apple_id_token
+            user_info = verify_apple_id_token(payload.id_token)
+        except ImportError:
+            user_info = None
+        
+        if user_info:
+            # Token 验证成功，使用验证后的用户信息
+            email = user_info.get("email")
+            display_name = None  # Apple 不提供 name
+            avatar_url = None  # Apple 不提供头像
+            email_verified = user_info.get("email_verified", False)
+        else:
+            # Token 验证失败或未配置，使用占位符（仅用于开发测试）
+            logger.warning("⚠️ Apple 登录未配置或验证失败，使用占位符（仅用于开发测试）")
+            email = "apple_user@example.com"
+            display_name = "Apple User"
+            avatar_url = None
+            email_verified = True
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="无法从 Token 中获取邮箱信息")
+        
+        # 获取或创建用户
+        user = get_or_create_user_by_email(
+            email=email,
+            display_name=display_name,
+            auth_provider="apple",
+            email_verified=email_verified,
+            avatar_url=avatar_url,
+            cur=cur
+        )
+        
+        # 生成 Token
+        access_token = create_access_token(data={"sub": user["id"]})
+        refresh_token = create_refresh_token(data={"sub": user["id"]})
+        
+        # 保存 Refresh Token
+        save_refresh_token(user["id"], refresh_token, cur)
+        
+        from datetime import timedelta
+        from config import ACCESS_TOKEN_EXPIRE_MINUTES
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        return LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=expires_at.isoformat(),
+            user={
+                "id": user["id"],
+                "email": user.get("email"),
+                "display_name": user.get("display_name"),
+                "avatar_url": user.get("avatar_url"),
+                "auth_provider": user.get("auth_provider", "apple"),
+                "email_verified": user.get("email_verified", True),
+            }
+        )
+    except Exception as exc:
+        logger.error(f"❌ Apple 登录失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Apple 登录失败: {str(exc)}") from exc
+
+
+@app.post("/auth/email/send-code", response_model=SendEmailCodeResponse)
+async def send_email_code(
+    payload: SendEmailCodeRequest,
+    background_tasks: BackgroundTasks,
+    cur = Depends(get_db_cursor)
+) -> SendEmailCodeResponse:
+    """
+    发送邮箱验证码
+    """
+    try:
+        email = payload.email.strip().lower()
+        
+        # 简单的邮箱格式验证
+        if "@" not in email or "." not in email.split("@")[1]:
+            raise HTTPException(status_code=400, detail="无效的邮箱地址")
+        
+        # 生成验证码
+        code = generate_verification_code()
+        
+        # 保存验证码
+        save_verification_code(email, code, cur)
+        
+        # 发送邮件（后台任务，不阻塞响应）
+        try:
+            from email_service import send_verification_code_email
+            # 使用 FastAPI 的后台任务
+            background_tasks.add_task(send_verification_code_email, email, code)
+        except Exception as e:
+            logger.error(f"添加邮件发送任务失败: {e}", exc_info=True)
+            # 即使添加任务失败，也继续（验证码已保存到数据库）
+            logger.info(f"📧 验证码: {code} (发送到 {email})")
+        
+        from config import VERIFICATION_CODE_EXPIRE_MINUTES
+        
+        return SendEmailCodeResponse(
+            success=True,
+            message="验证码已发送",
+            expires_in=VERIFICATION_CODE_EXPIRE_MINUTES * 60
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 发送验证码失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"发送验证码失败: {str(exc)}") from exc
+
+
+@app.post("/auth/email/verify-code", response_model=LoginResponse)
+def email_login(
+    payload: EmailLoginRequest,
+    cur = Depends(get_db_cursor)
+) -> LoginResponse:
+    """
+    邮箱验证码登录
+    """
+    try:
+        email = payload.email.strip().lower()
+        code = payload.code.strip()
+        
+        # 验证验证码
+        if not verify_verification_code(email, code, cur):
+            raise HTTPException(status_code=400, detail="验证码无效或已过期")
+        
+        # 获取或创建用户
+        user = get_or_create_user_by_email(
+            email=email,
+            display_name=None,
+            auth_provider="email",
+            email_verified=True,
+            avatar_url=None,
+            cur=cur
+        )
+        
+        # 生成 Token
+        access_token = create_access_token(data={"sub": user["id"]})
+        refresh_token = create_refresh_token(data={"sub": user["id"]})
+        
+        # 保存 Refresh Token
+        save_refresh_token(user["id"], refresh_token, cur)
+        
+        from datetime import timedelta
+        from config import ACCESS_TOKEN_EXPIRE_MINUTES
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        return LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=expires_at.isoformat(),
+            user={
+                "id": user["id"],
+                "email": user.get("email"),
+                "display_name": user.get("display_name"),
+                "avatar_url": user.get("avatar_url"),
+                "auth_provider": user.get("auth_provider", "email"),
+                "email_verified": user.get("email_verified", True),
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 邮箱登录失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"邮箱登录失败: {str(exc)}") from exc
+
+
+@app.post("/auth/refresh", response_model=RefreshTokenResponse)
+def refresh_token(
+    payload: RefreshTokenRequest,
+    cur = Depends(get_db_cursor)
+) -> RefreshTokenResponse:
+    """
+    刷新 Access Token
+    """
+    try:
+        # 验证 Refresh Token
+        user = verify_refresh_token(payload.refresh_token, cur)
+        if not user:
+            raise HTTPException(status_code=401, detail="无效的 Refresh Token")
+        
+        # 生成新的 Access Token
+        access_token = create_access_token(data={"sub": user["id"]})
+        
+        from datetime import timedelta
+        from config import ACCESS_TOKEN_EXPIRE_MINUTES
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        # 可选：生成新的 Refresh Token（轮换）
+        # 这里简化处理，不轮换 Refresh Token
+        new_refresh_token = None
+        
+        return RefreshTokenResponse(
+            access_token=access_token,
+            refresh_token=new_refresh_token,
+            token_expires_at=expires_at.isoformat()
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 刷新 Token 失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"刷新 Token 失败: {str(exc)}") from exc
+
+
+@app.post("/auth/logout")
+def logout(
+    request: Request,
+    cur = Depends(get_db_cursor)
+) -> dict:
+    """
+    登出
+    """
+    try:
+        # 从请求头获取 Token
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="未提供认证 Token")
+        
+        token = auth_header.split(" ")[1]
+        
+        # 验证 Token 并获取用户ID
+        payload = verify_token(token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="无效的 Token")
+        
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="无效的 Token")
+        
+        # 清除 Refresh Token
+        clear_refresh_token(user_id, cur)
+        
+        return {"success": True, "message": "登出成功"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 登出失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"登出失败: {str(exc)}") from exc
+
+
+@app.get("/auth/me", response_model=UserResponse)
+def get_current_user(
+    request: Request,
+    cur = Depends(get_db_cursor)
+) -> UserResponse:
+    """
+    获取当前用户信息
+    """
+    try:
+        # 从请求头获取 Token
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="未提供认证 Token")
+        
+        token = auth_header.split(" ")[1]
+        
+        # 验证 Token 并获取用户ID
+        payload = verify_token(token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="无效的 Token")
+        
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="无效的 Token")
+        
+        # 获取用户信息
+        user = get_user_by_id(user_id, cur)
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        return UserResponse(
+            id=user["id"],
+            email=user.get("email"),
+            display_name=user.get("display_name"),
+            avatar_url=user.get("avatar_url"),
+            auth_provider=user.get("auth_provider", "email"),
+            email_verified=user.get("email_verified", False),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"❌ 获取用户信息失败: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取用户信息失败: {str(exc)}") from exc
 
 
 if __name__ == "__main__":

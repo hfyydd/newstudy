@@ -1,6 +1,6 @@
-# newstudyapp
+# FlashMind
 
-A new Flutter project.
+AI-Powered Learning App - Learn smarter, not harder.
 
 ## Getting Started
 

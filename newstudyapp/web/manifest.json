@@ -1,11 +1,11 @@
 {
-    "name": "newstudyapp",
-    "short_name": "newstudyapp",
+    "name": "FlashMind",
+    "short_name": "FlashMind",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "FlashMind - AI-Powered Learning App",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

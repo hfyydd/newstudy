@@ -2,6 +2,9 @@
 class AppRoutes {
   AppRoutes._();
 
+  /// 登录页
+  static const login = '/login';
+
   /// 主页面（包含底部Tab导航）
   static const main = '/main';
 

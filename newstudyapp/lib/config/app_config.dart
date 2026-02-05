@@ -8,5 +8,5 @@ class AppConfig {
   static const String backendBaseUrl = apiBaseUrl;
 
   /// 应用标题
-  static const String appTitle = '费曼学习法';
+  static const String appTitle = 'FlashMind';
 }

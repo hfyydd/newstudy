@@ -1,7 +1,7 @@
 {
   "@@locale": "zh",
 
-  "appTitle": "闪学",
+  "appTitle": "FlashMind",
 
   "goodMorning": "早上好",
   "goodAfternoon": "下午好",
@@ -345,5 +345,41 @@
   "termsExtracted": "已抽取 {count} 个词语",
   "parseContentFailed": "解析内容失败：{error}",
 
-  "askAIInDev": "Ask AI 功能开发中"
+  "askAIInDev": "Ask AI 功能开发中",
+
+  "loginTitle": "登录",
+  "googleLogin": "使用 Google 登录",
+  "appleLogin": "使用 Apple 登录",
+  "emailLogin": "邮箱登录",
+  "enterEmail": "请输入邮箱",
+  "sendCode": "发送验证码",
+  "resendCode": "重新发送",
+  "codeSent": "验证码已发送",
+  "enterCode": "请输入验证码",
+  "loginButton": "登录",
+  "loginFailed": "登录失败：{error}",
+  "@loginFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "pleaseEnterEmail": "请输入邮箱",
+  "pleaseEnterValidEmail": "请输入有效的邮箱地址",
+  "pleaseEnterCode": "请输入验证码",
+  "pleaseEnterValidCode": "请输入6位验证码",
+  "sendCodeFailed": "发送验证码失败：{error}",
+  "@sendCodeFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "codeCountdown": "{seconds}秒",
+  "@codeCountdown": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "or": "或",
+  "privacyPolicy": "隐私政策",
+  "termsOfService": "服务条款"
 }

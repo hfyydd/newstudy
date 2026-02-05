@@ -1,7 +1,7 @@
 {
   "@@locale": "es",
 
-  "appTitle": "FlashStudy",
+  "appTitle": "FlashMind",
 
   "goodMorning": "Buenos días",
   "goodAfternoon": "Buenas tardes",
@@ -345,5 +345,41 @@
   "termsExtracted": "Extraídos {count} términos",
   "parseContentFailed": "Error al analizar contenido: {error}",
 
-  "askAIInDev": "Función Preguntar a IA en desarrollo"
+  "askAIInDev": "Función Preguntar a IA en desarrollo",
+
+  "loginTitle": "Iniciar Sesión",
+  "googleLogin": "Continuar con Google",
+  "appleLogin": "Continuar con Apple",
+  "emailLogin": "Iniciar Sesión con Email",
+  "enterEmail": "Ingresa tu email",
+  "sendCode": "Enviar Código",
+  "resendCode": "Reenviar",
+  "codeSent": "Código de verificación enviado",
+  "enterCode": "Ingresa el código de verificación",
+  "loginButton": "Iniciar Sesión",
+  "loginFailed": "Error al iniciar sesión: {error}",
+  "@loginFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "pleaseEnterEmail": "Por favor ingresa tu email",
+  "pleaseEnterValidEmail": "Por favor ingresa una dirección de email válida",
+  "pleaseEnterCode": "Por favor ingresa el código de verificación",
+  "pleaseEnterValidCode": "Por favor ingresa un código de 6 dígitos",
+  "sendCodeFailed": "Error al enviar código: {error}",
+  "@sendCodeFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "codeCountdown": "{seconds}s",
+  "@codeCountdown": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "or": "o",
+  "privacyPolicy": "Política de Privacidad",
+  "termsOfService": "Términos de Servicio"
 }

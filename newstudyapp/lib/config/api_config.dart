@@ -98,6 +98,29 @@ class ApiConfig {
   /// 获取首页学习统计数据（含趋势、streak、周进度）
   static const String homeStatistics = '/home/statistics';
 
+  // ==================== 认证相关接口 ====================
+
+  /// Google 登录
+  static const String googleLogin = '/auth/google/login';
+
+  /// Apple 登录
+  static const String appleLogin = '/auth/apple/login';
+
+  /// 发送邮箱验证码
+  static const String sendEmailCode = '/auth/email/send-code';
+
+  /// 邮箱验证码登录
+  static const String emailLogin = '/auth/email/verify-code';
+
+  /// 刷新 Token
+  static const String refreshToken = '/auth/refresh';
+
+  /// 登出
+  static const String logout = '/auth/logout';
+
+  /// 获取当前用户信息
+  static const String getCurrentUser = '/auth/me';
+
   // ==================== 辅助方法 ====================
 
   /// 构建完整的 API URL
